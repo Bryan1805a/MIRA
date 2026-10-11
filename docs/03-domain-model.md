@@ -32,6 +32,67 @@ The schema is a logical design. Physical migrations and ORM mappings will be imp
 | `MESSAGE` | A message within a conversation |
 | `USER_STYLE_PROFILE` | The user's persistent communication-style preferences |
 
+### 3.1 Message and AI Response Processing
+
+The existing `MESSAGE` entity represents persisted conversation messages.
+
+For assistant responses, the logical response identity must remain stable across retries. Processing attempts must be represented separately so that a retry does not create duplicate user messages or duplicate logical assistant responses.
+
+#### Logical assistant response
+
+The logical assistant response should contain or reference:
+
+- `id`: stable UUID for the response.
+- `conversation_id`: owning conversation.
+- `status`: `PENDING`, `COMPLETED`, `FAILED`, or `UNKNOWN`.
+- `content`: nullable until a valid response is persisted.
+- `created_at` and `updated_at`.
+
+The implementation may extend `MESSAGE` with these fields or introduce a separate `AI_RESPONSE` entity. The final schema choice remains open until the transaction and retry flow is designed.
+
+#### AI processing attempt
+
+Each attempt should be independently identifiable and record enough information to troubleshoot retries:
+
+- `id`: attempt UUID.
+- `response_id`: logical response being processed.
+- `attempt_number`.
+- `status` or outcome.
+- `started_at` and `finished_at`.
+- A safe error category, when applicable.
+
+Provider request identifiers may be stored when available. Do not persist secrets or unrestricted sensitive provider payloads merely for debugging.
+
+A timeout after dispatch may produce an `UNKNOWN` outcome. A later successful retry can complete the same logical response. Attempt history must not be mistaken for additional conversation messages.
+
+### 3.2 User Sessions
+
+Add a `USER_SESSION` entity to represent individual login sessions.
+
+Proposed fields:
+
+- `id`: UUID primary key.
+- `user_id`: foreign key to `USER_ACCOUNT`.
+- `refresh_token_hash`: hash of the currently valid refresh token.
+- `created_at`.
+- `expires_at`.
+- `last_used_at`, nullable.
+- `revoked_at`, nullable.
+
+Refresh-token rotation must update the stored token hash and invalidate the predecessor atomically. The implementation must also define how refresh-token reuse is detected and handled.
+
+Each login creates a separate session. Revoking one session must not revoke other sessions belonging to the same account; revoking all sessions must invalidate all refresh sessions for that account.
+
+### 3.3 Data Integrity
+
+- Enforce ownership through backend authorization and database relationships.
+- Ensure a logical assistant response is unique within its request lifecycle.
+- Use transactions for state changes that must be atomic, including refresh-token rotation.
+- Use concurrency controls to prevent duplicate submissions or competing attempts from corrupting the response state.
+- Define retention and cleanup policies for expired sessions and attempt records before production deployment.
+
+**Open schema decision:** whether response-processing metadata belongs directly in `MESSAGE` or in a separate `AI_RESPONSE` table. Preserve the logical distinction regardless of the physical schema.
+
 ## 4. Entity Definitions
 
 ### 4.1 USER_ACCOUNT

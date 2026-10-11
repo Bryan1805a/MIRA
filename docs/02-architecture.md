@@ -228,6 +228,6 @@ The following formal decisions govern MIRA's architecture:
 
 | ADR ID | Title | Status | Core Rationale |
 | :--- | :--- | :--- | :--- |
-| **ADR-001** | [Backend Technology Stack](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-001-backend-stack.md) | Approved | Java 17 + Spring Boot 3 modular monolith delivers enterprise stability, fast development, and strong typing. |
-| **ADR-002** | [Memory Model & Concurrency](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-002-memory-model.md) | Approved | Hybrid persistence policy with OCC versioning prevents stale background overwrites and protects user privacy. |
-| **ADR-003** | [Multimodal Processing Phasing](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-003-file-processing.md) | Approved | Defer image and PDF processing to Phase 2 to ensure core text chat, idempotency, and memory mechanics are 100% verified first. |
+| **ADR-001** | [Backend Technology Stack](./decisions/ADR-001-backend-stack.md) | Approved | Java 17 + Spring Boot 3 modular monolith delivers enterprise stability, fast development, and strong typing. |
+| **ADR-002** | [Memory Model & Concurrency](./decisions/ADR-002-memory-model.md) | Approved | Hybrid persistence policy with OCC versioning prevents stale background overwrites and protects user privacy. |
+| **ADR-003** | [Multimodal Processing Phasing](./decisions/ADR-003-file-processing.md) | Approved | Defer image and PDF processing to Phase 2 to ensure core text chat, idempotency, and memory mechanics are 100% verified first. |

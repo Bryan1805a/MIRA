@@ -5,7 +5,7 @@
 | **Status** | Accepted |
 | **Deciders** | Bryan, MIRA Architecture Team |
 | **Date** | 2026-10-10 |
-| **Technical Story** | [docs/05-memory-lifecycle.md](file:///C:/Users/Bryan/Documents/MIRA/docs/05-memory-lifecycle.md) |
+| **Technical Story** | [05-memory-lifecycle.md](../05-memory-lifecycle.md) |
 
 ---
 

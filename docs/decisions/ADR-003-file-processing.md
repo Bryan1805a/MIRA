@@ -5,7 +5,7 @@
 | **Status** | Accepted |
 | **Deciders** | Bryan, MIRA Architecture Team |
 | **Date** | 2026-10-10 |
-| **Technical Story** | [docs/01-requirements.md](file:///C:/Users/Bryan/Documents/MIRA/docs/01-requirements.md), [docs/02-architecture.md](file:///C:/Users/Bryan/Documents/MIRA/docs/02-architecture.md) |
+| **Technical Story** | [01-requirements.md](../01-requirements.md), [02-architecture.md](../02-architecture.md) |
 
 ---
 

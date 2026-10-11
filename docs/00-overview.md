@@ -125,15 +125,15 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 
 The complete engineering specification is partitioned into modular, version-controlled documents:
 
-* [01-requirements.md](file:///C:/Users/Bryan/Documents/MIRA/docs/01-requirements.md) — Comprehensive Product Requirements Specification (PRS).
-* [02-architecture.md](file:///C:/Users/Bryan/Documents/MIRA/docs/02-architecture.md) — System Architecture, Module Boundaries, and Failure Semantics.
-* [03-domain-model.md](file:///C:/Users/Bryan/Documents/MIRA/docs/03-domain-model.md) — Relational Domain Model, PostgreSQL Schemas, and Constraints.
-* [04-api-contract.md](file:///C:/Users/Bryan/Documents/MIRA/docs/04-api-contract.md) — RESTful HTTP Interface, Request/Response Schemas, and Idempotency.
-* [05-memory-lifecycle.md](file:///C:/Users/Bryan/Documents/MIRA/docs/05-memory-lifecycle.md) — Style Memory Extraction, Validation, and Concurrency Controls.
-* [06-security-and-privacy.md](file:///C:/Users/Bryan/Documents/MIRA/docs/06-security-and-privacy.md) — Threat Modeling, Token Lifecycles, and Data Privacy Standards.
-* [07-testing-strategy.md](file:///C:/Users/Bryan/Documents/MIRA/docs/07-testing-strategy.md) — Multi-Tier Quality Assurance, Testcontainers, and Mocking Strategy.
-* [08-deployment-plan.md](file:///C:/Users/Bryan/Documents/MIRA/docs/08-deployment-plan.md) — Cloud Infrastructure Topology, Flyway Migrations, and Release Runbooks.
-* [09-phase-0-checklist.md](file:///C:/Users/Bryan/Documents/MIRA/docs/09-phase-0-checklist.md) — Phase 0 Repository Baseline, Verification Steps, and Readiness Gates.
-* [ADR-001-backend-stack.md](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-001-backend-stack.md) — Architectural Decision Record: Backend Technology Selection.
-* [ADR-002-memory-model.md](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-002-memory-model.md) — Architectural Decision Record: Memory Lifecycle & Concurrency Model.
-* [ADR-003-file-processing.md](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-003-file-processing.md) — Architectural Decision Record: Multimodal Processing Phasing.
+* [01-requirements.md](./01-requirements.md) — Comprehensive Product Requirements Specification (PRS).
+* [02-architecture.md](./02-architecture.md) — System Architecture, Module Boundaries, and Failure Semantics.
+* [03-domain-model.md](./03-domain-model.md) — Relational Domain Model, PostgreSQL Schemas, and Constraints.
+* [04-api-contract.md](./04-api-contract.md) — RESTful HTTP Interface, Request/Response Schemas, and Idempotency.
+* [05-memory-lifecycle.md](./05-memory-lifecycle.md) — Style Memory Extraction, Validation, and Concurrency Controls.
+* [06-security-and-privacy.md](./06-security-and-privacy.md) — Threat Modeling, Token Lifecycles, and Data Privacy Standards.
+* [07-testing-strategy.md](./07-testing-strategy.md) — Multi-Tier Quality Assurance, Testcontainers, and Mocking Strategy.
+* [08-deployment-plan.md](./08-deployment-plan.md) — Cloud Infrastructure Topology, Flyway Migrations, and Release Runbooks.
+* [09-phase-0-checklist.md](./09-phase-0-checklist.md) — Phase 0 Repository Baseline, Verification Steps, and Readiness Gates.
+* [ADR-001-backend-stack.md](./decisions/ADR-001-backend-stack.md) — Architectural Decision Record: Backend Technology Selection.
+* [ADR-002-memory-model.md](./decisions/ADR-002-memory-model.md) — Architectural Decision Record: Memory Lifecycle & Concurrency Model.
+* [ADR-003-file-processing.md](./decisions/ADR-003-file-processing.md) — Architectural Decision Record: Multimodal Processing Phasing.

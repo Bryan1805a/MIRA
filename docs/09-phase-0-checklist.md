@@ -160,7 +160,7 @@ Before executing build commands, ensure the following local prerequisites are co
 * Run backend startup and verify that Flyway executes the migration without errors.
 
 ### Step 5: Root Documentation & Developer Onboarding (README)
-* Author the root [README.md](file:///C:/Users/Bryan/Documents/MIRA/README.md) documenting:
+* Author the root [README.md](../README.md) documenting:
   * Architecture overview.
   * System prerequisites.
   * Backend local execution instructions (`.\mvnw.cmd spring-boot:run`).

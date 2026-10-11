@@ -36,6 +36,60 @@ Android App → HTTPS REST API → MIRA Backend → PostgreSQL / DeepSeek API
 
 The Android application must not connect directly to PostgreSQL or call the DeepSeek API using a privileged server-side API key.
 
+### 2.1 Message Processing and Failure Semantics
+
+MIRA persists a user message before requesting an AI response. Each logical assistant response has a stable identity and may contain multiple processing attempts.
+
+The assistant-response lifecycle uses the following statuses:
+
+- `PENDING`: the response is being processed or is awaiting processing.
+- `COMPLETED`: a valid assistant response has been received and persisted.
+- `FAILED`: the attempt has failed with a known failure outcome.
+- `UNKNOWN`: the backend cannot determine whether the provider completed the request, such as when a timeout occurs after the request was sent.
+
+A provider timeout does not necessarily mean the provider stopped processing the request. MIRA must not assume that every timeout is a confirmed provider failure.
+
+### Retry semantics
+
+- Retrying must not create a duplicate user message or a second logical assistant-response record.
+- Each processing attempt should have its own identifier and outcome.
+- Retry attempts must be bounded and duplicate client submissions must be handled safely.
+- MIRA must not assume that the AI provider supports idempotency unless this capability has been verified.
+- Retrying an `UNKNOWN` outcome may cause another provider execution or charge. MIRA cannot guarantee exactly-once provider execution without provider-side support.
+
+Memory extraction is eligible only after a valid assistant response has been persisted with status `COMPLETED`. It must not run from a failed or unresolved response.
+
+### 2.2 Authentication and Session Lifecycle
+
+MIRA uses short-lived access tokens and longer-lived refresh tokens.
+
+- Access tokens authorize API requests and have a defined expiration.
+- Refresh tokens are cryptographically random, stored as hashes on the backend, and associated with individual login sessions.
+- Successful refresh operations rotate the refresh token and invalidate its predecessor.
+- Each login creates a distinct session that can be revoked independently.
+- Users can revoke the current session or all sessions belonging to their account.
+- Expired access tokens may be replaced through a valid refresh session; re-authentication is required when refresh is no longer permitted.
+
+Immediate revocation of an already-issued access token is outside the MVP scope. The initial design accepts that a valid access token may remain usable until expiration after its refresh session has been revoked, subject to the backend's access-token validation policy.
+
+Authentication state and AI processing state are separate. An expired access token must not, by itself, cause persisted messages to be deleted or completed work to be discarded.
+
+### 2.3 Decisions and Open Questions
+
+**Confirmed decisions**
+
+- Response lifecycle: `PENDING`, `COMPLETED`, `FAILED`, with `UNKNOWN` for unresolved provider outcomes.
+- Retry preserves the logical response identity and tracks individual attempts.
+- Access tokens are short-lived; refresh tokens are hashed, expiring, rotated, and revocable by session.
+- Immediate access-token revocation is deferred beyond MVP.
+
+**Open questions**
+
+- Exact access-token and refresh-token lifetimes.
+- Whether the access token will be a signed JWT or an opaque token.
+- The exact retry limit, backoff policy, and user-facing treatment of `UNKNOWN`.
+- Whether the app will expose a session-management screen in the MVP.
+
 ## 3. Architecture Style
 
 MIRA uses a **modular monolith**.

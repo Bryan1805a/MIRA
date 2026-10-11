@@ -1,234 +1,231 @@
-# MIRA — Product Requirements Specification
-
-**Document ID:** MIRA-PRS-001  
-**Version:** 0.1.0  
-**Status:** Draft Baseline  
-**Product:** Memory-Informed Response Agent
-
-## 1. Purpose
-
-This document defines the initial functional scope, quality requirements, and acceptance criteria for MIRA's minimum viable product (MVP).
-
-MIRA is a native Android AI assistant that maintains a persistent communication-style profile and uses it to inform responses across conversation sessions.
-
-## 2. Scope
-
-### In Scope
-
-- Email-and-password account registration and authentication.
-- Creation and management of conversation sessions.
-- Text-based AI conversations.
-- Persistent message history.
-- Persistent communication-style memory.
-- Style-memory extraction, validation, and merging.
-- User access to inspect, edit, disable, and delete style memory.
-- Image input and understanding.
-- PDF input and document-based question answering.
-- Backend-mediated AI provider integration.
-- Automated testing, secure configuration, and deployment documentation.
-
-### Out of Scope
-
-- Foundation-model training or fine-tuning.
-- General-purpose personal knowledge memory.
-- Automatic storage of inferred personal-life facts in the style profile.
-- Autonomous multi-agent workflows.
-- Public sharing of conversations.
-- Support for every image, document, or AI provider format.
-
-## 3. Actors
-
-### Registered User
-A user who has an account and can manage conversations, submit supported content, and control their communication-style profile.
-
-### External AI Provider
-A third-party service that generates responses and may extract structured style-memory candidates.
-
-### System Administrator
-An operational role responsible for service configuration and maintenance. Administrative capabilities are not necessarily exposed through the MVP user interface.
-
-## 4. Functional Requirements
-
-### FR-001 — Account Registration
-
-The system shall allow a new user to register using an email address and password.
-
-**Acceptance criteria**
-- Valid registration creates one account.
-- Duplicate email registration is rejected.
-- Invalid input produces a clear error.
-- Passwords are stored using an appropriate password-hashing algorithm, never as plaintext.
-
-### FR-002 — User Authentication
-
-The system shall authenticate registered users and associate subsequent requests with the authenticated account.
-
-**Acceptance criteria**
-- Valid credentials establish an authenticated session.
-- Invalid credentials do not disclose whether an unrelated account exists.
-- Protected endpoints reject missing, invalid, or expired authentication credentials.
-- Logout invalidates or removes the relevant client-side authentication state.
-
-### FR-003 — Conversation Management
-
-The system shall allow users to create and revisit conversation sessions.
-
-**Acceptance criteria**
-- A user can create a new conversation.
-- A user can retrieve their own conversation list.
-- A user can open a conversation and retrieve its messages.
-- A user cannot access another user's conversations by changing an identifier.
-
-### FR-004 — Text Messaging
-
-The system shall accept text messages and return AI-generated responses through the backend.
-
-**Acceptance criteria**
-- The backend validates each request.
-- The user message and successful assistant response are persisted.
-- Provider failures produce a controlled error rather than an application crash.
-- Duplicate client retries do not silently create duplicate messages when an idempotency mechanism is applicable.
-
-### FR-005 — Communication-Style Profile
-
-The system shall maintain a persistent style profile for each user.
-
-**Acceptance criteria**
-- The profile is associated with exactly one user account.
-- The profile contains communication preferences rather than a general personal biography.
-- A new conversation can use the stored profile.
-- A user can retrieve and inspect their profile.
-
-### FR-006 — Style-Memory Extraction
-
-The system shall be able to derive candidate communication preferences from conversation content.
-
-**Acceptance criteria**
-- Extraction produces structured data conforming to a defined schema.
-- Explicit preferences are distinguishable from inferred preferences.
-- Temporary or context-specific instructions are not automatically treated as permanent preferences.
-- Invalid or malformed model output is rejected or handled safely.
-
-### FR-007 — Style-Memory Update and Conflict Resolution
-
-The system shall merge approved memory candidates into the existing profile.
-
-**Acceptance criteria**
-- An update does not replace the entire profile without an explicit policy.
-- Newer user corrections take precedence over conflicting older preferences.
-- Failed extraction does not corrupt the previously valid profile.
-- Concurrent updates do not silently discard newer information.
-
-### FR-008 — Memory Controls
-
-The system shall allow users to modify their communication-style profile and control its use.
-
-**Acceptance criteria**
-- Users can edit or remove stored preferences.
-- Users can disable personalization without disabling ordinary chat.
-- A deleted preference is not reintroduced from stale asynchronous results.
-- Memory-management operations are restricted to the profile owner.
-
-### FR-009 — Image Input
-
-The system shall allow users to submit supported images for AI-assisted understanding.
-
-**Acceptance criteria**
-- The application supports image selection and preview.
-- The backend validates file type and size.
-- Unsupported content and provider errors are handled gracefully.
-- Images are processed only through an approved, documented path.
-
-### FR-010 — PDF Input
-
-The system shall allow users to submit supported PDF documents and ask questions about their contents.
-
-**Acceptance criteria**
-- The application supports selecting a PDF through the Android document picker.
-- The backend enforces file-size and processing limits.
-- Invalid or unsupported documents produce a clear error.
-- Answers are generated using the supported document-processing workflow.
-- Long documents are handled according to documented context and processing limits.
-
-### FR-011 — Data Isolation
-
-The system shall enforce ownership checks for all user-specific data.
-
-**Acceptance criteria**
-- Every protected data query is scoped to the authenticated user where applicable.
-- Unauthorized cross-account access is denied.
-- Ownership checks are tested at the API or service layer.
-- Client-supplied identifiers are never treated as proof of ownership.
-
-### FR-012 — Error Handling
-
-The system shall return predictable errors for invalid requests, authentication failures, database failures, and AI-provider failures.
-
-**Acceptance criteria**
-- Errors use a documented response structure.
-- Internal secrets, credentials, and sensitive stack traces are not returned to clients.
-- The Android application can distinguish recoverable errors from terminal failures.
-
-## 5. Non-Functional Requirements
-
-### NFR-001 — Security
-
-Credentials, provider API keys, and database secrets shall not be embedded in the Android application package.
-
-All production communication shall use HTTPS. Password storage, authentication, authorization, file handling, and secret management shall follow documented security practices.
-
-### NFR-002 — Privacy
-
-The system shall collect and retain only data required by documented features.
-
-Users shall be able to control their style profile. Retention and deletion behavior for messages and uploaded documents shall be explicitly documented.
-
-### NFR-003 — Reliability
-
-Failures in the AI provider or memory-extraction process shall not corrupt persisted conversations or previously valid memory.
-
-Database updates that require atomicity shall use appropriate transaction boundaries.
-
-### NFR-004 — Maintainability
-
-The codebase shall separate presentation, business logic, persistence, and external-provider integration.
-
-Important architectural decisions and API contracts shall be documented and version-controlled.
-
-### NFR-005 — Testability
-
-Critical business rules shall be testable independently of the Android UI and external AI provider.
-
-Automated tests shall cover authentication, data isolation, memory merging, error handling, and core conversation workflows.
-
-### NFR-006 — Usability
-
-The application shall provide clear loading, success, empty, and error states for primary workflows.
-
-Users shall not be required to understand backend or AI-provider details to use core functionality.
-
-### NFR-007 — Portability and Reproducibility
-
-A developer following the project documentation shall be able to configure the environment, initialize the database, run automated tests, and launch the application without access to another developer's private credentials.
-
-## 6. Requirements Traceability
-
-Each requirement shall be traceable to:
-- Its design or API specification.
-- One or more implementation components.
-- One or more verification tests.
-
-Requirements may be revised through documented changes. Implementations and tests shall be updated when an accepted change affects their behavior.
-
-## 7. Open Items
-
-- Final authentication and token-lifecycle design.
-- Exact AI model and multimodal API capabilities.
-- Memory extraction schedule and retry policy.
-- File-storage and deletion strategy.
-- Measurable response-time targets.
-- Backup, recovery, and operational logging policies.
-
-## 8. Baseline Rule
-
-This document defines the intended product behavior. It does not claim that the listed requirements have already been implemented or verified.
+# MIRA — Product Requirements Specification (PRS)
+
+| Attribute | Value |
+| :--- | :--- |
+| **Document ID** | MIRA-PRS-001 |
+| **Classification** | Internal Engineering Specification |
+| **Status** | Approved Baseline |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-10-11 |
+| **Author / Lead** | Bryan / MIRA Architecture Team |
+| **Target Audience** | Engineering, Product, Quality Assurance |
+
+---
+
+## Document Revision History
+
+| Version | Date | Author | Description of Changes |
+| :--- | :--- | :--- | :--- |
+| 0.1.0 | 2026-10-10 | Architecture Team | Draft baseline specification of functional and non-functional requirements. |
+| 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: added document control block, formal traceability matrix, enhanced failure recovery FRs, and explicit MVP scope boundaries. |
+
+---
+
+## 1. Scope & System Objectives
+
+This specification defines the functional requirements (FRs), non-functional requirements (NFRs), and operational acceptance criteria for the Minimum Viable Product (MVP) release of **MIRA** (**M**emory-**I**nformed **R**esponse **A**gent).
+
+### 1.1 In-Scope Capabilities (MVP Release)
+* Secure account registration and authentication via email and password.
+* Dual-token session lifecycle (short-lived access tokens + revocable, rotating refresh tokens).
+* Multi-session conversation management (create, list, retrieve, delete).
+* Real-time conversational text exchange with an external LLM via an authenticated backend gateway.
+* Bounded retry mechanics with client-supplied idempotency tokens.
+* Persistent communication-style profile extraction, validation, and optimistic concurrency merging.
+* Comprehensive user memory governance (inspect, edit, toggle, and purge).
+* Strict multi-tenant account and resource data isolation.
+* Automated integration test suites verifying data integrity without requiring live AI provider charges.
+
+### 1.2 Explicit Out-of-Scope Capabilities (Deferred)
+* Pre-training, fine-tuning, or hosting on-premise foundation models.
+* Extraction or storage of biographical, personal knowledge, or financial data.
+* Direct device-to-provider API communication.
+* Public sharing or multi-user collaborative conversation sessions.
+* Multimodal attachment processing (PDF and image question-answering are deferred to Phase 2).
+
+---
+
+## 2. System Stakeholders & User Personas
+
+```mermaid
+flowchart TD
+    subgraph Actors ["System Actors"]
+        User["Registered Mobile User\n(Individual Consumer)"]
+        AI["External AI Provider\n(DeepSeek Inference API)"]
+        Admin["System Administrator / Operator\n(Observability & Ops)"]
+    end
+
+    subgraph Boundaries ["MIRA Platform Boundary"]
+        App["Android Application UI"]
+        API["Backend REST API Gateway"]
+        DB[("PostgreSQL Storage")]
+    end
+
+    User -->|Interacts with UI| App
+    App -->|HTTPS / Bearer Auth| API
+    API -->|Prompt Orchestration| AI
+    API -->|Persistence & Queries| DB
+    Admin -.->|Monitors Metrics & Health| API
+```
+
+* **Registered User:** Primary consumer operating the native Android application. Owns distinct conversations, messages, sessions, and a personalized style profile.
+* **External AI Provider (DeepSeek):** Downstream stateless inference engine consumed by the backend via secure server-side credentials.
+* **System Operator:** Responsible for backend service deployment, environment variable configuration, schema migrations, and log monitoring.
+
+---
+
+## 3. Functional Requirements (FR)
+
+### 3.1 Authentication & Session Management
+
+#### FR-001: Account Registration
+* **Description:** The system shall allow a new user to create an account by submitting a valid email address and password.
+* **Acceptance Criteria:**
+  1. Emails must be validated and normalized (lowercase, trimmed) prior to storage.
+  2. Duplicate normalized emails must be rejected with an appropriate client error (`409 Conflict` or generic validation error) without leaking sensitive database internals.
+  3. Passwords must be hashed using a modern, adaptive hashing algorithm (Argon2id or bcrypt with appropriate cost factor) before database storage. Plaintext passwords must never be stored, logged, or serialized.
+  4. Successful registration creates exactly one user record and returns initial authentication credentials.
+
+#### FR-002: User Authentication & Token Issuance
+* **Description:** The system shall authenticate registered users using email and password, issuing dual-token credentials.
+* **Acceptance Criteria:**
+  1. Successful authentication issues a short-lived access token (e.g., 15 minutes) and a long-lived refresh token.
+  2. Invalid login attempts return a uniform authentication failure (`401 Unauthorized`) without revealing whether the email or password was the cause.
+  3. Refresh tokens must be cryptographically random strings, hashed before storage in the database, and associated with a specific user session.
+  4. Submitting a valid refresh token atomically rotates the refresh token (invalidates predecessor, issues a new successor) and returns a new access token.
+  5. Logout revokes the specific session's refresh token immediately on the backend.
+
+---
+
+### 3.2 Conversation & Messaging Subsystem
+
+#### FR-003: Conversation Management
+* **Description:** The system shall allow authenticated users to create, list, inspect, and delete distinct conversation threads.
+* **Acceptance Criteria:**
+  1. An authenticated user can create a new conversation with an optional title.
+  2. A user can fetch a paginated list of their conversations sorted by last update time descending.
+  3. Deleting a conversation removes the conversation record and cascades to all its associated messages.
+  4. Deleting a conversation does **not** alter or delete the user's persistent communication-style profile.
+  5. Users cannot inspect, list, modify, or delete conversations belonging to any other user.
+
+#### FR-004: Text Messaging & AI Orchestration
+* **Description:** The system shall accept user text prompts, persist them, coordinate AI provider inference, and persist the resulting assistant response.
+* **Acceptance Criteria:**
+  1. Requests must enforce message length limits (e.g., non-empty, max 4,000 characters).
+  2. Every message submission must include an `Idempotency-Key` header scoped to the user and operation.
+  3. User messages are persisted immediately upon validation before contacting the external AI provider.
+  4. Assistant responses follow an explicit lifecycle state: `PENDING`, `COMPLETED`, `FAILED`, or `UNKNOWN`.
+  5. If an AI provider request times out or returns an unresolvable network error, the response state transitions to `UNKNOWN`, preserving attempt audit records without deleting the user's message.
+
+#### FR-005: Idempotent Retries
+* **Description:** The system shall allow client retries of failed or unresolved message generation attempts without generating duplicate user messages.
+* **Acceptance Criteria:**
+  1. Resubmitting an identical request with the same `Idempotency-Key` returns the existing response or in-flight processing status.
+  2. Reusing an existing `Idempotency-Key` with a different request payload is rejected with `409 Conflict`.
+  3. A retry executes against the existing logical response record, tracking the new attempt independently in `AI_PROCESSING_ATTEMPT`.
+  4. Total retry attempts are strictly bounded by server configuration to prevent runaway provider costs.
+
+---
+
+### 3.3 Communication-Style Memory Subsystem
+
+#### FR-006: Persistent Style Profile Retrieval
+* **Description:** The system shall maintain an independent, persistent communication-style profile per user account.
+* **Acceptance Criteria:**
+  1. A user account is associated with at most one active `USER_STYLE_PROFILE` record.
+  2. Authenticated users can retrieve their current profile schema, active preferences, and version integer.
+  3. When memory is enabled, the backend serializes the profile into advisory system prompts for new chat generation.
+  4. If memory is disabled by the user, the profile is strictly omitted from AI context assembly.
+
+#### FR-007: Candidate Extraction & Eligibility Gate
+* **Description:** The system shall extract candidate style preferences only from successfully persisted conversations.
+* **Acceptance Criteria:**
+  1. Memory extraction is triggered **only** after an assistant response reaches `COMPLETED` status.
+  2. In-flight (`PENDING`), failed (`FAILED`), or unresolved (`UNKNOWN`) responses are strictly ineligible for extraction.
+  3. Extraction parses conversational signals against a strict schema (e.g., `explanation_depth`, `tone`, `examples`, `formatting`).
+  4. Ephemeral task instructions (e.g., *"Make this specific summary short"*) are classified as context-specific and discarded from persistent memory.
+
+#### FR-008: Hybrid Persistence & Conflict Resolution
+* **Description:** The system shall merge approved memory candidates into the persistent profile using a hybrid policy.
+* **Acceptance Criteria:**
+  1. Explicit durable preferences (e.g., *"Always explain concepts from first principles"*) are validated and merged automatically.
+  2. Inferred preferences require repeated evidence or explicit user confirmation.
+  3. Newer user corrections and manual edits always take precedence over older inferred candidates.
+  4. Profile updates must specify `expectedVersion` and execute via optimistic concurrency control (OCC). Version mismatches are rejected with `409 Conflict`.
+
+#### FR-009: User Memory Governance (Edit, Toggle, Delete)
+* **Description:** The system shall provide comprehensive user controls to inspect, manually edit, toggle, or purge their style memory.
+* **Acceptance Criteria:**
+  1. Users can manually overwrite any profile attribute via `PUT /api/v1/memory/style`.
+  2. Users can toggle memory active status via `PATCH /api/v1/memory/style/settings`.
+  3. Users can purge their memory via `DELETE /api/v1/memory/style`.
+  4. Purging memory increments/invalidates the generation counter, guaranteeing that pending background extraction tasks cannot resurrect deleted data.
+
+---
+
+### 3.4 Cross-Cutting & Security Requirements
+
+#### FR-010: Strict Data Isolation (Authorization)
+* **Description:** The system shall enforce server-side resource ownership checks across all endpoints.
+* **Acceptance Criteria:**
+  1. The authenticated principal (from the verified access token) is the sole authority for data scoping.
+  2. Client-provided `user_id` fields in request bodies or query parameters are never trusted for authorization.
+  3. Attempting to access or mutate another user's conversation, message, or profile returns `404 Not Found` (to prevent IDOR enumeration) or `403 Forbidden`.
+
+#### FR-011: Uniform Error Formatting
+* **Description:** The API shall return deterministic, structured JSON errors for all failure modes.
+* **Acceptance Criteria:**
+  1. Error responses conform to the standard structure containing `code`, `message`, `requestId`, and optional `details`.
+  2. Internal stack traces, raw SQL queries, and third-party API keys are never included in error bodies.
+  3. Client applications can unambiguously categorize recoverable vs. non-recoverable errors based on HTTP status and error codes.
+
+---
+
+## 4. Non-Functional Requirements (NFR)
+
+### NFR-001: Security & Confidentiality
+* **NFR-001.1:** All network traffic between Android clients and the backend must enforce TLS 1.3 (HTTPS).
+* **NFR-001.2:** Third-party AI provider credentials (`DEEPSEEK_API_KEY`) and database passwords must reside strictly in server environment variables and never be included in client binaries or source control.
+* **NFR-001.3:** Passwords must be hashed using Argon2id or bcrypt. Refresh tokens must be hashed (SHA-256) at rest.
+
+### NFR-002: Privacy & Data Minimization
+* **NFR-002.1:** The memory subsystem must strictly restrict its domain to communication-style preferences. Extraction prompts must explicitly instruct models to omit biographical, financial, health, or political data.
+* **NFR-002.2:** Server-side application logs must never record raw user prompt text, full AI response payloads, authentication tokens, or passwords.
+
+### NFR-003: Reliability & Fault Isolation
+* **NFR-003.1:** Outages or network timeouts from the external AI provider must not corrupt existing conversation history, truncate user messages, or crash the backend application.
+* **NFR-003.2:** Database updates spanning multiple tables (e.g., token rotation, message + response creation) must execute within atomic transactional boundaries (`@Transactional`).
+
+### NFR-004: Performance & Latency
+* **NFR-004.1:** Local backend API operations (authentication, conversation listing, message history retrieval) shall return within 200 ms under nominal load (p95).
+* **NFR-004.2:** External AI generation requests shall apply a strict connection timeout of 5 seconds and read timeout of 30 seconds to prevent thread starvation.
+
+### NFR-005: Maintainability & Modularity
+* **NFR-005.1:** The backend must be organized as a modular monolith with strictly isolated domain packages (`auth`, `chat`, `memory`, `ai`, `common`).
+* **NFR-005.2:** Provider integration must depend on an abstracted interface (`AIProvider`) to permit drop-in provider replacement or mock testing without modifying core chat logic.
+
+### NFR-006: Verifiability & Testability
+* **NFR-006.1:** 100% of core business logic (authorization, memory merge policies, OCC version checks, token rotation) must be verifiable via automated unit and integration tests without active internet connectivity or paid API tokens.
+* **NFR-006.2:** Database integration tests must run against real PostgreSQL instances via Testcontainers.
+
+---
+
+## 5. Requirements Traceability Matrix (RTM)
+
+| Requirement ID | Domain Area | Architecture Reference | API Endpoint | Verification Test Suite |
+| :--- | :--- | :--- | :--- | :--- |
+| **FR-001** | Account Registration | `02-architecture.md#4.1` | `POST /api/v1/auth/register` | `AuthIntegrationTest` |
+| **FR-002** | Auth & Session | `02-architecture.md#2.2` | `POST /api/v1/auth/login`, `/refresh` | `SessionLifecycleTest` |
+| **FR-003** | Conversation Mgmt | `02-architecture.md#4.2` | `GET`, `POST`, `DELETE /conversations` | `ConversationSecurityTest` |
+| **FR-004** | Chat Orchestration | `02-architecture.md#2.1` | `POST /conversations/{id}/messages` | `ChatOrchestrationTest` |
+| **FR-005** | Idempotent Retries | `02-architecture.md#2.1` | `POST /conversations/{id}/messages` | `IdempotencyConcurrencyTest` |
+| **FR-006** | Profile Retrieval | `02-architecture.md#4.3` | `GET /api/v1/memory/style` | `MemoryProfileTest` |
+| **FR-007** | Memory Gate | `05-memory-lifecycle.md#5.7` | Internal Service Boundary | `MemoryEligibilityTest` |
+| **FR-008** | Memory Merging (OCC)| `05-memory-lifecycle.md#6` | `PUT /api/v1/memory/style` | `MemoryConflictResolutionTest` |
+| **FR-009** | Memory Governance | `05-memory-lifecycle.md#9` | `PATCH`, `DELETE /memory/style` | `MemoryDeletionRaceTest` |
+| **FR-010** | Data Isolation | `06-security-and-privacy.md#5`| All Endpoints | `CrossAccountSecurityTest` |
+| **FR-011** | Error Formatting | `04-api-contract.md#7` | Global Exception Handler | `ApiErrorContractTest` |
+| **NFR-001** | Transport & Key Sec | `06-security-and-privacy.md#7`| Server Configuration | `SecurityHeadersTest` |
+| **NFR-002** | Privacy Minimization| `06-security-and-privacy.md#9`| Memory Validation Engine | `MemoryPrivacyAuditTest` |
+| **NFR-003** | Fault Isolation | `02-architecture.md#8` | Provider Abstraction Layer | `ProviderFailureRecoveryTest` |
+| **NFR-006** | Testability | `07-testing-strategy.md#2`| Maven Build Verification | `CI Pipeline / Testcontainers` |

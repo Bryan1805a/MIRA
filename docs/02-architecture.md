@@ -1,295 +1,233 @@
-# MIRA — System Architecture
-
-**Document:** `docs/02-architecture.md`  
-**Status:** Draft  
-**Project:** Memory-Informed Response Agent  
-**Architecture style:** Modular monolith  
-**Last updated:** 2026-10-10
-
-## 1. Purpose
-
-This document defines MIRA's high-level architecture, component responsibilities, data flows, security boundaries, and major technical decisions.
-
-The architecture prioritizes:
-
-- Clear separation of responsibilities.
-- A single source of truth for persistent user data.
-- Secure handling of credentials and AI provider secrets.
-- Testable business logic.
-- Incremental development and deployment.
-- Future extensibility without premature complexity.
-
-## 2. System Context
-
-MIRA is a native Android chatbot backed by a server-side application. Its primary distinguishing feature is a persistent communication-style profile that can influence responses across conversations.
-
-### System components
-
-1. **Android application:** User interface, chat interaction, conversation selection, and secure token handling.
-2. **MIRA backend:** Authentication, authorization, conversation management, memory management, and AI request orchestration.
-3. **PostgreSQL database:** Persistent storage for user accounts, conversations, messages, and communication-style profiles.
-4. **DeepSeek API:** External language-model inference provider.
-
-### High-level data flow
-
-Android App → HTTPS REST API → MIRA Backend → PostgreSQL / DeepSeek API
-
-The Android application must not connect directly to PostgreSQL or call the DeepSeek API using a privileged server-side API key.
-
-### 2.1 Message Processing and Failure Semantics
-
-MIRA persists a user message before requesting an AI response. Each logical assistant response has a stable identity and may contain multiple processing attempts.
-
-The assistant-response lifecycle uses the following statuses:
-
-- `PENDING`: the response is being processed or is awaiting processing.
-- `COMPLETED`: a valid assistant response has been received and persisted.
-- `FAILED`: the attempt has failed with a known failure outcome.
-- `UNKNOWN`: the backend cannot determine whether the provider completed the request, such as when a timeout occurs after the request was sent.
-
-A provider timeout does not necessarily mean the provider stopped processing the request. MIRA must not assume that every timeout is a confirmed provider failure.
-
-### Retry semantics
-
-- Retrying must not create a duplicate user message or a second logical assistant-response record.
-- Each processing attempt should have its own identifier and outcome.
-- Retry attempts must be bounded and duplicate client submissions must be handled safely.
-- MIRA must not assume that the AI provider supports idempotency unless this capability has been verified.
-- Retrying an `UNKNOWN` outcome may cause another provider execution or charge. MIRA cannot guarantee exactly-once provider execution without provider-side support.
-
-Memory extraction is eligible only after a valid assistant response has been persisted with status `COMPLETED`. It must not run from a failed or unresolved response.
-
-### 2.2 Authentication and Session Lifecycle
-
-MIRA uses short-lived access tokens and longer-lived refresh tokens.
-
-- Access tokens authorize API requests and have a defined expiration.
-- Refresh tokens are cryptographically random, stored as hashes on the backend, and associated with individual login sessions.
-- Successful refresh operations rotate the refresh token and invalidate its predecessor.
-- Each login creates a distinct session that can be revoked independently.
-- Users can revoke the current session or all sessions belonging to their account.
-- Expired access tokens may be replaced through a valid refresh session; re-authentication is required when refresh is no longer permitted.
-
-Immediate revocation of an already-issued access token is outside the MVP scope. The initial design accepts that a valid access token may remain usable until expiration after its refresh session has been revoked, subject to the backend's access-token validation policy.
-
-Authentication state and AI processing state are separate. An expired access token must not, by itself, cause persisted messages to be deleted or completed work to be discarded.
-
-### 2.3 Decisions and Open Questions
-
-**Confirmed decisions**
-
-- Response lifecycle: `PENDING`, `COMPLETED`, `FAILED`, with `UNKNOWN` for unresolved provider outcomes.
-- Retry preserves the logical response identity and tracks individual attempts.
-- Access tokens are short-lived; refresh tokens are hashed, expiring, rotated, and revocable by session.
-- Immediate access-token revocation is deferred beyond MVP.
-
-**Open questions**
-
-- Exact access-token and refresh-token lifetimes.
-- Whether the access token will be a signed JWT or an opaque token.
-- The exact retry limit, backoff policy, and user-facing treatment of `UNKNOWN`.
-- Whether the app will expose a session-management screen in the MVP.
-
-## 3. Architecture Style
-
-MIRA uses a **modular monolith**.
-
-The backend is deployed as one application while its internal components have explicit responsibilities and dependencies.
-
-Microservices, message brokers, distributed caches, and orchestration platforms are not required for the initial MVP. They may be considered later if measurable operational or scaling requirements justify them.
-
-## 4. Backend Components
-
-### 4.1 Auth Module
-
-Responsibilities:
-
-- Register accounts using email and password.
-- Authenticate users.
-- Issue, validate, and revoke or expire authentication credentials.
-- Enforce user identity and access-control rules.
-
-Security requirements:
-
-- Store password hashes, never plaintext passwords.
-- Use HTTPS for network communication.
-- Apply rate limiting to sensitive authentication endpoints.
-- Avoid exposing whether an email exists when doing so could enable account enumeration.
-- Never trust a user ID supplied by the client as proof of identity.
-
-### 4.2 Chat Module
-
-Responsibilities:
-
-- Create, list, retrieve, and delete conversations as defined by the API contract.
-- Accept user messages.
-- Retrieve the relevant conversation history.
-- Coordinate response generation.
-- Persist messages and expose conversation history to authorized users.
-
-The Chat module must verify conversation ownership on every relevant operation.
-
-### 4.3 Memory Module
-
-Responsibilities:
-
-- Retrieve a user's communication-style profile.
-- Validate candidate memory updates.
-- Merge approved changes without unintentionally replacing unrelated preferences.
-- Support inspecting, editing, disabling, and deleting style memory.
-- Prevent stale asynchronous updates from restoring preferences that a user has corrected or deleted.
-
-The MVP memory profile is limited to communication style, such as preferred explanation depth, tone, examples, and formatting.
-
-It is not intended to become a general-purpose personal knowledge store.
-
-Memory extraction and memory updates must be separate from ordinary response generation. Temporary instructions must not automatically become permanent preferences.
-
-### 4.4 AI Integration Module
-
-Responsibilities:
-
-- Assemble the context required for a model request.
-- Combine the current user message, relevant conversation history, and applicable style profile.
-- Call the configured AI provider.
-- Validate provider responses and normalize errors.
-- Apply timeout and bounded retry policies where appropriate.
-
-The application must depend on an internal provider abstraction rather than embedding DeepSeek-specific HTTP logic throughout the business layer.
-
-Illustrative interface:
-
-`AIProvider.generate(AIRequest) -> AIResponse`
-
-The exact interface, synchronous or asynchronous execution model, and streaming behavior will be determined during implementation planning.
-
-### 4.5 File Processing Module — Future Scope
-
-Image understanding and PDF question answering are planned capabilities, but they should be added after the text-chat workflow is reliable.
-
-Before implementation, verify the selected provider model's current support for image inputs, document processing, context limits, and relevant API endpoints.
-
-File processing must include file-type and size validation, appropriate access control, and a documented retention and deletion policy.
-
-## 5. Data Ownership
-
-PostgreSQL is the authoritative store for persistent application data.
-
-The Android application may cache data for presentation or temporary offline behavior, but its local state must not override server-side authorization or become the authoritative memory profile.
-
-Initial logical entities:
-
-- `USER_ACCOUNT`
-- `CONVERSATION`
-- `MESSAGE`
-- `USER_STYLE_PROFILE`
-
-Additional entities may be introduced for refresh tokens, memory revisions, uploaded files, or audit events if the detailed requirements justify them.
-
-The relational schema and constraints will be defined in `docs/03-domain-model.md`.
-
-## 6. Request Lifecycle
-
-For a standard text message:
-
-1. The Android application submits a request using its authenticated session.
-2. The backend authenticates the caller and verifies conversation ownership.
-3. The Chat module retrieves the relevant conversation context.
-4. The Memory module retrieves the applicable communication-style profile.
-5. The AI Integration module assembles the model request.
-6. The backend calls the configured provider using server-side credentials.
-7. The backend validates and persists the response according to the agreed failure-handling policy.
-8. The API returns a structured response to Android.
-
-Memory updates are handled through a separate controlled workflow. A model response must not directly overwrite the user's persistent style profile.
-
-## 7. Security Boundaries
-
-- All production client-server communication must use HTTPS.
-- DeepSeek API credentials must remain on the server and outside source control.
-- Secrets must be provided through deployment configuration or a secret-management mechanism.
-- Authentication credentials must be stored securely on Android.
-- Every operation involving user-owned data must enforce authorization on the server.
-- Database access must use parameterized queries or a suitable ORM.
-- Request bodies, uploaded files, and provider responses must be validated.
-- Logs must not expose passwords, authentication tokens, API keys, or unnecessary sensitive conversation content.
-- Account deletion and memory deletion must have explicit, documented semantics.
-
-## 8. Error Handling and Reliability
-
-The backend must distinguish between:
-
-- Invalid client requests.
-- Authentication and authorization failures.
-- Missing resources.
-- Rate limits.
-- Provider timeouts or unavailability.
-- Invalid or unexpected provider responses.
-- Internal persistence failures.
-
-Retries must be bounded and restricted to operations where retrying is safe. In particular, repeated client submissions must not unintentionally create duplicate messages or trigger uncontrolled provider charges.
-
-The implementation must define how failed AI requests affect persisted messages and how clients can recover from uncertain request outcomes.
-
-## 9. Testing Strategy
-
-### Unit tests
-
-- Memory-profile validation and merge behavior.
-- Temporary versus persistent preference handling.
-- Authorization and business rules.
-- Provider-response normalization.
-- Error mapping.
-
-### Integration tests
-
-- Database persistence and transaction behavior.
-- Authentication and access-control enforcement.
-- Conversation and message lifecycle.
-- Memory lifecycle and deletion behavior.
-- Backend integration using a mocked AI provider.
-
-### End-to-end tests
-
-- Register, log in, and send a message.
-- Continue a conversation across application restarts.
-- Reuse a style profile in a separate conversation.
-- Correct or delete a preference and verify it does not return.
-- Verify that one user cannot access another user's data.
-
-Automated tests must not depend on paid provider calls unless explicitly configured for a separate integration test.
-
-## 10. Deployment Model
-
-The initial deployment consists of:
-
-- One Spring Boot backend service.
-- One managed PostgreSQL database.
-- One Android application distributed as an installable APK or through an appropriate testing channel.
-- External access to the configured AI provider.
-
-The deployment environment must provide database credentials and provider secrets without committing them to Git.
-
-Development, testing, and production configuration should be separated.
-
-## 11. Architectural Decision Records
-
-| ID | Decision | Status |
-|---|---|---|
-| ADR-001 | Use a modular monolith for the backend | Proposed |
-| ADR-002 | Keep provider credentials on the backend | Required |
-| ADR-003 | Use PostgreSQL as the authoritative persistent store | Proposed |
-| ADR-004 | Keep communication-style memory separate from chat history | Proposed |
-| ADR-005 | Defer image and PDF support until text chat is stable | Proposed |
-
-## 12. Open Decisions
-
-- Token format, lifetime, refresh, and revocation strategy.
-- Exact model and API capabilities for the selected DeepSeek endpoint.
-- Message persistence and idempotency strategy.
-- Memory extraction timing, validation, and concurrency control.
-- File storage and deletion policy.
-- Deployment provider, backup strategy, and operational logging.
-- Whether streaming responses are required for the initial release.
-
-These decisions must be resolved in the relevant design documents before their implementation begins.
+# MIRA — System Architecture Specification
+
+| Attribute | Value |
+| :--- | :--- |
+| **Document ID** | MIRA-ARC-001 |
+| **Classification** | Internal Engineering Specification |
+| **Status** | Approved Baseline |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-10-11 |
+| **Author / Lead** | Bryan / MIRA Architecture Team |
+| **Target Audience** | Software Engineers, Solution Architects, DevOps |
+
+---
+
+## Document Revision History
+
+| Version | Date | Author | Description of Changes |
+| :--- | :--- | :--- | :--- |
+| 0.1.0 | 2026-10-10 | Architecture Team | Initial modular monolith architectural design and draft component definitions. |
+| 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated response lifecycle state machine, session rotation models, message retry semantics, and unified all pending draft updates. |
+
+---
+
+## 1. Architectural Philosophy & Strategy
+
+MIRA adopts a **Modular Monolith** architecture pattern. 
+
+### Why a Modular Monolith?
+For an early-stage system, distributed microservices, message queues (e.g., Kafka, RabbitMQ), and distributed caches introduce severe operational overhead, distributed transaction hazards, and network latency without providing tangible scaling benefits.
+
+Instead, MIRA enforces strict modularity at the application packaging boundary:
+* **Single Deployment Unit:** Deployed as an executable Spring Boot fat JAR.
+* **Domain Isolation:** Package-private visibility and decoupled service interfaces guarantee that modules do not leak implementation internals or bypass domain logic.
+* **Unified ACID Persistence:** Modules share an enterprise-grade managed PostgreSQL instance, ensuring atomic state transitions without two-phase commits.
+* **Extensibility:** Modules interact via clearly defined service interfaces, enabling clean future extraction into microservices if specific scale invariants demand it.
+
+```mermaid
+flowchart TD
+    subgraph ClientBoundary ["Client Layer"]
+        AndroidClient["Android Client Application\n(Java / Android SDK)\n- UI Layer (Activities/Fragments)\n- Retrofit/OkHttp REST Client\n- Encrypted SharedPreferences"]
+    end
+
+    subgraph BackendBoundary ["MIRA Backend Application (Spring Boot Modular Monolith)"]
+        subgraph Gateway ["Web & Security Gateway Layer"]
+            SecFilter["Security Filter Chain\n(Bearer Token Auth)"]
+            RateLimiter["Rate Limiting & Validation"]
+        end
+
+        subgraph CoreModules ["Core Domain Modules"]
+            AuthMod["Auth Module\n- Registration\n- Argon2id Password Hashing\n- Dual-Token & Rotation Engine"]
+            ChatMod["Chat Orchestration Module\n- Idempotency Interceptor\n- Context Assembly\n- Message & Response Persistence"]
+            MemMod["Memory Subsystem Module\n- Schema Validation\n- Hybrid Policy Engine\n- OCC Version & Generation Guard"]
+            AIMod["AI Integration Module\n- Provider Abstraction (AIProvider)\n- DeepSeek HTTP Client\n- Bounded Retries & Circuit Breaker"]
+        end
+    end
+
+    subgraph InfrastructureBoundary ["External & Data Services"]
+        NeonDB[("Managed PostgreSQL (Neon)\n- Flyway Versioned Migrations\n- JSONB Memory Profiles\n- Relational Constraints")]
+        DeepSeekService["DeepSeek API\n- Stateless Inference\n- Structured JSON Output"]
+    end
+
+    AndroidClient -->|HTTPS REST /api/v1| SecFilter
+    SecFilter --> RateLimiter
+    RateLimiter --> AuthMod
+    RateLimiter --> ChatMod
+    RateLimiter --> MemMod
+
+    ChatMod -->|Fetch User Style Profile| MemMod
+    ChatMod -->|Dispatch AI Request| AIMod
+    AIMod -->|HTTPS POST| DeepSeekService
+
+    AuthMod -->|User Accounts & Sessions| NeonDB
+    ChatMod -->|Conversations & Messages| NeonDB
+    MemMod -->|Profiles & Generations| NeonDB
+```
+
+---
+
+## 2. Core Subsystem Modules
+
+### 2.1 Authentication & Session Management Module (`com.mira.auth`)
+* **Primary Scope:** Account creation, password hashing, credential verification, and token session lifecycles.
+* **Core Responsibilities:**
+  * Validate normalized email identity and enforce database uniqueness.
+  * Execute adaptive password hashing using Argon2id/bcrypt.
+  * Issue short-lived access tokens (15-minute JWT or cryptographically signed opaque tokens).
+  * Issue cryptographically random, revocable refresh tokens.
+  * Store only SHA-256 hashes of refresh tokens in the `USER_SESSION` table.
+  * Enforce atomic single-use refresh token rotation: using a valid refresh token yields a new token and permanently invalidates its predecessor.
+  * Detect refresh token reuse (potential token theft) and trigger immediate revocation of the associated session.
+
+### 2.2 Chat Orchestration Module (`com.mira.chat`)
+* **Primary Scope:** Conversation management, message persistence, context aggregation, and interaction orchestration.
+* **Core Responsibilities:**
+  * Enforce server-side ownership: verify that the authenticated caller owns the target conversation before any read or write.
+  * Intercept requests with `Idempotency-Key` headers to prevent duplicate message dispatch or duplicate AI invocations.
+  * Persist incoming user messages immediately to ensure conversation state is never lost even if subsequent network calls fail.
+  * Query the `Memory Module` for active style preferences and serialize them into advisory system context.
+  * Retrieve the latest conversation history within bounded context limits (e.g., last 10 messages).
+  * Record and track the logical assistant response and its individual processing attempts.
+
+### 2.3 Memory Subsystem Module (`com.mira.memory`)
+* **Primary Scope:** Style memory extraction, validation, conflict resolution, versioning, and user governance.
+* **Core Responsibilities:**
+  * Manage persistent `USER_STYLE_PROFILE` records.
+  * Gate extraction eligibility: only trigger memory extraction when a logical assistant response reaches `COMPLETED` status.
+  * Execute schema validation on candidate preferences (allow-listing fields and enum values).
+  * Apply the **Hybrid Memory Persistence Policy**: automatically persist explicit durable statements; hold ambiguous inferred preferences for confirmation; discard ephemeral task instructions.
+  * Enforce **Optimistic Concurrency Control (OCC)** using an incremental `version` field to block stale asynchronous extraction updates from overwriting newer user changes.
+  * Enforce **Generation Tracking** to ensure that purged style profiles cannot be resurrected by delayed background tasks.
+
+### 2.4 AI Integration Module (`com.mira.ai`)
+* **Primary Scope:** Third-party LLM communication, request assembly, timeout management, and response normalization.
+* **Core Responsibilities:**
+  * Implement an abstracted provider interface:
+    ```java
+    public interface AIProvider {
+        AIResponse generate(AIRequest request) throws AIProviderException;
+    }
+    ```
+  * Maintain all DeepSeek API credentials on the server, injecting them via environment variables (`DEEPSEEK_API_KEY`).
+  * Enforce bounded HTTP client connection (5s) and socket read (30s) timeouts.
+  * Map provider-specific HTTP and JSON errors into normalized internal domain exceptions.
+  * Facilitate deterministic local testing by providing mock implementations (`MockAIProvider`) that run without internet access or financial cost.
+
+---
+
+## 3. Message Processing & Failure Semantics
+
+When a user submits a prompt, the system must navigate asynchronous network interactions, potential timeouts, and duplicate submissions while maintaining bulletproof data integrity.
+
+### 3.1 Logical Response Lifecycle State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: User Prompt Persisted
+    PENDING --> COMPLETED: AI Provider Generates Valid Output
+    PENDING --> FAILED: Provider Returns Terminal Error (4xx/5xx)
+    PENDING --> UNKNOWN: Provider Call Times Out / Unresolved
+    
+    FAILED --> PENDING: Client Retries (New Attempt)
+    UNKNOWN --> PENDING: Client Retries (New Attempt)
+    
+    COMPLETED --> ExtractionGate: Response Persisted
+    state ExtractionGate {
+        [*] --> EvaluateEligibility
+        EvaluateEligibility --> TriggerExtraction: Status == COMPLETED
+    }
+```
+
+* `PENDING`: Initial state. The user message is saved, the logical assistant response record is created, and the backend is processing or awaiting provider output.
+* `COMPLETED`: Terminal success. A valid, complete assistant response has been received, sanitized, and stored.
+* `FAILED`: Terminal attempt failure. The provider explicitly returned a deterministic error (e.g., quota exceeded, content violation).
+* `UNKNOWN`: Unresolved outcome. The HTTP client timed out after dispatching the request. The backend cannot confirm whether DeepSeek processed the message or not.
+
+> [!WARNING]
+> **Timeout Ambiguity Rule:**
+> A network timeout must **never** be assumed to mean the provider did not execute. MIRA records an `UNKNOWN` attempt outcome rather than reporting an outright failure, preventing erroneous assumptions about downstream state.
+
+### 3.2 Bounded Retry & Idempotency Rules
+1. **Stable Response Identity:** A retry operation references the existing logical response UUID. It does **not** create a duplicate user message or a second assistant response entity.
+2. **Attempt Tracking:** Each execution is recorded as an independent `AI_PROCESSING_ATTEMPT` record with its own attempt number, timestamp, and outcome.
+3. **Extraction Gate:** Memory extraction is strictly blocked from running on `PENDING`, `FAILED`, or `UNKNOWN` responses. Extraction is only permitted on `COMPLETED` responses.
+
+---
+
+## 4. Authentication & Session Security Architecture
+
+MIRA protects user access through a defense-in-depth token strategy:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Android Client
+    participant API as MIRA Backend
+    participant DB as PostgreSQL
+    participant AI as DeepSeek API
+
+    User->>API: POST /api/v1/auth/login (email, password)
+    API->>DB: Query account by normalized email
+    API->>API: Verify password hash (Argon2id)
+    API->>DB: Create USER_SESSION (save SHA-256 of refresh token)
+    API-->>User: 200 OK (access_token: 15m, refresh_token: 30d)
+
+    Note over User, API: Authenticated Chat Interaction
+    User->>API: POST /api/v1/conversations/{id}/messages (Bearer Token + Idempotency-Key)
+    API->>API: Validate Access Token & Scope to User
+    API->>DB: Verify Conversation Ownership
+    API->>DB: Save USER message & create PENDING response
+    API->>DB: Fetch active USER_STYLE_PROFILE
+    API->>AI: Execute Prompt Context
+    AI-->>API: LLM Output
+    API->>DB: Save ASSISTANT message (Status: COMPLETED)
+    API-->>User: 201 Created (Message Payload)
+
+    Note over API, DB: Asynchronous Memory Pipeline
+    API->>API: Check Eligibility Gate (Status == COMPLETED)
+    API->>DB: Merge Style Memory via OCC (expectedVersion)
+```
+
+### 4.1 Token Specifications
+* **Access Tokens:**
+  * Short-lived (15 minutes).
+  * Bearer token containing user ID, session ID, and issuance/expiration claims.
+  * Validated statelessly on every protected endpoint.
+* **Refresh Tokens:**
+  * Long-lived (e.g., 30 days).
+  * High-entropy cryptographically random string (256-bit).
+  * Stored on the backend strictly as a SHA-256 hash.
+  * Rotated on every single refresh operation.
+
+---
+
+## 5. Security & Boundary Controls
+
+1. **Client Isolation:** The Android client communicates strictly with `/api/v1/*` over TLS 1.3. Direct client access to PostgreSQL or DeepSeek is architecturally impossible.
+2. **Object-Level Authorization:** Handled via Spring Security and custom service assertions. Every database query filters by `user_id = authenticatedPrincipal.getId()`. Knowing another user's UUID yields a generic `404 Not Found`.
+3. **Secret Isolation:**
+   * `DEEPSEEK_API_KEY`, `DATABASE_URL`, and token signing keys are injected exclusively via system environment variables.
+   * Android APK builds contain only the public backend API URL.
+4. **Log Sanitization:** Sensitive payload fields (passwords, tokens, raw conversational prompts) are excluded from server logs using structured logging filters.
+
+---
+
+## 6. Architectural Decision Records (ADR) Summary
+
+The following formal decisions govern MIRA's architecture:
+
+| ADR ID | Title | Status | Core Rationale |
+| :--- | :--- | :--- | :--- |
+| **ADR-001** | [Backend Technology Stack](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-001-backend-stack.md) | Approved | Java 17 + Spring Boot 3 modular monolith delivers enterprise stability, fast development, and strong typing. |
+| **ADR-002** | [Memory Model & Concurrency](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-002-memory-model.md) | Approved | Hybrid persistence policy with OCC versioning prevents stale background overwrites and protects user privacy. |
+| **ADR-003** | [Multimodal Processing Phasing](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-003-file-processing.md) | Approved | Defer image and PDF processing to Phase 2 to ensure core text chat, idempotency, and memory mechanics are 100% verified first. |

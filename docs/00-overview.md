@@ -1,126 +1,139 @@
-# MIRA — Project Overview
+# MIRA — System Overview & Executive Summary
 
-**Full Name:** Memory-Informed Response Agent  
-**Project Status:** Planning  
-**Document Version:** 0.1.0  
-**Last Updated:** 2026-10-10
+| Attribute | Value |
+| :--- | :--- |
+| **Document ID** | MIRA-DOC-000 |
+| **Classification** | Internal Engineering Specification |
+| **Status** | Approved Baseline |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-10-11 |
+| **Author / Lead** | Bryan / MIRA Architecture Team |
+| **Target Audience** | Engineering, QA, Project Stakeholders |
 
-## 1. Product Vision
+---
 
-MIRA is a personalized AI conversational assistant designed to provide responses that adapt to a user's preferred communication style across multiple conversation sessions.
+## Document Revision History
 
-Rather than relying exclusively on the current conversation, MIRA maintains a persistent user style profile that can inform response generation in future sessions.
+| Version | Date | Author | Description of Changes |
+| :--- | :--- | :--- | :--- |
+| 0.1.0 | 2026-10-10 | Architecture Team | Initial concept baseline and product overview draft. |
+| 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: added document control block, architecture flowchart, and cross-specification linkages. |
 
-MIRA aims to make AI interactions feel more consistent, natural, and personalized without requiring users to repeatedly explain how they prefer to communicate.
+---
 
-## 2. Problem Statement
+## 1. Executive Summary
 
-AI assistants may not consistently preserve a user's preferred response style across independent conversation sessions.
+**MIRA** (**M**emory-**I**nformed **R**esponse **A**gent) is a personalized conversational artificial intelligence system engineered to maintain high-fidelity communication style persistence across independent conversation sessions. 
 
-Users who prefer particular explanation styles, levels of detail, tones, or learning approaches may need to repeatedly communicate these preferences.
+Traditional conversational assistants suffer from session amnesia: they fail to retain how an individual user prefers information delivered (e.g., depth of technical explanation, preferred pedagogical style, structured vs. prose formatting, and tone). As a result, users are forced to repeatedly prompt the system with boilerplate formatting and persona constraints.
 
-MIRA addresses this problem through persistent conversational style memory and context-aware response generation.
+MIRA resolves this friction by introducing an isolated, asynchronous **Persistent Communication-Style Memory Subsystem**. Operating on the principle that *"memory informs responses; it does not define the user,"* MIRA selectively identifies durable communication preferences, subjects them to validation and optimistic concurrency control, and injects them into downstream response generation—all while granting the user total inspection, editing, and deletion authority.
 
-## 3. Product Goals
+```mermaid
+flowchart LR
+    subgraph ClientLayer ["Client Layer"]
+        AndroidApp["Native Android Client\n(Java / Gradle)"]
+    end
 
-- Provide a native Android application for AI conversations.
-- Integrate an external large language model through a secure backend.
-- Maintain conversation history across sessions.
-- Build and update a persistent user style profile.
-- Use stored preferences to inform responses in new sessions.
-- Support image understanding and PDF-based question answering, subject to model and API capabilities.
-- Provide users with control over their stored personalization data.
-- Maintain reliable documentation, automated tests, and reproducible deployment procedures.
+    subgraph ServiceLayer ["Backend Service Boundary (Modular Monolith)"]
+        APIGateway["REST API Gateway\n(/api/v1 - Spring Boot)"]
+        AuthModule["Auth & Session Module\n(Tokens / Ownership)"]
+        ChatModule["Chat Orchestration\n(Context Assembly)"]
+        MemoryModule["Memory Subsystem\n(Validation & OCC)"]
+        AIProviderMod["AI Provider Service\n(DeepSeek Integration)"]
+    end
 
-## 4. Non-Goals
+    subgraph PersistenceLayer ["Persistence & External Services"]
+        PostgreSQL[("Managed PostgreSQL\n(Neon Database)")]
+        DeepSeekAPI["DeepSeek LLM API\n(Inference Engine)"]
+    end
 
-The initial release will not attempt to:
+    AndroidApp -->|HTTPS / JSON Bearer Auth| APIGateway
+    APIGateway --> AuthModule
+    APIGateway --> ChatModule
+    ChatModule --> MemoryModule
+    ChatModule --> AIProviderMod
+    
+    AuthModule -->|Credential & Session State| PostgreSQL
+    ChatModule -->|Message Persistence| PostgreSQL
+    MemoryModule -->|Style Profile & Generations| PostgreSQL
+    AIProviderMod -->|Secure Backend Request| DeepSeekAPI
+```
 
-- Train or fine-tune a foundation model.
-- Reproduce the full capabilities of commercial AI platforms.
-- Build a general-purpose autonomous agent.
-- Guarantee perfect inference of a user's personality or preferences.
-- Implement a complex multi-agent architecture without a demonstrated need.
-- Support every document format or every possible multimodal input.
+---
 
-## 5. Target Users
+## 2. Problem Statement & Value Proposition
 
-The initial target user is an individual who regularly uses AI assistants and values consistent communication preferences across conversations.
+### 2.1 The Core Problem: Cross-Session Style Friction
+Foundation language model interfaces isolate chat sessions into independent context windows. A user who prefers succinct mathematical summaries or concrete real-world code analogies must either configure a global, rigid system instruction or repeat their preferences in every new conversation.
 
-The first release will prioritize a single-user experience with secure account isolation and an architecture that can support multiple registered users.
+### 2.2 The MIRA Solution
+MIRA establishes a decoupled, persistent user style profile that automatically informs responses in subsequent sessions without leaking biographical details or unverified ephemeral instructions.
 
-## 6. Core Features
+> [!IMPORTANT]
+> **Core Behavioral Invariant:**
+> 1. Explicit user instructions in the current prompt **always** take precedence over historical preferences.
+> 2. Direct user corrections to their profile **always** take precedence over automated inferences.
+> 3. Memory strictly encompasses *communication style*—it is not a personal biographical repository.
 
-### 6.1. Conversational Chat
-Users can create conversations, exchange messages with the AI assistant, and revisit previous sessions.
+---
 
-### 6.2. Persistent Style Memory
-MIRA extracts candidate communication preferences from conversations, validates them, and merges appropriate updates into a persistent user profile.
+## 3. Product Goals & Non-Goals
 
-### 6.3. Image Understanding
-Users can submit supported images and ask questions about their contents.
+### 3.1 Primary Goals (MVP)
+* **Native Mobile Experience:** Provide a responsive, stable Android application built in Java.
+* **Secure Monolith Gateway:** Host all authentication, session management, and third-party AI keys exclusively on a secure Java/Spring Boot backend.
+* **Persistent Session History:** Reliably persist conversations, messages, and retry attempts within PostgreSQL.
+* **Style Memory Lifecycle:** Extract, validate, merge, and apply communication-style profiles using optimistic concurrency control (OCC).
+* **Complete User Sovereignty:** Equip users with full visibility and control to view, edit, disable, or permanently purge their style memory.
+* **High Reliability & Deterministic Verification:** Provide end-to-end automated test suites that verify business logic and authorization without requiring billable third-party API calls.
 
-### 6.4. PDF Understanding
-Users can provide PDF documents and ask questions about their contents within supported document and context limits.
+### 3.2 Explicit Non-Goals (MVP Boundary)
+* **No Foundation Model Training:** MIRA does not pre-train or fine-tune models; it orchestrates external provider APIs.
+* **No Biographical Knowledge Graph:** Personal life details, financial data, health information, and political opinions are strictly excluded from memory extraction.
+* **No Autonomous Multi-Agent Graphs:** The system focuses on robust single-agent assistant conversations rather than unbounded multi-agent task execution.
+* **Deferred Multimodal Ingestion:** Ingestion of PDFs and images is deferred to Phase 2 to ensure maximum reliability of the core text and memory engine.
 
-### 6.5. Memory Management
-Users can inspect, modify, disable, or delete their stored style preferences.
+---
 
-### 6.6. Account and Data Isolation
-Each user can access only their own conversations, files, and personalization data.
+## 4. System Architecture & Technology Stack
 
-## 7. Proposed Technology Stack
+The MIRA platform adopts an enterprise **Modular Monolith** architecture, balancing low operational overhead with strict domain boundary separation:
 
-| Component | Proposed Technology |
-|---|---|
-| Mobile application | Android, Java, Gradle |
-| Backend | Java, Spring Boot, Maven |
-| Relational database | PostgreSQL |
-| Database hosting | Neon PostgreSQL |
-| AI provider | DeepSeek API |
-| API communication | HTTPS, REST, JSON |
-| Source control | Git |
+| Subsystem | Selected Technology | Architectural Rationale |
+| :--- | :--- | :--- |
+| **Mobile Client** | Android (Java, Gradle) | Native performance, standard OS security (Keystore), device document pickers. |
+| **Backend Service** | Java 17+, Spring Boot 3.x, Maven | Enterprise-grade type safety, robust transaction management, modular structure. |
+| **Database Engine** | PostgreSQL (Neon Managed) | ACID guarantees, JSONB document querying, rock-solid schema migrations via Flyway. |
+| **AI Inference Provider** | DeepSeek API | High-performance reasoning and conversational intelligence via an abstracted provider interface. |
+| **Protocol & Transport** | HTTPS / REST / JSON | Uniform `/api/v1` contract, deterministic error payloads, and Bearer authentication. |
+| **Continuous Integration** | GitHub Actions / Maven / Gradle | Repeatable containerized builds and automated test suites without external dependencies. |
 
-Technology choices remain subject to documented technical validation before implementation.
+---
 
-## 8. Design Principles
+## 5. Architectural Principles
 
-1. **Memory informs responses; it does not define the user.**
-2. Explicit user preferences take precedence over uncertain inferences.
-3. Current instructions take precedence over conflicting historical preferences.
-4. Users retain control over their personalization data.
-5. Secrets and provider credentials remain on the backend.
-6. Every significant architectural decision should be documented.
-7. Features must be testable and demonstrable on a real Android device.
-8. Complexity must be justified by a clear product or engineering requirement.
+1. **Memory Informs, Never Dictates:** Memory is advisory personalization. It must never bypass application security rules or override current user intent.
+2. **Absolute Secret Isolation:** Under no circumstances are provider keys (DeepSeek API keys) or database credentials distributed to client APKs.
+3. **Server-Side Authorization Everywhere:** Every user-owned entity (conversation, message, profile) is strictly authenticated and authorized on the server; client-supplied IDs are never trusted blindly.
+4. **Resilient Failure Semantics:** If an external AI provider experiences an outage or timeout, conversation integrity is preserved, idempotency guards prevent duplicate billing, and failure states are reported cleanly.
+5. **Deterministic Verifiability:** Core workflows, authorization invariants, and memory merge logic must be 100% testable using simulated test doubles (Mocks/Testcontainers) without incurred API costs.
 
-## 9. Initial Success Criteria
+---
 
-The initial release will be considered successful when:
+## 6. Specification Document Roadmap
 
-- A user can register, authenticate, and use the application on a physical Android device.
-- Messages and conversation history persist in PostgreSQL.
-- A user's style profile can be updated and reused in a new session.
-- Memory updates do not silently overwrite newer information with stale results.
-- Users can inspect and control their stored style preferences.
-- Supported image and PDF inputs can be processed through the backend.
-- Unauthorized access to another user's data is prevented and tested.
-- Automated tests cover critical business logic and API behavior.
-- A new developer can follow the documentation to configure and run the project.
+The complete engineering specification is partitioned into modular, version-controlled documents:
 
-## 10. Open Decisions
-
-The following decisions must be resolved before their corresponding implementations begin:
-
-- Authentication mechanism and account lifecycle.
-- Exact DeepSeek model identifiers, API endpoints, and multimodal capabilities.
-- Memory schema, update policy, and conflict resolution.
-- File storage strategy and retention policy.
-- Database migration and testing strategy.
-- Deployment environment, operational limits, and cost constraints.
-
-## 11. Scope Management
-
-Features will be prioritized according to user value, technical feasibility, implementation cost, and the six-week academic delivery constraint, if applicable.
-
-Any scope change affecting architecture, security, data integrity, or delivery commitments must be reflected in the relevant requirements and design documents.
+* [01-requirements.md](file:///C:/Users/Bryan/Documents/MIRA/docs/01-requirements.md) — Comprehensive Product Requirements Specification (PRS).
+* [02-architecture.md](file:///C:/Users/Bryan/Documents/MIRA/docs/02-architecture.md) — System Architecture, Module Boundaries, and Failure Semantics.
+* [03-domain-model.md](file:///C:/Users/Bryan/Documents/MIRA/docs/03-domain-model.md) — Relational Domain Model, PostgreSQL Schemas, and Constraints.
+* [04-api-contract.md](file:///C:/Users/Bryan/Documents/MIRA/docs/04-api-contract.md) — RESTful HTTP Interface, Request/Response Schemas, and Idempotency.
+* [05-memory-lifecycle.md](file:///C:/Users/Bryan/Documents/MIRA/docs/05-memory-lifecycle.md) — Style Memory Extraction, Validation, and Concurrency Controls.
+* [06-security-and-privacy.md](file:///C:/Users/Bryan/Documents/MIRA/docs/06-security-and-privacy.md) — Threat Modeling, Token Lifecycles, and Data Privacy Standards.
+* [07-testing-strategy.md](file:///C:/Users/Bryan/Documents/MIRA/docs/07-testing-strategy.md) — Multi-Tier Quality Assurance, Testcontainers, and Mocking Strategy.
+* [08-deployment-plan.md](file:///C:/Users/Bryan/Documents/MIRA/docs/08-deployment-plan.md) — Cloud Infrastructure Topology, Flyway Migrations, and Release Runbooks.
+* [09-phase-0-checklist.md](file:///C:/Users/Bryan/Documents/MIRA/docs/09-phase-0-checklist.md) — Phase 0 Repository Baseline, Verification Steps, and Readiness Gates.
+* [ADR-001-backend-stack.md](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-001-backend-stack.md) — Architectural Decision Record: Backend Technology Selection.
+* [ADR-002-memory-model.md](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-002-memory-model.md) — Architectural Decision Record: Memory Lifecycle & Concurrency Model.
+* [ADR-003-file-processing.md](file:///C:/Users/Bryan/Documents/MIRA/docs/decisions/ADR-003-file-processing.md) — Architectural Decision Record: Multimodal Processing Phasing.

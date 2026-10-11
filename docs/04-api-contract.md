@@ -1,467 +1,456 @@
-# MIRA — API Contract
+# MIRA — RESTful API Contract Specification
 
-**Document:** `docs/04-api-contract.md`  
-**Status:** Draft  
-**API prefix:** `/api/v1`  
-**Data format:** JSON  
-**Authentication:** Bearer access token
+| Attribute | Value |
+| :--- | :--- |
+| **Document ID** | MIRA-API-001 |
+| **Classification** | Internal Engineering Specification |
+| **Status** | Approved Baseline |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-10-11 |
+| **Author / Lead** | Bryan / MIRA API & Backend Team |
+| **Protocol & Base URL** | HTTPS / `/api/v1` |
+| **Data Format** | JSON (UTF-8 Encoded) |
 
-## 1. Purpose
+---
 
-This document defines the public HTTP API between the MIRA Android application and the MIRA backend.
+## Document Revision History
 
-It specifies endpoints, request and response structures, status codes, authentication requirements, and expected error behavior.
+| Version | Date | Author | Description of Changes |
+| :--- | :--- | :--- | :--- |
+| 0.1.0 | 2026-10-10 | Backend Team | Initial draft of public REST endpoints. |
+| 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated session refresh/logout endpoints, response retry contracts, idempotency specifications, and consolidated draft notes. |
 
-The API contract is independent of the backend's internal implementation.
+---
 
-## 2. Conventions
+## 1. Global API Conventions
 
-### 2.1 Request and response format
+### 1.1 Transport & Headers
+* All production traffic must utilize TLS 1.3 (HTTPS).
+* Protected endpoints require an `Authorization` header containing a valid Bearer access token:
+  ```http
+  Authorization: Bearer <access_token>
+  ```
+* Mutations on conversational messaging endpoints require an `Idempotency-Key` header:
+  ```http
+  Idempotency-Key: <unique-client-generated-uuid-or-v4-string>
+  ```
 
-- Request and response bodies use JSON encoded as UTF-8.
-- Timestamps use ISO 8601 UTC format, for example `2026-10-11T06:00:00Z`.
-- Resource identifiers use UUID strings.
-- Protected endpoints require `Authorization: Bearer <access_token>`.
-- Production endpoints must use HTTPS.
+### 1.2 Data Serialization & Timestamps
+* All timestamps use ISO 8601 UTC representation (e.g., `2026-10-11T08:30:00Z`).
+* Identifiers are represented as 128-bit UUID strings (e.g., `3fa85f64-5717-4562-b3fc-2c963f66afa6`).
 
-### 2.2 HTTP status codes
+---
 
-| Status | Meaning |
-|---|---|
-| `200 OK` | Request succeeded |
-| `201 Created` | Resource created |
-| `204 No Content` | Request succeeded without a response body |
-| `400 Bad Request` | Invalid request or malformed input |
-| `401 Unauthorized` | Missing, invalid, or expired access token |
-| `403 Forbidden` | Authenticated caller lacks permission |
-| `404 Not Found` | Resource not found or intentionally concealed |
-| `409 Conflict` | Resource state or idempotency conflict |
-| `413 Content Too Large` | Request exceeds a configured size limit |
-| `415 Unsupported Media Type` | Unsupported request content type |
-| `422 Unprocessable Content` | Valid JSON but invalid field values or business rules |
-| `429 Too Many Requests` | Rate limit exceeded |
-| `500 Internal Server Error` | Unexpected internal failure |
-| `502 Bad Gateway` | Upstream provider returned an unusable response |
-| `503 Service Unavailable` | Required service temporarily unavailable |
-| `504 Gateway Timeout` | Upstream provider timed out |
+## 2. Authentication & Session Endpoints
 
-The implementation must use these statuses consistently. More specific validation conventions may be established during implementation.
+### 2.1 Register Account
+* **Endpoint:** `POST /api/v1/auth/register`
+* **Authentication:** None (Public)
+* **Status Code:** `201 Created`
 
-## 3. Authentication
+#### Request Body
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+```
 
-### 3.1 Register
+#### Response Body (`201 Created`)
+```json
+{
+  "user": {
+    "id": "c1f7b8d4-5390-48e2-9d33-4df45e317c01",
+    "email": "user@example.com",
+    "createdAt": "2026-10-11T08:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
+  "refreshToken": "7c4a16b9f2e848d7a123456789abcdef...",
+  "expiresIn": 900
+}
+```
 
-**Endpoint:** `POST /api/v1/auth/register`  
-**Authentication:** Not required  
-**Success:** `201 Created`
+---
 
-Request:
+### 2.2 User Login
+* **Endpoint:** `POST /api/v1/auth/login`
+* **Authentication:** None (Public)
+* **Status Code:** `200 OK`
 
+#### Request Body
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+#### Response Body (`200 OK`)
+```json
+{
+  "user": {
+    "id": "c1f7b8d4-5390-48e2-9d33-4df45e317c01",
+    "email": "user@example.com"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
+  "refreshToken": "7c4a16b9f2e848d7a123456789abcdef...",
+  "expiresIn": 900
+}
+```
+
+---
+
+### 2.3 Token Refresh (Session Rotation)
+* **Endpoint:** `POST /api/v1/auth/refresh`
+* **Authentication:** None (Requires valid refresh token in body)
+* **Status Code:** `200 OK`
+
+#### Request Body
+```json
+{
+  "refreshToken": "7c4a16b9f2e848d7a123456789abcdef..."
+}
+```
+
+#### Response Body (`200 OK`)
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
+  "refreshToken": "8d5b27c0a3f949e8b23456789abcdef0...",
+  "expiresIn": 900
+}
+```
+> [!NOTE]
+> Refresh token rotation is atomic. The submitted refresh token is permanently revoked, and a newly generated refresh token is returned. Attempting to reuse an already-revoked refresh token triggers immediate session termination across all devices for that user.
+
+---
+
+### 2.4 User Logout
+* **Endpoint:** `POST /api/v1/auth/logout`
+* **Authentication:** Required (`Bearer <access_token>`)
+* **Status Code:** `204 No Content`
+
+#### Request Body
+```json
+{
+  "refreshToken": "8d5b27c0a3f949e8b23456789abcdef0..."
+}
+```
+* **Behavior:** Revokes the specific `user_session` record associated with the provided refresh token.
+
+---
+
+### 2.5 Current User Profile
+* **Endpoint:** `GET /api/v1/me`
+* **Authentication:** Required (`Bearer <access_token>`)
+* **Status Code:** `200 OK`
+
+#### Response Body (`200 OK`)
+```json
+{
+  "id": "c1f7b8d4-5390-48e2-9d33-4df45e317c01",
+  "email": "user@example.com",
+  "createdAt": "2026-10-11T08:30:00Z"
+}
+```
+
+---
+
+## 3. Conversation Management Endpoints
+
+### 3.1 List Conversations
+* **Endpoint:** `GET /api/v1/conversations`
+* **Authentication:** Required
+* **Query Parameters:**
+  * `limit` (Optional, integer, default `20`, max `50`): Number of conversations to return.
+  * `cursor` (Optional, UUID): Pagination cursor representing the last retrieved conversation ID.
+* **Status Code:** `200 OK`
+
+#### Response Body (`200 OK`)
+```json
+{
+  "items": [
     {
-      "email": "user@example.com",
-      "password": "a-strong-password"
+      "id": "8fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "title": "Discussion on Quantum Computing",
+      "createdAt": "2026-10-11T08:00:00Z",
+      "updatedAt": "2026-10-11T08:25:00Z"
     }
+  ],
+  "nextCursor": null
+}
+```
 
-Response:
+---
 
+### 3.2 Create Conversation
+* **Endpoint:** `POST /api/v1/conversations`
+* **Authentication:** Required
+* **Status Code:** `201 Created`
+
+#### Request Body
+```json
+{
+  "title": "Discussion on Quantum Computing"
+}
+```
+
+#### Response Body (`201 Created`)
+```json
+{
+  "id": "8fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "title": "Discussion on Quantum Computing",
+  "createdAt": "2026-10-11T08:00:00Z",
+  "updatedAt": "2026-10-11T08:00:00Z"
+}
+```
+
+---
+
+### 3.3 Delete Conversation
+* **Endpoint:** `DELETE /api/v1/conversations/{conversationId}`
+* **Authentication:** Required
+* **Status Code:** `204 No Content`
+* **Behavior:** Permanently deletes the conversation and cascades to all child messages and AI response records. Does **not** modify or delete the user's persistent style profile.
+
+---
+
+## 4. Messaging & AI Response Endpoints
+
+### 4.1 List Conversation Messages
+* **Endpoint:** `GET /api/v1/conversations/{conversationId}/messages`
+* **Authentication:** Required
+* **Query Parameters:**
+  * `limit` (Optional, integer, default `50`, max `100`)
+  * `cursor` (Optional, timestamp or UUID)
+* **Status Code:** `200 OK`
+
+#### Response Body (`200 OK`)
+```json
+{
+  "items": [
     {
-      "user": {
-        "id": "UUID",
-        "email": "user@example.com",
-        "createdAt": "2026-10-11T06:00:00Z"
-      },
-      "accessToken": "ACCESS_TOKEN",
-      "expiresIn": 900
+      "id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "role": "USER",
+      "content": "Explain Shor's algorithm from first principles.",
+      "createdAt": "2026-10-11T08:10:00Z"
+    },
+    {
+      "id": "a2c3eb4d-4b7d-4bad-8bee-3b0d7b3dcb7e",
+      "role": "ASSISTANT",
+      "content": "Shor's algorithm is a quantum algorithm that finds prime factors...",
+      "createdAt": "2026-10-11T08:10:05Z"
     }
+  ],
+  "nextCursor": null
+}
+```
 
-The example assumes a 15-minute access-token lifetime. The actual lifetime is a configuration decision.
+---
 
-The backend must validate the email and password, normalize the email consistently, hash the password, and enforce unique account identity.
+### 4.2 Send Message (Synchronous Orchestration)
+* **Endpoint:** `POST /api/v1/conversations/{conversationId}/messages`
+* **Authentication:** Required
+* **Required Headers:**
+  * `Idempotency-Key: <unique-request-key>`
+* **Status Code:** `201 Created`
 
-The response must never contain the password or password hash.
+#### Request Body
+```json
+{
+  "content": "Explain Shor's algorithm from first principles."
+}
+```
 
-### 3.2 Login
+#### Response Body (`201 Created`)
+```json
+{
+  "userMessage": {
+    "id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    "role": "USER",
+    "content": "Explain Shor's algorithm from first principles.",
+    "createdAt": "2026-10-11T08:10:00Z"
+  },
+  "assistantResponse": {
+    "id": "a2c3eb4d-4b7d-4bad-8bee-3b0d7b3dcb7e",
+    "status": "COMPLETED",
+    "content": "Shor's algorithm is a quantum algorithm that finds prime factors...",
+    "createdAt": "2026-10-11T08:10:05Z"
+  }
+}
+```
 
-**Endpoint:** `POST /api/v1/auth/login`  
-**Authentication:** Not required  
-**Success:** `200 OK`
+#### Error & Timeout Response (`504 Gateway Timeout` / `200 OK` with `UNKNOWN`)
+If an upstream AI provider times out after the user message has been safely persisted:
+```json
+{
+  "userMessage": {
+    "id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    "role": "USER",
+    "content": "Explain Shor's algorithm from first principles.",
+    "createdAt": "2026-10-11T08:10:00Z"
+  },
+  "assistantResponse": {
+    "id": "a2c3eb4d-4b7d-4bad-8bee-3b0d7b3dcb7e",
+    "status": "UNKNOWN",
+    "content": null,
+    "createdAt": "2026-10-11T08:10:05Z"
+  }
+}
+```
 
-Request:
+---
 
-    {
-      "email": "user@example.com",
-      "password": "a-strong-password"
-    }
+### 4.3 Retry AI Response
+* **Endpoint:** `POST /api/v1/conversations/{conversationId}/responses/{responseId}/retry`
+* **Authentication:** Required
+* **Required Headers:**
+  * `Idempotency-Key: <retry-attempt-key>`
+* **Status Code:** `200 OK`
 
-Response:
+#### Response Body (`200 OK`)
+```json
+{
+  "assistantResponse": {
+    "id": "a2c3eb4d-4b7d-4bad-8bee-3b0d7b3dcb7e",
+    "status": "COMPLETED",
+    "content": "Shor's algorithm is a quantum algorithm that finds prime factors...",
+    "createdAt": "2026-10-11T08:10:05Z"
+  }
+}
+```
+* **Rules:**
+  * Bounded retry execution: Maximum 3 attempts per logical response.
+  * Preserves original user prompt and response UUID; logs an additional row in `ai_processing_attempt`.
 
-    {
-      "user": {
-        "id": "UUID",
-        "email": "user@example.com"
-      },
-      "accessToken": "ACCESS_TOKEN",
-      "expiresIn": 900
-    }
+---
 
-Invalid credentials must produce a generic authentication error rather than revealing whether the email or password was incorrect.
+## 5. Communication-Style Memory Endpoints
 
-### 3.3 Refresh and logout
+### 5.1 Read Style Profile
+* **Endpoint:** `GET /api/v1/memory/style`
+* **Authentication:** Required
+* **Status Code:** `200 OK`
 
-Proposed endpoints:
+#### Response Body (`200 OK`)
+```json
+{
+  "enabled": true,
+  "version": 4,
+  "profile": {
+    "explanation_depth": "detailed",
+    "tone": "conversational",
+    "examples": "prefer_concrete_examples",
+    "formatting": "structured",
+    "teaching_sequence": "principles_first"
+  },
+  "updatedAt": "2026-10-11T07:45:00Z"
+}
+```
 
-- `POST /api/v1/auth/refresh`
-- `POST /api/v1/auth/logout`
+---
 
-A production-quality mobile session needs an explicit refresh-token strategy. The preferred design is a short-lived access token and a securely stored, revocable refresh token with rotation.
+### 5.2 Replace Style Profile (Optimistic Concurrency Control)
+* **Endpoint:** `PUT /api/v1/memory/style`
+* **Authentication:** Required
+* **Status Code:** `200 OK`
 
-The exact refresh-token transport, reuse detection, revocation behavior, and persistence strategy must be specified before authentication implementation begins.
+#### Request Body
+```json
+{
+  "expectedVersion": 4,
+  "profile": {
+    "explanation_depth": "concise",
+    "tone": "formal",
+    "examples": "prefer_concrete_examples",
+    "formatting": "prose",
+    "teaching_sequence": "principles_first"
+  }
+}
+```
 
-Refresh tokens must not be treated as ordinary access tokens or exposed in logs.
+#### Response Body (`200 OK`)
+```json
+{
+  "enabled": true,
+  "version": 5,
+  "profile": {
+    "explanation_depth": "concise",
+    "tone": "formal",
+    "examples": "prefer_concrete_examples",
+    "formatting": "prose",
+    "teaching_sequence": "principles_first"
+  },
+  "updatedAt": "2026-10-11T08:35:00Z"
+}
+```
+* **Conflict Behavior (`409 Conflict`):** If the database `version` is not equal to `expectedVersion`, the mutation is rejected with `409 Conflict` and error code `VERSION_CONFLICT`.
 
-### 3.4 Current user
+---
 
-**Endpoint:** `GET /api/v1/me`  
-**Authentication:** Required  
-**Success:** `200 OK`
+### 5.3 Toggle Memory Settings
+* **Endpoint:** `PATCH /api/v1/memory/style/settings`
+* **Authentication:** Required
+* **Status Code:** `200 OK`
 
-Response:
+#### Request Body
+```json
+{
+  "enabled": false
+}
+```
 
-    {
-      "id": "UUID",
-      "email": "user@example.com",
-      "createdAt": "2026-10-11T06:00:00Z"
-    }
+#### Response Body (`200 OK`)
+```json
+{
+  "enabled": false,
+  "version": 5,
+  "updatedAt": "2026-10-11T08:36:00Z"
+}
+```
 
-The user identity is derived from the authenticated principal, not a client-supplied user ID.
+---
 
-## 4. Conversations
+### 5.4 Delete Style Memory (Purge)
+* **Endpoint:** `DELETE /api/v1/memory/style`
+* **Authentication:** Required
+* **Status Code:** `204 No Content`
+* **Behavior:** Clears the stored JSONB profile and increments the `generation` counter. Any running background extraction jobs carrying older generation numbers are automatically aborted to prevent resurrecting deleted preferences.
 
-### 4.1 List conversations
+---
 
-**Endpoint:** `GET /api/v1/conversations`  
-**Authentication:** Required  
-**Success:** `200 OK`
+## 6. Standardized Error Handling
 
-Optional query parameters:
+All error responses strictly adhere to the standardized schema:
 
-- `limit`: maximum number of items returned.
-- `cursor`: pagination cursor.
-
-Response:
-
-    {
-      "items": [
-        {
-          "id": "CONVERSATION_UUID",
-          "title": "Learning gradient descent",
-          "createdAt": "2026-10-11T06:00:00Z",
-          "updatedAt": "2026-10-11T06:15:00Z"
-        }
-      ],
-      "nextCursor": null
-    }
-
-The backend returns only conversations owned by the authenticated user.
-
-The default and maximum page sizes must be configured and documented during implementation.
-
-### 4.2 Create conversation
-
-**Endpoint:** `POST /api/v1/conversations`  
-**Authentication:** Required  
-**Success:** `201 Created`
-
-Request:
-
-    {
-      "title": "Learning gradient descent"
-    }
-
-The `title` field is optional.
-
-Response:
-
-    {
-      "id": "CONVERSATION_UUID",
-      "title": "Learning gradient descent",
-      "createdAt": "2026-10-11T06:00:00Z",
-      "updatedAt": "2026-10-11T06:00:00Z"
-    }
-
-The backend assigns the owner from the authenticated principal.
-
-### 4.3 Delete conversation
-
-**Endpoint:** `DELETE /api/v1/conversations/{conversationId}`  
-**Authentication:** Required  
-**Success:** `204 No Content`
-
-The backend deletes the conversation and its dependent messages according to the documented deletion policy.
-
-Deleting a conversation does not delete the user's communication-style profile.
-
-Unauthorized access to another user's conversation must not disclose the resource's contents or existence.
-
-## 5. Messages
-
-### 5.1 List messages
-
-**Endpoint:** `GET /api/v1/conversations/{conversationId}/messages`  
-**Authentication:** Required  
-**Success:** `200 OK`
-
-Optional query parameters:
-
-- `limit`
-- `cursor`
-
-Response:
-
-    {
-      "items": [
-        {
-          "id": "MESSAGE_UUID_1",
-          "role": "USER",
-          "content": "Explain gradient descent.",
-          "createdAt": "2026-10-11T06:00:00Z"
-        },
-        {
-          "id": "MESSAGE_UUID_2",
-          "role": "ASSISTANT",
-          "content": "Gradient descent is an optimization method...",
-          "createdAt": "2026-10-11T06:00:02Z"
-        }
-      ],
-      "nextCursor": null
-    }
-
-Messages must be returned in a deterministic order. The implementation should use a stable tie-breaker when multiple messages share the same timestamp.
-
-### 5.2 Send a message
-
-**Endpoint:** `POST /api/v1/conversations/{conversationId}/messages`  
-**Authentication:** Required  
-**Success:** `201 Created`
-
-Required header:
-
-    Idempotency-Key: <unique-request-key>
-
-Request:
-
-    {
-      "content": "Explain gradient descent from first principles."
-    }
-
-Response:
-
-    {
-      "userMessage": {
-        "id": "USER_MESSAGE_UUID",
-        "role": "USER",
-        "content": "Explain gradient descent from first principles.",
-        "createdAt": "2026-10-11T06:00:00Z"
-      },
-      "assistantMessage": {
-        "id": "ASSISTANT_MESSAGE_UUID",
-        "role": "ASSISTANT",
-        "content": "Gradient descent is an optimization method...",
-        "createdAt": "2026-10-11T06:00:02Z"
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "The request contains invalid fields.",
+    "requestId": "4a7f92b4-7b12-421b-8041-382901309fef",
+    "details": [
+      {
+        "field": "content",
+        "reason": "must not be blank"
       }
-    }
+    ]
+  }
+}
+```
 
-The backend must:
+### 6.1 Standard Error Code Registry
 
-1. Authenticate the caller and verify conversation ownership.
-2. Validate the message content and request size.
-3. Apply idempotency handling.
-4. Retrieve relevant conversation context and the applicable style profile.
-5. Generate a response through the configured AI provider.
-6. Persist messages according to the agreed transaction and failure policy.
-7. Return the response in the documented structure.
-
-The client cannot supply trusted system instructions, a privileged provider key, or an arbitrary user identity.
-
-#### Idempotency rules
-
-- The key is scoped to the authenticated user and operation.
-- Reusing a key with the same request must not create duplicate messages or trigger another model generation.
-- Reusing a key with a different request payload must return `409 Conflict`.
-- Concurrent requests with the same key must be coordinated safely.
-- The backend must document how long idempotency records remain valid.
-
-If a provider request fails, the API must distinguish the failure from a successful response. The persistence policy must make clear whether the user message remains stored and how the client can retry safely.
-
-A retry after an uncertain network outcome must reuse the original idempotency key.
-
-## 6. Communication-Style Memory
-
-### 6.1 Read style profile
-
-**Endpoint:** `GET /api/v1/memory/style`  
-**Authentication:** Required  
-**Success:** `200 OK`
-
-Response when a profile exists:
-
-    {
-      "enabled": true,
-      "version": 3,
-      "profile": {
-        "explanation_depth": "detailed",
-        "tone": "conversational",
-        "examples": "prefer_concrete_examples",
-        "formatting": "structured"
-      },
-      "updatedAt": "2026-10-11T06:00:00Z"
-    }
-
-If no profile exists, the endpoint returns a consistent empty-profile representation. The exact representation must be selected before implementation.
-
-The response must not include other users' data or raw internal model instructions.
-
-### 6.2 Replace style profile
-
-**Endpoint:** `PUT /api/v1/memory/style`  
-**Authentication:** Required  
-**Success:** `200 OK`
-
-Request:
-
-    {
-      "expectedVersion": 3,
-      "profile": {
-        "explanation_depth": "detailed",
-        "tone": "conversational",
-        "examples": "prefer_concrete_examples",
-        "formatting": "structured"
-      }
-    }
-
-`expectedVersion` is an optimistic-concurrency precondition. If the stored profile has changed since the client read it, the backend returns `409 Conflict` rather than silently overwriting a newer version.
-
-The backend validates the complete profile, increments its version on a successful update, and returns the saved representation.
-
-If the profile does not yet exist, the contract must define how creation is represented. A version-zero convention or a dedicated creation endpoint may be selected during implementation.
-
-### 6.3 Change memory settings
-
-**Endpoint:** `PATCH /api/v1/memory/style/settings`  
-**Authentication:** Required  
-**Success:** `200 OK`
-
-Request:
-
-    {
-      "enabled": false
-    }
-
-Response:
-
-    {
-      "enabled": false,
-      "version": 3,
-      "updatedAt": "2026-10-11T06:20:00Z"
-    }
-
-This endpoint changes whether the profile is applied. Disabling memory does not itself delete the profile.
-
-The backend must define the effect on requests that were already running when the setting changed.
-
-### 6.4 Delete style memory
-
-**Endpoint:** `DELETE /api/v1/memory/style`  
-**Authentication:** Required  
-**Success:** `204 No Content`
-
-The backend removes the persisted style profile and prevents outdated extraction tasks from restoring it.
-
-Deleting style memory does not automatically delete conversation history. These are separate data-lifecycle operations.
-
-The deletion policy must also define how pending memory updates are invalidated and how deletion is reflected in backups.
-
-## 7. Standard Error Format
-
-All API errors should use a consistent structure.
-
-Example:
-
-    {
-      "error": {
-        "code": "VALIDATION_ERROR",
-        "message": "The request contains invalid fields.",
-        "requestId": "REQUEST_UUID",
-        "details": [
-          {
-            "field": "content",
-            "reason": "must not be blank"
-          }
-        ]
-      }
-    }
-
-Fields:
-
-- `code`: stable machine-readable error identifier.
-- `message`: safe, user-facing description.
-- `requestId`: identifier for support and server-side diagnostics.
-- `details`: optional validation details.
-
-The backend must not return stack traces, database internals, provider secrets, or sensitive prompt content.
-
-Suggested error codes include:
-
-- `VALIDATION_ERROR`
-- `INVALID_CREDENTIALS`
-- `AUTHENTICATION_REQUIRED`
-- `RESOURCE_NOT_FOUND`
-- `ACCESS_DENIED`
-- `IDEMPOTENCY_CONFLICT`
-- `VERSION_CONFLICT`
-- `RATE_LIMITED`
-- `AI_PROVIDER_UNAVAILABLE`
-- `AI_PROVIDER_TIMEOUT`
-- `INTERNAL_ERROR`
-
-## 8. Security Requirements
-
-- All protected endpoints require a valid access token.
-- The backend derives user identity from the authenticated principal.
-- Every user-owned resource must be authorized server-side.
-- Authentication endpoints require appropriate rate limits.
-- Secrets and tokens must not appear in logs.
-- Password hashes must never be returned through the API.
-- Request bodies and profile fields must be validated.
-- Provider credentials remain exclusively server-side.
-- Production traffic must use HTTPS.
-- Cross-account access must be tested explicitly.
-
-## 9. Contract Testing
-
-The API contract should be verified through:
-
-- Request and response schema tests.
-- Authentication and authorization tests.
-- Validation and error-status tests.
-- Idempotency and concurrent-request tests.
-- Conversation and message lifecycle tests.
-- Memory version-conflict tests.
-- Memory disablement and deletion tests.
-- Mocked AI-provider integration tests.
-
-The Android application and backend should use the same documented request and response shapes.
-
-## 10. Open Decisions
-
-- Exact access-token and refresh-token implementation.
-- Empty-profile representation and first-time profile creation.
-- Exact style-profile schema and allowed values.
-- Pagination cursor format and maximum page sizes.
-- Message persistence semantics during provider failure.
-- Idempotency-record storage and retention.
-- Request size limits and rate limits.
-- Whether message streaming is needed for the initial release.
-- Whether image and PDF endpoints belong in a later API version or the current version.
-
-These decisions must be resolved before the corresponding endpoint is implemented.
+| HTTP Status | Error Code | Description / Occurrence |
+| :--- | :--- | :--- |
+| `400 Bad Request` | `VALIDATION_ERROR` | Malformed JSON or failed schema field validations. |
+| `401 Unauthorized` | `AUTHENTICATION_REQUIRED` | Missing, malformed, or expired access token. |
+| `401 Unauthorized` | `INVALID_CREDENTIALS` | Invalid email or password during login. |
+| `403 Forbidden` | `ACCESS_DENIED` | Authenticated caller does not have permission. |
+| `404 Not Found` | `RESOURCE_NOT_FOUND` | Resource does not exist or caller does not own it. |
+| `409 Conflict` | `IDEMPOTENCY_CONFLICT` | Idempotency key reused with different payload. |
+| `409 Conflict` | `VERSION_CONFLICT` | OCC expectedVersion mismatch on style memory update. |
+| `429 Too Many Requests`| `RATE_LIMITED` | Exceeded per-minute account request quotas. |
+| `502 Bad Gateway` | `AI_PROVIDER_UNAVAILABLE` | External AI provider returned unusable output. |
+| `504 Gateway Timeout` | `AI_PROVIDER_TIMEOUT` | Upstream provider failed to respond within timeout window. |
+| `500 Internal Error` | `INTERNAL_ERROR` | Unexpected backend server fault (sanitized, logged). |

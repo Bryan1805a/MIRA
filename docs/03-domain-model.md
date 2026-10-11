@@ -1,300 +1,274 @@
-# MIRA — Domain Model & Database Design
+# MIRA — Domain Model & Relational Database Design
 
-**Document:** `docs/03-domain-model.md`  
-**Status:** Draft  
-**Database:** PostgreSQL  
-**Scope:** MVP — Authentication, text chat, conversation history, communication-style memory
+| Attribute | Value |
+| :--- | :--- |
+| **Document ID** | MIRA-DAT-001 |
+| **Classification** | Internal Engineering Specification |
+| **Status** | Approved Baseline |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-10-11 |
+| **Author / Lead** | Bryan / MIRA Data Engineering Team |
+| **Database Engine** | PostgreSQL 15+ (Neon Managed Database) |
+| **Migration Tool** | Flyway |
 
-## 1. Purpose
+---
 
-This document defines MIRA's initial domain entities, relationships, persistence rules, and data integrity requirements.
+## Document Revision History
 
-The design separates account identity, conversation history, individual messages, and persistent communication-style preferences.
+| Version | Date | Author | Description of Changes |
+| :--- | :--- | :--- | :--- |
+| 0.1.0 | 2026-10-10 | Data Team | Initial entity overview and relational draft schema. |
+| 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid ERD, detailed DDL specifications, session tracking, attempt audits, and optimistic concurrency versioning. |
 
-The schema is a logical design. Physical migrations and ORM mappings will be implemented after the API contract and transaction policies are finalized.
+---
 
-## 2. Design Principles
+## 1. Architectural Principles & Data Invariants
 
-- Every user's private data must be isolated by ownership.
-- PostgreSQL is the authoritative persistent store.
-- Foreign keys and database constraints must enforce data integrity.
-- The client cannot establish identity or authorization by supplying an arbitrary user ID.
-- Communication-style memory must remain independent of individual conversations.
-- User corrections and deletions must not be silently reversed by stale memory extraction tasks.
-- The MVP should avoid tables that have no current, justified use case.
+1. **PostgreSQL as Single Source of Truth:** All persistent state (accounts, sessions, conversation threads, messages, and style profiles) resides authoritatively within PostgreSQL. The Android client operates purely as a secure consumer and presentation layer.
+2. **Strict Foreign Key Constraints:** Referential integrity is strictly enforced at the database level rather than relying solely on application-level code.
+3. **Data Ownership & Tenant Isolation:** Every user-owned record explicitly references `user_id`. Queries must scope by this key to prevent unauthorized cross-tenant data access.
+4. **Decoupled Memory Life Cycle:** Deleting a conversation cascades to its messages, but **never** deletes the user's communication-style profile. Memory profile deletion must execute via an explicit, dedicated user action.
+5. **Concurrency-Safe Mutations:** Concurrent style memory extractions and client edits are governed by Optimistic Concurrency Control (OCC) using an incremental `version` and `generation` counter.
 
-## 3. Entity Overview
+---
 
-| Entity | Responsibility |
-|---|---|
-| `USER_ACCOUNT` | Account identity and authentication data |
-| `CONVERSATION` | A user's chat session |
-| `MESSAGE` | A message within a conversation |
-| `USER_STYLE_PROFILE` | The user's persistent communication-style preferences |
+## 2. Entity Relationship Diagram (ERD)
 
-### 3.1 Message and AI Response Processing
+```mermaid
+erDiagram
+    USER_ACCOUNT ||--o{ USER_SESSION : "establishes"
+    USER_ACCOUNT ||--o{ CONVERSATION : "owns"
+    USER_ACCOUNT ||--o| USER_STYLE_PROFILE : "maintains"
+    CONVERSATION ||--o{ MESSAGE : "contains"
+    CONVERSATION ||--o{ AI_RESPONSE : "coordinates"
+    AI_RESPONSE ||--o{ AI_PROCESSING_ATTEMPT : "tracks"
 
-The existing `MESSAGE` entity represents persisted conversation messages.
-
-For assistant responses, the logical response identity must remain stable across retries. Processing attempts must be represented separately so that a retry does not create duplicate user messages or duplicate logical assistant responses.
-
-#### Logical assistant response
-
-The logical assistant response should contain or reference:
-
-- `id`: stable UUID for the response.
-- `conversation_id`: owning conversation.
-- `status`: `PENDING`, `COMPLETED`, `FAILED`, or `UNKNOWN`.
-- `content`: nullable until a valid response is persisted.
-- `created_at` and `updated_at`.
-
-The implementation may extend `MESSAGE` with these fields or introduce a separate `AI_RESPONSE` entity. The final schema choice remains open until the transaction and retry flow is designed.
-
-#### AI processing attempt
-
-Each attempt should be independently identifiable and record enough information to troubleshoot retries:
-
-- `id`: attempt UUID.
-- `response_id`: logical response being processed.
-- `attempt_number`.
-- `status` or outcome.
-- `started_at` and `finished_at`.
-- A safe error category, when applicable.
-
-Provider request identifiers may be stored when available. Do not persist secrets or unrestricted sensitive provider payloads merely for debugging.
-
-A timeout after dispatch may produce an `UNKNOWN` outcome. A later successful retry can complete the same logical response. Attempt history must not be mistaken for additional conversation messages.
-
-### 3.2 User Sessions
-
-Add a `USER_SESSION` entity to represent individual login sessions.
-
-Proposed fields:
-
-- `id`: UUID primary key.
-- `user_id`: foreign key to `USER_ACCOUNT`.
-- `refresh_token_hash`: hash of the currently valid refresh token.
-- `created_at`.
-- `expires_at`.
-- `last_used_at`, nullable.
-- `revoked_at`, nullable.
-
-Refresh-token rotation must update the stored token hash and invalidate the predecessor atomically. The implementation must also define how refresh-token reuse is detected and handled.
-
-Each login creates a separate session. Revoking one session must not revoke other sessions belonging to the same account; revoking all sessions must invalidate all refresh sessions for that account.
-
-### 3.3 Data Integrity
-
-- Enforce ownership through backend authorization and database relationships.
-- Ensure a logical assistant response is unique within its request lifecycle.
-- Use transactions for state changes that must be atomic, including refresh-token rotation.
-- Use concurrency controls to prevent duplicate submissions or competing attempts from corrupting the response state.
-- Define retention and cleanup policies for expired sessions and attempt records before production deployment.
-
-**Open schema decision:** whether response-processing metadata belongs directly in `MESSAGE` or in a separate `AI_RESPONSE` table. Preserve the logical distinction regardless of the physical schema.
-
-## 4. Entity Definitions
-
-### 4.1 USER_ACCOUNT
-
-Represents a registered MIRA user.
-
-| Field | Proposed type | Constraints | Description |
-|---|---|---|---|
-| `id` | UUID | Primary key | Account identifier |
-| `email` | VARCHAR(254) | Not null, unique after normalization | Login email |
-| `password_hash` | VARCHAR(255) | Not null | Password hash |
-| `created_at` | TIMESTAMPTZ | Not null | Creation timestamp |
-| `updated_at` | TIMESTAMPTZ | Not null | Last account update |
-
-Rules:
-
-- Passwords must never be stored in plaintext.
-- Email normalization must be consistent across registration and authentication.
-- Database uniqueness must be enforced even when concurrent registration requests occur.
-- Authentication failures must not disclose password data.
-- Email changes, if supported, must use a separate validation process.
-
-### 4.2 CONVERSATION
-
-Represents a chat session owned by one user.
-
-| Field | Proposed type | Constraints | Description |
-|---|---|---|---|
-| `id` | UUID | Primary key | Conversation identifier |
-| `user_id` | UUID | Not null, foreign key | Owner account |
-| `title` | VARCHAR(200) | Nullable | Display title |
-| `created_at` | TIMESTAMPTZ | Not null | Creation timestamp |
-| `updated_at` | TIMESTAMPTZ | Not null | Last conversation update |
-
-Rules:
-
-- A conversation belongs to exactly one account.
-- Every read, update, and deletion operation must verify ownership.
-- Conversation titles may initially be null and generated or assigned later.
-- An index should support retrieving conversations by owner and recent update time.
-
-### 4.3 MESSAGE
-
-Represents a persisted message in a conversation.
-
-| Field | Proposed type | Constraints | Description |
-|---|---|---|---|
-| `id` | UUID | Primary key | Message identifier |
-| `conversation_id` | UUID | Not null, foreign key | Parent conversation |
-| `role` | VARCHAR(20) | Not null, constrained values | Message role |
-| `content` | TEXT | Not null | Text content |
-| `created_at` | TIMESTAMPTZ | Not null | Creation timestamp |
-
-Initial role values:
-
-- `USER`
-- `ASSISTANT`
-
-Rules:
-
-- The backend determines the permitted message roles.
-- Clients cannot submit arbitrary system or developer instructions as trusted messages.
-- Messages must only be retrieved through an authorized conversation.
-- An index should support retrieving messages for a conversation in chronological order.
-- Empty-message and maximum-length policies must be enforced by the application and, where appropriate, the database.
-
-The initial text-only model intentionally excludes attachment metadata, tool calls, and multimodal content structures. These can be introduced through an explicit schema extension when their requirements are defined.
-
-### 4.4 USER_STYLE_PROFILE
-
-Represents one user's current communication-style profile.
-
-| Field | Proposed type | Constraints | Description |
-|---|---|---|---|
-| `user_id` | UUID | Primary key, foreign key | Profile owner |
-| `profile` | JSONB | Not null | Structured preferences |
-| `version` | INTEGER | Not null, positive | Profile revision number |
-| `enabled` | BOOLEAN | Not null | Whether memory is applied |
-| `updated_at` | TIMESTAMPTZ | Not null | Last profile update |
-
-The `user_id` field is both the primary key and a foreign key to `USER_ACCOUNT`. This enforces at most one current style profile per account.
-
-Illustrative profile:
-
-    {
-      "explanation_depth": "detailed",
-      "tone": "conversational",
-      "examples": "prefer_concrete_examples",
-      "formatting": "structured"
+    USER_ACCOUNT {
+        uuid id PK
+        varchar email UK "Normalized, unique"
+        varchar password_hash "Argon2id hash"
+        timestamptz created_at
+        timestamptz updated_at
     }
 
-The example is not the final profile schema. Permitted keys, value types, defaults, and validation rules must be defined in application code and covered by tests.
+    USER_SESSION {
+        uuid id PK
+        uuid user_id FK
+        varchar refresh_token_hash "SHA-256 hash"
+        timestamptz created_at
+        timestamptz expires_at
+        timestamptz revoked_at "Nullable"
+        timestamptz last_used_at "Nullable"
+    }
 
-Rules:
+    CONVERSATION {
+        uuid id PK
+        uuid user_id FK
+        varchar title "Nullable, max 200 chars"
+        timestamptz created_at
+        timestamptz updated_at
+    }
 
-- Only communication-style preferences are in scope for the MVP.
-- Model-generated candidate updates must be validated before persistence.
-- Profile updates must preserve unrelated preferences unless they are explicitly changed.
-- The `version` value must increase when the profile changes.
-- Updates must use optimistic concurrency control or an equivalent mechanism to prevent stale writes.
-- Disabling memory must stop the profile from being applied without necessarily deleting it.
-- Deleting memory must remove the stored profile and prevent stale tasks from recreating deleted preferences.
+    MESSAGE {
+        uuid id PK
+        uuid conversation_id FK
+        varchar role "USER or ASSISTANT"
+        text content "Non-empty message content"
+        timestamptz created_at
+    }
 
-## 5. Relationships
+    AI_RESPONSE {
+        uuid id PK
+        uuid conversation_id FK
+        varchar status "PENDING, COMPLETED, FAILED, UNKNOWN"
+        text content "Persisted assistant output"
+        varchar idempotency_key "UK with user_id"
+        timestamptz created_at
+        timestamptz updated_at
+    }
 
-- `USER_ACCOUNT` 1 — 0..N `CONVERSATION`
-- `CONVERSATION` 1 — 0..N `MESSAGE`
-- `USER_ACCOUNT` 1 — 0..1 `USER_STYLE_PROFILE`
+    AI_PROCESSING_ATTEMPT {
+        uuid id PK
+        uuid response_id FK
+        integer attempt_number
+        varchar outcome "SUCCESS, TIMEOUT, ERROR"
+        varchar error_category "Nullable"
+        timestamptz started_at
+        timestamptz finished_at
+    }
 
-Each conversation has one owner. Each message belongs to one conversation. Each account can have one current style profile or no profile.
+    USER_STYLE_PROFILE {
+        uuid user_id PK, FK
+        jsonb profile "Structured preference schema"
+        integer version "OCC monotonic counter"
+        integer generation "Tombstone protection counter"
+        boolean enabled "Personalization toggle"
+        timestamptz updated_at
+    }
+```
 
-## 6. Referential Integrity and Deletion
+---
 
-The physical schema must define explicit foreign-key deletion behavior.
+## 3. Relational Schema Specifications
 
-Recommended initial policy:
+### 3.1 `USER_ACCOUNT`
+Maintains user identity and authentication credentials.
 
-- Deleting a conversation deletes its messages.
-- Deleting a user initiates a documented account-deletion workflow that removes or appropriately handles owned conversations, messages, and style memory.
-- Deleting a conversation must not delete the user's style profile.
-- Account deletion must account for active sessions, outstanding requests, backups, and any data retained under a documented legal or operational requirement.
+```sql
+CREATE TABLE user_account (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(254) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
-Cascading deletion may be used for dependent records where appropriate, but account deletion should be orchestrated carefully so that related data and external resources are handled consistently.
+CREATE UNIQUE INDEX idx_user_account_normalized_email 
+    ON user_account (LOWER(TRIM(email)));
+```
+* **Integrity Rules:**
+  * Emails are validated and normalized before indexing to prevent collision attacks (`user@example.com` vs `USER@example.com`).
+  * `password_hash` stores the output of an adaptive password hasher (Argon2id or bcrypt).
 
-## 7. Indexes and Constraints
+---
 
-Initial database requirements:
+### 3.2 `USER_SESSION`
+Tracks active and historical mobile login sessions to support revocable refresh tokens and session rotation.
 
-- Unique constraint on normalized account email.
-- Foreign keys for all entity relationships.
-- Constraint limiting message roles to permitted values.
-- Positive-value constraint for style-profile version.
-- Index for conversations by owner and update time.
-- Index for messages by conversation and creation order.
+```sql
+CREATE TABLE user_session (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES user_account(id) ON DELETE CASCADE,
+    refresh_token_hash VARCHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ NULL,
+    last_used_at TIMESTAMPTZ NULL
+);
 
-Exact index definitions, normalization strategy, and tie-breaking rules for messages with identical timestamps will be specified in the database migration.
+CREATE INDEX idx_user_session_user_lookup 
+    ON user_session (user_id) 
+    WHERE revoked_at IS NULL;
 
-## 8. Memory Update Concurrency
+CREATE INDEX idx_user_session_hash 
+    ON user_session (refresh_token_hash);
+```
+* **Integrity Rules:**
+  * Only the SHA-256 hash of the cryptographically random refresh token is stored.
+  * When a refresh token is rotated, `revoked_at` is updated atomically, and a new `user_session` record is inserted.
+  * If a revoked token hash is presented, all active sessions for that `user_id` are revoked as a security countermeasure (refresh token reuse detection).
 
-Memory extraction may finish after a user has manually edited or deleted their profile. A stale task must not overwrite the newer state.
+---
 
-The implementation should:
+### 3.3 `CONVERSATION`
+Represents an individual chat thread belonging to a user.
 
-1. Read the current profile and version.
-2. Generate or validate a candidate update.
-3. Attempt to save only if the expected version and current memory state still match.
-4. Increment the version atomically on a successful update.
-5. Discard or recompute the candidate if the profile changed concurrently.
+```sql
+CREATE TABLE conversation (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES user_account(id) ON DELETE CASCADE,
+    title VARCHAR(200) NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
-Memory deletion also requires a strategy for invalidating pending extraction work. A deleted profile must not be silently recreated by an older task.
+CREATE INDEX idx_conversation_user_updated 
+    ON conversation (user_id, updated_at DESC);
+```
+* **Integrity Rules:**
+  * Deleting a user cascades and deletes all associated conversations.
+  * The compound index on `(user_id, updated_at DESC)` ensures efficient pagination of user conversation history.
 
-The precise locking or compare-and-swap implementation will be documented with the memory lifecycle design.
+---
 
-## 9. Data Lifecycle
+### 3.4 `MESSAGE`
+Stores chronological conversation turns.
 
-### Conversation deletion
+```sql
+CREATE TABLE message (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('USER', 'ASSISTANT')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
-Remove the selected conversation and its associated messages according to the deletion policy. Preserve the account's independent style profile.
+CREATE INDEX idx_message_conversation_chronological 
+    ON message (conversation_id, created_at ASC);
+```
+* **Integrity Rules:**
+  * Role values are strictly constrained via a database `CHECK` constraint.
+  * Message ordering is deterministically retrieved via `created_at ASC` (with `id ASC` as an absolute tie-breaker).
 
-### Memory disablement
+---
 
-Retain the profile but exclude it from context assembly for subsequent requests. Define how already-running requests are handled.
+### 3.5 `AI_RESPONSE` & `AI_PROCESSING_ATTEMPT`
+Decouples logical assistant responses from individual HTTP execution attempts, providing clean retry semantics and idempotency protection.
 
-### Memory deletion
+```sql
+CREATE TABLE ai_response (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED', 'UNKNOWN')),
+    content TEXT NULL,
+    idempotency_key VARCHAR(128) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
-Remove the profile and invalidate outstanding updates that could restore it. Verify the result through an authenticated read or a dedicated memory-status endpoint.
+CREATE UNIQUE INDEX idx_ai_response_idempotency 
+    ON ai_response (conversation_id, idempotency_key);
 
-### Account deletion
+CREATE TABLE ai_processing_attempt (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    response_id UUID NOT NULL REFERENCES ai_response(id) ON DELETE CASCADE,
+    attempt_number INTEGER NOT NULL CHECK (attempt_number >= 1),
+    outcome VARCHAR(20) NOT NULL CHECK (outcome IN ('SUCCESS', 'TIMEOUT', 'ERROR')),
+    error_category VARCHAR(50) NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMPTZ NULL
+);
 
-Remove account-owned data according to the account-deletion workflow. Document any backup retention period and eventual purge behavior.
+CREATE INDEX idx_ai_attempt_response 
+    ON ai_processing_attempt (response_id, attempt_number ASC);
+```
+* **Integrity Rules:**
+  * The unique constraint on `(conversation_id, idempotency_key)` guarantees that identical client submissions do not produce duplicate logical responses or duplicate provider executions.
+  * Individual timeout occurrences are logged in `ai_processing_attempt` as `TIMEOUT`, transitioning the parent response to `UNKNOWN` until resolved by a retry.
 
-## 10. Testing Requirements
+---
 
-- Duplicate normalized emails cannot be registered.
-- A user cannot retrieve another user's conversations or messages.
-- Deleting a conversation does not delete the user's style profile.
-- Disabling memory prevents it from influencing new requests.
-- Deleting memory removes the current profile.
-- Stale updates cannot overwrite a newer profile version.
-- A deleted profile cannot be recreated by an outdated extraction task.
-- Invalid profile keys and values are rejected.
-- Referential integrity is preserved during deletion and failed transactions.
+### 3.6 `USER_STYLE_PROFILE`
+Maintains persistent communication-style memory.
 
-## 11. Deferred Schema Extensions
+```sql
+CREATE TABLE user_style_profile (
+    user_id UUID PRIMARY KEY REFERENCES user_account(id) ON DELETE CASCADE,
+    profile JSONB NOT NULL DEFAULT '{}'::jsonb,
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    generation INTEGER NOT NULL DEFAULT 1 CHECK (generation >= 1),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+* **Integrity Rules:**
+  * `user_id` is both the primary key and a foreign key, enforcing a strict 1-to-1 relationship with `user_account`.
+  * Optimistic Concurrency Control: Updates must include a `WHERE user_id = :userId AND version = :expectedVersion` predicate. On match, `version` is incremented by 1.
+  * Tombstone / Generation Protection: When a user deletes their profile, `generation` is incremented, and `profile` is reset to `{}`. Background tasks carrying older generation numbers are automatically aborted to prevent resurrecting deleted memory.
 
-The following are intentionally excluded from the initial four-entity schema:
+---
 
-- Refresh-token or session storage.
-- Memory revision history.
-- Uploaded-file metadata and storage references.
-- AI usage and cost accounting.
-- Audit-event storage.
-- Message processing and idempotency records.
+## 4. Database Migrations & Versioning Strategy
 
-These entities should be added when their corresponding API, security, or operational requirements are specified, rather than preemptively creating unused tables.
+All physical schema definitions are maintained using **Flyway** under `backend/src/main/resources/db/migration/`:
 
-## 12. Open Decisions
+| Migration Script | Scope & Description |
+| :--- | :--- |
+| `V1__init_user_account.sql` | Create `user_account` and normalized email indices. |
+| `V2__init_user_session.sql` | Create `user_session` table and hash lookup indices. |
+| `V3__init_conversation_message.sql` | Create `conversation` and `message` tables with constraints. |
+| `V4__init_ai_response_lifecycle.sql`| Create `ai_response` and `ai_processing_attempt` tables. |
+| `V5__init_user_style_profile.sql` | Create `user_style_profile` table with JSONB and OCC constraints. |
 
-- Whether account deletion is immediate or handled asynchronously.
-- Whether message edits are supported.
-- Whether conversation titles are user-defined, model-generated, or both.
-- Whether memory revision history is required for the portfolio MVP.
-- Whether an explicit request-id or idempotency mechanism is required for message submission.
-- Exact style-profile keys, permitted values, and validation rules.
-- Authentication session and refresh-token persistence strategy.
+> [!NOTE]
+> Database migrations must be forward-compatible. Destructive migrations (e.g., dropping columns) must follow a multi-step expand-and-contract deployment pattern.

@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-MEM-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-10-11 |
 | **Author / Lead** | Bryan / MIRA Personalization & Memory Team |
 | **Scope** | Persistent Communication-Style Preferences |
@@ -17,7 +17,8 @@
 | Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
 | 0.1.0 | 2026-10-10 | Memory Team | Initial memory scope, schema draft, and extraction lifecycle definition. |
-| 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid extraction pipeline, eligibility gate specification, generation tombstone mechanics, and unified draft notes. |
+| 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid extraction pipeline, eligibility gate specification, and generation tombstone mechanics. |
+| 1.1.0 | 2026-10-11 | Bryan | Integrated durable `USER_MEMORY_CONTROL` generation table, atomic row-level locking deletion protocol, and robust deletion-race verification suite. |
 
 ---
 
@@ -29,7 +30,7 @@ The MIRA personalization engine is built upon five foundational axioms:
 2. **Current Request Dominance:** Immediate, explicit prompt instructions in an active conversation (e.g., *"Provide this specific answer in bullet points"*) **always** take precedence over historical style preferences.
 3. **Manual Overrides Automated:** A direct user edit or deletion in profile settings **always** overrules and invalidates automated background model extractions.
 4. **Extraction Decoupled from Ingestion:** Chat responses are delivered to users without waiting for memory extraction. Extraction runs asynchronously and never impacts chat latency or response availability.
-5. **Strict Eligibility Gate:** Memory extraction is permitted **only** on messages associated with successfully persisted assistant responses in `COMPLETED` status.
+5. **Strict Eligibility Gate:** Memory extraction is permitted **only** on messages associated with successfully persisted assistant responses in `COMPLETED` status. In-flight (`PENDING`), failed (`FAILED`), or unresolved (`UNKNOWN`) responses are strictly ineligible.
 
 ---
 
@@ -46,8 +47,8 @@ flowchart TD
     end
 
     subgraph ExtractionPipeline ["2. Candidate Extraction & Validation"]
-        TriggerExtraction --> ReadGen["Capture Current Generation & Version"]
-        ReadGen --> ParseSignals["LLM Analyzes Message Turn"]
+        TriggerExtraction --> CaptureExpectedGen["Capture Immutable expected_generation\n& Profile version"]
+        CaptureExpectedGen --> ParseSignals["LLM Analyzes Message Turn"]
         ParseSignals --> ValidateSchema{"Conforms to Allowed Schema?"}
         ValidateSchema -- No --> DiscardCandidate["Discard Malformed Candidate"]
         ValidateSchema -- Yes --> ClassifyPolicy{"Classify Candidate Policy"}
@@ -56,13 +57,18 @@ flowchart TD
     subgraph PolicyEngine ["3. Hybrid Persistence Engine"]
         ClassifyPolicy -- "Ephemeral Instruction" --> DiscardCandidate
         ClassifyPolicy -- "Weak / Inferred Preference" --> HoldForEvidence["Stage Candidate / Await Confirmation"]
-        ClassifyPolicy -- "Explicit Durable Preference" --> VerifyState["Proceed to Concurrency Gate"]
+        ClassifyPolicy -- "Explicit Durable Preference" --> ProceedToCommit["Proceed to Atomic Transaction Gate"]
     end
 
-    subgraph ConcurrencyGate ["4. Optimistic Concurrency Control (OCC)"]
-        VerifyState --> CheckGen{"Generation == CapturedGen AND Version == CapturedVer?"}
-        CheckGen -- No (User Edited or Deleted Concurrently) --> AbortStale["Abort: Prevent Stale Overwrite"]
-        CheckGen -- Yes --> CommitUpdate["Atomically Commit JSONB & Increment Version"]
+    subgraph ConcurrencyGate ["4. Transactional Lock & Generation Gate"]
+        ProceedToCommit --> LockControl["BEGIN TX; Lock USER_MEMORY_CONTROL\n(SELECT FOR UPDATE)"]
+        LockControl --> CheckGen{"current_generation == expected_generation?"}
+        CheckGen -- No (User Deleted Profile Concurrently) --> AbortStale["ROLLBACK; Stale Task Terminated"]
+        CheckGen -- Yes --> CheckEnabled{"Memory Still Enabled?"}
+        CheckEnabled -- No --> AbortDisabled["ROLLBACK; Disabled Profile Unmodified"]
+        CheckEnabled -- Yes --> CheckOCC{"version == expectedVersion?"}
+        CheckOCC -- No --> AbortOCC["ROLLBACK; Version Conflict Handled"]
+        CheckOCC -- Yes --> CommitUpdate["Persist Profile JSONB, Increment Version\nCOMMIT TX"]
     end
 ```
 
@@ -127,33 +133,79 @@ stateDiagram-v2
 
 ---
 
-## 5. Concurrency Controls & Race Condition Mitigations
+## 5. Concurrency Controls & Memory Deletion Race Protection
 
-Because memory extraction executes asynchronously, background tasks can finish **after** a user has manually updated their profile or deleted it entirely.
+Because memory extraction executes asynchronously in background workers, tasks may complete **after** a user has manually updated their profile, disabled memory, or purged it entirely. MIRA coordinates these operations via database-level concurrency controls.
 
-### 5.1 Optimistic Concurrency Control (OCC)
-Every update transaction enforces atomic version checking:
-```sql
-UPDATE user_style_profile
-SET profile = :updatedProfileJson,
-    version = version + 1,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = :userId 
-  AND version = :expectedVersion;
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User Action
+    participant API as Backend Service
+    participant DB as PostgreSQL
+    participant Worker as Background Extraction Worker
+
+    Note over Worker: 1. Extraction Job Dispatched
+    Worker->>DB: Read state: captures expected_generation = 1
+    Worker->>Worker: LLM analyzes conversational turn...
+
+    Note over User, DB: 2. Concurrent Memory Deletion
+    User->>API: DELETE /api/v1/memory/style
+    API->>DB: BEGIN TRANSACTION;
+    API->>DB: SELECT * FROM user_memory_control WHERE user_id = :id FOR UPDATE;
+    API->>DB: UPDATE user_memory_control SET generation = generation + 1 (gen -> 2);
+    API->>DB: DELETE FROM user_style_profile WHERE user_id = :id;
+    API->>DB: COMMIT TRANSACTION;
+    API-->>User: 204 No Content (Memory Purged)
+
+    Note over Worker, DB: 3. Extraction Attempt With Stale Generation
+    Worker->>DB: BEGIN TRANSACTION;
+    Worker->>DB: SELECT generation FROM user_memory_control WHERE user_id = :id FOR UPDATE;
+    Worker->>Worker: Compare: current_generation (2) != expected_generation (1)
+    Worker->>DB: ROLLBACK TRANSACTION;
+    Worker->>Worker: Terminate Job: Stale Generation Detected!
+    Note over DB: Profile remains completely purged. Zero resurrection.
 ```
-If the database record has been updated concurrently (i.e., `version != :expectedVersion`), zero rows are updated, and the background task discards its candidate rather than overwriting newer user preferences.
 
-### 5.2 Generation Counter (Tombstone Protection Against Deletion Race)
-When a user purges their memory via `DELETE /api/v1/memory/style`:
+### 5.1 Durable Generation Control (`USER_MEMORY_CONTROL`)
+To ensure that generational counters persist even when `USER_STYLE_PROFILE` rows are physically deleted, MIRA maintains a dedicated, durable control record per user:
+
 ```sql
-UPDATE user_style_profile
-SET profile = '{}'::jsonb,
-    generation = generation + 1,
-    version = version + 1,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = :userId;
+CREATE TABLE user_memory_control (
+    user_id UUID PRIMARY KEY REFERENCES user_account(id) ON DELETE CASCADE,
+    generation INTEGER NOT NULL DEFAULT 1 CHECK (generation >= 1),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 ```
-Background extraction jobs capture the `generation` number at the time they are dispatched. If `capturedGeneration < currentGeneration` upon persistence attempt, the extraction job is terminated. This guarantees that an in-flight background task cannot accidentally resurrect a deleted memory profile.
+* **Immutable Capture:** When an extraction job is created, it captures an immutable `expected_generation` value. The worker must **never** replace this value with the current generation when processing begins.
+
+### 5.2 Atomic Deletion Protocol
+Deleting a style profile must execute atomically within a single database transaction:
+1. Lock the user's `user_memory_control` row using `SELECT ... FOR UPDATE`.
+2. Increment its `generation` counter (`generation = generation + 1`).
+3. Delete the associated `user_style_profile` record (or reset its JSONB payload).
+4. Commit the transaction before reporting successful deletion (`204 No Content`) to the client.
+
+### 5.3 Transactional Extraction Commit Protocol
+Before persisting an extracted profile, the worker must execute within an atomic transaction:
+1. Lock the user's `user_memory_control` record using `SELECT ... FOR UPDATE`.
+2. Compare the database `generation` with the job's immutable `expected_generation`.
+3. **Reject and abort** the write if the generations differ.
+4. Verify that memory is currently enabled; if disabled, abort without modifying the profile.
+5. Verify that the profile update satisfies the current `version` precondition (Optimistic Concurrency Control).
+6. Persist the profile and commit the transaction.
+
+> [!IMPORTANT]
+> The generation check, enabled check, and profile write must occur within the **same database transaction under row lock**. An un-locked read outside the write transaction is insufficient to prevent race windows.
+
+### 5.4 Disabled Memory Behavior
+* When a user toggles memory to `enabled: false`, the profile is immediately excluded from prompt context assembly for subsequent AI requests.
+* Background workers must verify the `enabled` flag inside the locked commit transaction. If memory is disabled, the worker must not commit modifications to the stored profile.
+
+### 5.5 Establishing Preferences After Deletion
+* Deleting a profile permanently invalidates all background extraction work associated with earlier generations.
+* Subsequent conversational activity occurring **after** deletion will capture the *new* generation number, allowing fresh preferences to be established cleanly under the current generation.
+* Stale jobs created prior to deletion cannot commit simply because their execution was delayed.
 
 ---
 
@@ -167,7 +219,7 @@ flowchart LR
         View["GET /memory/style\n(Inspect active preferences)"]
         Edit["PUT /memory/style\n(Manual override with OCC)"]
         Toggle["PATCH /memory/style/settings\n(Enable/Disable toggle)"]
-        Purge["DELETE /memory/style\n(Purge profile & bump generation)"]
+        Purge["DELETE /memory/style\n(Atomic generation bump & purge)"]
     end
 
     subgraph ProfileState ["Persistent Profile State"]
@@ -187,4 +239,20 @@ flowchart LR
 * **Inspecting Memory:** Returns the currently active preferences, version integer, and enabled state.
 * **Editing Memory:** Manually replaces preferences with full schema validation; increments the version counter.
 * **Toggling Memory:** Setting `enabled: false` immediately excludes the profile from all future AI prompt context assemblies without deleting the underlying preference configuration.
-* **Purging Memory:** Completely resets the JSONB structure, increments the generation counter, and permanently aborts any pending asynchronous extraction workers.
+* **Purging Memory:** Atomically increments the generation counter in `USER_MEMORY_CONTROL` and purges the profile, permanently neutralizing in-flight extraction workers.
+
+---
+
+## 7. Verification & Concurrency Test Suite Requirements
+
+The memory subsystem must pass deterministic automated tests covering race conditions and lifecycle edge cases:
+
+| Test ID | Test Scenario | Setup & Injected Condition | Expected System Behavior |
+| :--- | :--- | :--- | :--- |
+| **MEM-TEST-01** | Stale Task After Deletion | Extraction job starts (`gen=1`). User deletes memory (`gen=2`). Worker attempts commit. | Worker aborts commit on generation mismatch. Profile remains deleted. |
+| **MEM-TEST-02** | Queued Job Execution | Multiple jobs queued under `gen=1`. User deletes memory (`gen=2`). Workers start execution. | All queued workers with `expected_generation=1` abort commit. |
+| **MEM-TEST-03** | Concurrent Delete & Extraction | Thread A executes deletion while Thread B executes commit concurrently. | Serialized cleanly by `SELECT FOR UPDATE`. Winner commits; stale operation is safely aborted. |
+| **MEM-TEST-04** | Commit on Disabled Memory | Job captures valid generation. User toggles `enabled=false`. Worker attempts commit. | Worker detects disabled state under transaction lock; aborts without altering profile. |
+| **MEM-TEST-05** | New Profile Post-Deletion | Memory is purged (`gen=2`). User subsequently makes explicit durable statement. | New task captures `expected_generation=2` and successfully establishes a fresh profile. |
+| **MEM-TEST-06** | OCC Version Collision | Two workers race to commit to the same generation with identical `expectedVersion`. | Exactly one worker succeeds; the second receives OCC conflict and aborts safely. |
+| **MEM-TEST-07** | Worker & Service Restart | Background extraction job persists across server restart. | Stale job still carries its immutable `expected_generation` and is rejected if memory was purged during downtime. |

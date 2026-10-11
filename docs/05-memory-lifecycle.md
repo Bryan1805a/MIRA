@@ -161,6 +161,47 @@ Example:
 
 This correction takes precedence over an older inferred preference.
 
+### 5.6 Hybrid Memory Persistence Policy
+
+MIRA uses a hybrid policy to balance personalization convenience with memory accuracy.
+
+#### Explicit durable preferences
+
+A preference may be persisted automatically when the user clearly expresses an ongoing communication-style preference.
+
+Examples:
+
+- "From now on, explain technical concepts from first principles."
+- "I generally prefer concrete examples before abstract explanations."
+
+Before persistence, the backend must validate the candidate's scope, field, value, and consistency with the latest profile state.
+
+#### Inferred preferences
+
+Preferences inferred from behavior must not be persisted automatically based on a single ambiguous interaction.
+
+They require either:
+
+- Explicit user confirmation, or
+- Sufficient supporting evidence under a documented validation policy.
+
+If neither condition is satisfied, the candidate remains unpersisted.
+
+#### Temporary instructions
+
+Instructions scoped to a particular response, task, or conversation are not durable preferences by default.
+
+#### Corrections and deletion
+
+Explicit user corrections take precedence over older inferred preferences. Memory deletion invalidates pending updates associated with the deleted profile generation.
+
+#### Acceptance criteria
+
+- Explicit durable preferences can be saved without a confirmation prompt after validation.
+- Inferred preferences require confirmation or sufficient supporting evidence.
+- Temporary instructions are not automatically promoted to persistent preferences.
+- No candidate can bypass validation or overwrite a newer user correction.
+
 ## 6. Candidate Extraction and Validation
 
 Extraction and persistence are separate operations.

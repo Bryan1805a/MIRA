@@ -25,10 +25,21 @@ import org.testcontainers.utility.DockerImageName;
 import java.time.Instant;
 import java.util.UUID;
 
+import tools.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 @SpringBootTest
+@AutoConfigureMockMvc
 class MiraBackendApplicationTests {
 
     @Container
@@ -59,6 +70,12 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private MockMvc mockMvc;
+    
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     void contextLoads() {
@@ -171,7 +188,6 @@ class MiraBackendApplicationTests {
         );
     }
 
-    
     @Test
     void registrationStoresNormalizedEmailAndVerifiablePasswordHash() {
         String email = "  Bryan-" + UUID.randomUUID()
@@ -226,6 +242,77 @@ class MiraBackendApplicationTests {
                 )
         );
     }
+
+
+    @Test
+    void registrationEndpointReturnsCreatedAndDoesNotExposePasswordHash()
+            throws Exception {
+            
+        var request = new com.mira.mira_backend.dto.RegisterRequest(
+                "  Api-" + UUID.randomUUID() + "@Example.com  ",
+                "Correct-Horse-123!"
+        );
+    
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNotEmpty())
+                .andExpect(jsonPath("$.email").value(
+                        request.email().trim().toLowerCase(
+                                java.util.Locale.ROOT
+                        )
+                ))
+                .andExpect(jsonPath("$.createdAt").isNotEmpty())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+    
+    @Test
+    void registrationEndpointReturnsConflictForDuplicateEmail()
+            throws Exception {
+            
+        String email = "api-duplicate-" + UUID.randomUUID()
+                + "@example.com";
+    
+        var firstRequest = new com.mira.mira_backend.dto.RegisterRequest(
+                email,
+                "Correct-Horse-123!"
+        );
+    
+        var duplicateRequest = new com.mira.mira_backend.dto.RegisterRequest(
+                "  " + email.toUpperCase() + "  ",
+                "Another-Password-456!"
+        );
+    
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(firstRequest)))
+                .andExpect(status().isCreated());
+    
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(duplicateRequest)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error")
+                        .value("email_already_registered"));
+    }
+    
+    @Test
+    void registrationEndpointRejectsInvalidRequest()
+            throws Exception {
+            
+        var request = new com.mira.mira_backend.dto.RegisterRequest(
+                "not-an-email",
+                "short"
+        );
+    
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
 
 
     private static String newTokenHash() {

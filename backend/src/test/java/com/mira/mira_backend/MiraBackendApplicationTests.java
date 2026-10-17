@@ -5,6 +5,11 @@ import com.mira.mira_backend.entity.UserSession;
 import com.mira.mira_backend.repository.UserAccountRepository;
 import com.mira.mira_backend.repository.UserSessionRepository;
 
+import com.mira.mira_backend.service.DuplicateEmailException;
+import com.mira.mira_backend.service.InvalidRegistrationException;
+import com.mira.mira_backend.service.UserAccountService;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,6 +53,12 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private UserSessionRepository userSessionRepository;
+
+    @Autowired
+    private UserAccountService userAccountService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Test
     void contextLoads() {
@@ -159,6 +170,63 @@ class MiraBackendApplicationTests {
                 )
         );
     }
+
+    
+    @Test
+    void registrationStoresNormalizedEmailAndVerifiablePasswordHash() {
+        String email = "  Bryan-" + UUID.randomUUID()
+                + "@Example.com  ";
+        String password = "Correct-Horse-123!";
+    
+        UserAccount account =
+                userAccountService.register(email, password);
+    
+        assertEquals(
+                email.trim().toLowerCase(java.util.Locale.ROOT),
+                account.getEmail()
+        );
+    
+        assertNotEquals(password, account.getPasswordHash());
+        assertTrue(passwordEncoder.matches(
+                password,
+                account.getPasswordHash()
+        ));
+    }
+    
+    @Test
+    void registrationRejectsDuplicateNormalizedEmail() {
+        String email = "Bryan-" + UUID.randomUUID() + "@example.com";
+    
+        userAccountService.register(email, "Correct-Horse-123!");
+    
+        assertThrows(
+                DuplicateEmailException.class,
+                () -> userAccountService.register(
+                        "  " + email.toUpperCase() + "  ",
+                        "Another-Password-456!"
+                )
+        );
+    }
+    
+    @Test
+    void registrationRejectsInvalidEmailAndWeakPassword() {
+        assertThrows(
+                InvalidRegistrationException.class,
+                () -> userAccountService.register(
+                        "not-an-email",
+                        "Correct-Horse-123!"
+                )
+        );
+    
+        assertThrows(
+                InvalidRegistrationException.class,
+                () -> userAccountService.register(
+                        "valid-" + UUID.randomUUID() + "@example.com",
+                        "short"
+                )
+        );
+    }
+
 
     private static String newTokenHash() {
         return UUID.randomUUID().toString().replace("-", "")

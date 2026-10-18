@@ -111,6 +111,12 @@
 			<version>1.80</version>
 		</dependency>
 
+		<!-- JWT signing and verification using Spring Security JOSE -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-jose</artifactId>
+		</dependency>
+
 	</dependencies>
 
 	<build>

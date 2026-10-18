@@ -32,3 +32,5 @@ application-local.properties
 
 # Logs
 *.log
+
+secret.txt

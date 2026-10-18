@@ -1,9 +1,9 @@
-
 package com.mira.mira_backend.exception;
 
 import com.mira.mira_backend.dto.ApiErrorResponse;
 import com.mira.mira_backend.service.DuplicateEmailException;
 import com.mira.mira_backend.service.InvalidRegistrationException;
+import com.mira.mira_backend.service.InvalidCredentialsException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,5 +61,16 @@ public class ApiExceptionHandler {
                         exception.getMessage()
                 )
         );
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(
+            InvalidCredentialsException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ApiErrorResponse(
+                        "invalid_credentials",
+                        "Invalid email or password."
+                ));
     }
 }

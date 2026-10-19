@@ -1,4 +1,3 @@
-
 package com.mira.mira_backend.entity;
 
 import jakarta.persistence.Column;

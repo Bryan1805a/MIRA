@@ -7,6 +7,8 @@ import com.mira.mira_backend.repository.UserSessionRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.mira.mira_backend.entity.RefreshTokenHistory;
+import com.mira.mira_backend.repository.RefreshTokenHistoryRepository;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -22,15 +24,18 @@ public class AuthenticationService {
     private final UserSessionRepository userSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
+    private final RefreshTokenHistoryRepository refreshTokenHistoryRepository;
 
     public AuthenticationService(
             UserAccountRepository userAccountRepository,
             UserSessionRepository userSessionRepository,
+            RefreshTokenHistoryRepository refreshTokenHistoryRepository,
             PasswordEncoder passwordEncoder,
             TokenService tokenService
     ) {
         this.userAccountRepository = userAccountRepository;
         this.userSessionRepository = userSessionRepository;
+        this.refreshTokenHistoryRepository = refreshTokenHistoryRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
     }
@@ -73,6 +78,14 @@ public class AuthenticationService {
 
         UserSession savedSession =
                 userSessionRepository.saveAndFlush(session);
+
+        RefreshTokenHistory initialHistory = new RefreshTokenHistory(
+                savedSession,
+                refreshTokenHash,
+                Instant.now()
+        );
+
+        refreshTokenHistoryRepository.saveAndFlush(initialHistory);
 
         return new LoginResult(
                 account.getId(),

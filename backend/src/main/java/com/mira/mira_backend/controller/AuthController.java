@@ -7,6 +7,9 @@ import com.mira.mira_backend.service.UserAccountService;
 import com.mira.mira_backend.dto.LoginRequest;
 import com.mira.mira_backend.dto.LoginResponse;
 import com.mira.mira_backend.service.AuthenticationService;
+import com.mira.mira_backend.dto.RefreshRequest;
+import com.mira.mira_backend.dto.RefreshResponse;
+import com.mira.mira_backend.service.RefreshTokenService;
 
 import jakarta.validation.Valid;
 
@@ -20,12 +23,15 @@ public class AuthController {
 
     private final UserAccountService userAccountService;
     private final AuthenticationService authenticationService;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthController(
         UserAccountService userAccountService,
-        AuthenticationService authenticationService) {
+        AuthenticationService authenticationService,
+        RefreshTokenService refreshTokenService) {
                 this.userAccountService = userAccountService;
                 this.authenticationService = authenticationService;
+                this.refreshTokenService = refreshTokenService;
     }
 
     @PostMapping("/register")
@@ -59,6 +65,27 @@ public class AuthController {
                 );
     
         LoginResponse response = new LoginResponse(
+                result.userId(),
+                result.email(),
+                result.sessionId(),
+                "Bearer",
+                result.accessToken(),
+                result.accessTokenExpiresAt(),
+                result.refreshToken(),
+                result.refreshTokenExpiresAt()
+        );
+    
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshResponse> refresh(
+            @Valid @RequestBody RefreshRequest request
+    ) {
+        RefreshTokenService.RefreshResult result =
+                refreshTokenService.refresh(request.refreshToken());
+    
+        RefreshResponse response = new RefreshResponse(
                 result.userId(),
                 result.email(),
                 result.sessionId(),

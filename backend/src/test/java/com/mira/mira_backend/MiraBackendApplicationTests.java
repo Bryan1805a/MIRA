@@ -472,6 +472,34 @@ class MiraBackendApplicationTests {
         }
     }
 
+    @Test
+    void meReturnsAuthenticatedUsersProfile() throws Exception {
+        String email = "me-" + UUID.randomUUID() + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        mockMvc.perform(get("/api/v1/me")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNotEmpty())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.createdAt").isNotEmpty())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+    }
+
+    @Test
+    void meRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error")
+                        .value("authentication_required"));
+    }
+
 
 
     private static String newTokenHash() {

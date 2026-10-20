@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class UserAccountService {
@@ -38,6 +39,7 @@ public class UserAccountService {
         this.validator = validator;
     }
 
+    // Register service
     @Transactional
     public UserAccount register(String email, String rawPassword) {
         
@@ -76,6 +78,13 @@ public class UserAccountService {
             // Do not misreport unrelated database failures as duplicates.
             throw exception;
         }
+    }
+
+    // Find user by ID
+    @Transactional(readOnly = true)
+    public UserAccount getById(UUID userId) {
+        return userAccountRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
     }
 
     private boolean isEmailUniqueViolation(Throwable exception) {

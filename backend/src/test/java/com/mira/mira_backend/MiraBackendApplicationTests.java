@@ -30,10 +30,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -313,10 +316,209 @@ class MiraBackendApplicationTests {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void protectedEndpointRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/conversations"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error")
+                        .value("authentication_required"));
+    }
+
+    @Test
+    void logoutRevokesOnlyThePresentedSession() throws Exception {
+        String email = "logout-" + UUID.randomUUID() + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens first = login(email, password);
+        LoginTokens second = login(email, password);
+    
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(
+                                "Authorization",
+                                "Bearer " + first.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.LogoutRequest(
+                                        first.refreshToken()
+                                )
+                        )))
+                .andExpect(status().isNoContent());
+    
+        assertNotNull(
+                userSessionRepository.findById(first.sessionId())
+                        .orElseThrow()
+                        .getRevokedAt()
+        );
+    
+        assertNull(
+                userSessionRepository.findById(second.sessionId())
+                        .orElseThrow()
+                        .getRevokedAt()
+        );
+    
+        // The logged-out session's refresh token must no longer work.
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.RefreshRequest(
+                                        first.refreshToken()
+                                )
+                        )))
+                .andExpect(status().isUnauthorized());
+    
+        // The other session must still work.
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.RefreshRequest(
+                                        second.refreshToken()
+                                )
+                        )))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void logoutRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"anything\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error")
+                        .value("authentication_required"));
+    }
+
+    @Test
+    void userCannotRevokeAnotherUsersSession() throws Exception {
+        String password = "Correct-Horse-123!";
+        String emailA = "logout-a-" + UUID.randomUUID() + "@example.com";
+        String emailB = "logout-b-" + UUID.randomUUID() + "@example.com";
+    
+        register(emailA, password);
+        register(emailB, password);
+    
+        LoginTokens a = login(emailA, password);
+        LoginTokens b = login(emailB, password);
+    
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(
+                                "Authorization",
+                                "Bearer " + a.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.LogoutRequest(
+                                        b.refreshToken()
+                                )
+                        )))
+                .andExpect(status().isNoContent());
+    
+        assertNull(
+                userSessionRepository.findById(b.sessionId())
+                        .orElseThrow()
+                        .getRevokedAt()
+        );
+    
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.RefreshRequest(
+                                        b.refreshToken()
+                                )
+                        )))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void logoutRejectsBlankRefreshToken() throws Exception {
+        String email = "logout-blank-"
+                + UUID.randomUUID() + "@example.com";
+    
+        register(email, "Correct-Horse-123!");
+        LoginTokens tokens = login(email, "Correct-Horse-123!");
+    
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void logoutIsIdempotent() throws Exception {
+        String email = "logout-idem-"
+                + UUID.randomUUID() + "@example.com";
+    
+        register(email, "Correct-Horse-123!");
+        LoginTokens tokens = login(email, "Correct-Horse-123!");
+    
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/v1/auth/logout")
+                            .header(
+                                    "Authorization",
+                                    "Bearer " + tokens.accessToken()
+                            )
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new com.mira.mira_backend.dto.LogoutRequest(
+                                            tokens.refreshToken()
+                                    )
+                            )))
+                    .andExpect(status().isNoContent());
+        }
+    }
+
 
 
     private static String newTokenHash() {
         return UUID.randomUUID().toString().replace("-", "")
                 + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private void register(String email, String password) throws Exception {
+    mockMvc.perform(post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(
+                            new com.mira.mira_backend.dto.RegisterRequest(
+                                    email,
+                                    password
+                            )
+                    )))
+            .andExpect(status().isCreated());
+    }
+    
+    private LoginTokens login(String email, String password)
+            throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.LoginRequest(
+                                        email,
+                                        password
+                                )
+                        )))
+                .andExpect(status().isOk())
+                .andReturn();
+    
+        var body = objectMapper.readTree(
+                result.getResponse().getContentAsString()
+        );
+    
+        return new LoginTokens(
+                body.get("accessToken").stringValue(),
+                body.get("refreshToken").stringValue(),
+                UUID.fromString(body.get("sessionId").stringValue())
+        );
+    }
+    
+    private record LoginTokens(
+            String accessToken,
+            String refreshToken,
+            UUID sessionId
+    ) {
     }
 }

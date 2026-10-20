@@ -14,6 +14,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import  java.util.UUID;
 
 @Service
 public class AuthenticationService {
@@ -96,6 +98,35 @@ public class AuthenticationService {
                 refreshToken,
                 refreshTokenExpiresAt
         );
+    }
+
+    @Transactional
+    public void logout(UUID userId, String rawRefreshToken) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        Objects.requireNonNull(
+                rawRefreshToken,
+                "rawRefreshToken must not be null"
+        );
+    
+        String refreshTokenHash =
+                tokenService.hashRefreshToken(rawRefreshToken);
+    
+        Optional<UserSession> lockedSession =
+                userSessionRepository.findByRefreshTokenHashForUpdate(
+                        refreshTokenHash
+                );
+    
+        if (lockedSession.isEmpty()) {
+            return;
+        }
+    
+        UserSession session = lockedSession.get();
+    
+        if (!session.getUser().getId().equals(userId)) {
+            return;
+        }
+    
+        session.revoke(Instant.now());
     }
 
     public record LoginResult(

@@ -3,6 +3,7 @@ package com.mira.mira_backend.exception;
 import com.mira.mira_backend.dto.ApiErrorResponse;
 import com.mira.mira_backend.service.DuplicateEmailException;
 import com.mira.mira_backend.service.InvalidRegistrationException;
+import com.mira.mira_backend.service.UserNotFoundException;
 import com.mira.mira_backend.service.InvalidCredentialsException;
 
 import org.springframework.http.HttpStatus;
@@ -72,5 +73,17 @@ public class ApiExceptionHandler {
                         "invalid_credentials",
                         "Invalid email or password."
                 ));
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleUserNotFound(
+            UserNotFoundException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                new ApiErrorResponse(
+                        "resource_not_found",
+                        "The requested resource was not found."
+                )
+        );
     }
 }

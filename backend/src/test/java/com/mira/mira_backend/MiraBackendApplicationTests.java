@@ -2,8 +2,10 @@ package com.mira.mira_backend;
 
 import com.mira.mira_backend.entity.UserAccount;
 import com.mira.mira_backend.entity.UserSession;
+import com.mira.mira_backend.repository.ConversationRepository;
 import com.mira.mira_backend.repository.UserAccountRepository;
 import com.mira.mira_backend.repository.UserSessionRepository;
+import com.mira.mira_backend.entity.Conversation;
 
 import com.mira.mira_backend.service.DuplicateEmailException;
 import com.mira.mira_backend.service.InvalidRegistrationException;
@@ -16,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.data.domain.PageRequest;
 
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -24,6 +27,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,6 +83,9 @@ class MiraBackendApplicationTests {
     
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private ConversationRepository conversationRepository;
 
     @Test
     void contextLoads() {
@@ -500,7 +507,94 @@ class MiraBackendApplicationTests {
                         .value("authentication_required"));
     }
 
+    @Test
+    void conversationCanBeFoundOnlyByItsOwner() {
+        String suffix = UUID.randomUUID().toString();
+    
+        UserAccount owner = userAccountRepository.saveAndFlush(
+                new UserAccount(
+                        "conversation-owner-" + suffix + "@example.com",
+                        "test-password-hash"
+                )
+        );
+    
+        UserAccount otherUser = userAccountRepository.saveAndFlush(
+                new UserAccount(
+                        "conversation-other-" + suffix + "@example.com",
+                        "test-password-hash"
+                )
+        );
+    
+        Conversation conversation = conversationRepository.saveAndFlush(
+                new Conversation(owner, "First conversation")
+        );
+    
+        assertTrue(
+                conversationRepository.findOwnedById(
+                        conversation.getId(),
+                        owner.getId()
+                ).isPresent()
+        );
+    
+        assertFalse(
+                conversationRepository.findOwnedById(
+                        conversation.getId(),
+                        otherUser.getId()
+                ).isPresent()
+        );
+    }
 
+    @Test
+    void conversationsAreOrderedNewestFirstAndPaginateWithACursor()
+            throws InterruptedException {
+        UserAccount owner = userAccountRepository.saveAndFlush(
+                new UserAccount(
+                        "conversation-page-" + UUID.randomUUID()
+                                + "@example.com",
+                        "test-password-hash"
+                )
+        );
+    
+        Conversation first = conversationRepository.saveAndFlush(
+                new Conversation(owner, "First")
+        );
+    
+        Thread.sleep(5);
+    
+        Conversation second = conversationRepository.saveAndFlush(
+                new Conversation(owner, "Second")
+        );
+    
+        Thread.sleep(5);
+    
+        Conversation third = conversationRepository.saveAndFlush(
+                new Conversation(owner, "Third")
+        );
+    
+        List<Conversation> firstPage =
+                conversationRepository.findFirstPage(
+                        owner.getId(),
+                        PageRequest.of(0, 2)
+                );
+    
+        assertEquals(
+                List.of(third.getId(), second.getId()),
+                firstPage.stream().map(Conversation::getId).toList()
+        );
+    
+        List<Conversation> secondPage =
+                conversationRepository.findPageAfter(
+                        owner.getId(),
+                        second.getUpdatedAt(),
+                        second.getId(),
+                        PageRequest.of(0, 2)
+                );
+    
+        assertEquals(
+                List.of(first.getId()),
+                secondPage.stream().map(Conversation::getId).toList()
+        );
+    }
 
     private static String newTokenHash() {
         return UUID.randomUUID().toString().replace("-", "")

@@ -10,12 +10,16 @@ import com.mira.mira_backend.service.AuthenticationService;
 import com.mira.mira_backend.dto.RefreshRequest;
 import com.mira.mira_backend.dto.RefreshResponse;
 import com.mira.mira_backend.service.RefreshTokenService;
+import com.mira.mira_backend.dto.LogoutRequest;
 
 import jakarta.validation.Valid;
+import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -95,7 +99,19 @@ public class AuthController {
                 result.refreshToken(),
                 result.refreshTokenExpiresAt()
         );
-    
+
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody LogoutRequest request
+    ) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+    
+        authenticationService.logout(userId, request.refreshToken());
+    
+        return ResponseEntity.noContent().build();
     }
 }

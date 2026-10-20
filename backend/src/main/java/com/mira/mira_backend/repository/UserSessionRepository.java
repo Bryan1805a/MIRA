@@ -26,4 +26,15 @@ public interface UserSessionRepository
     Optional<UserSession> findByIdForUpdate(
             @Param("sessionId") UUID sessionId
     );
+
+    // finds the session by the current refresh-token hash
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT s
+            FROM UserSession s
+            WHERE s.refreshTokenHash = :refreshTokenHash
+            """)
+    Optional<UserSession> findByRefreshTokenHashForUpdate(
+            @Param("refreshTokenHash") String refreshTokenHash
+);
 }

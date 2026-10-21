@@ -6,6 +6,8 @@ import com.mira.mira_backend.service.DuplicateEmailException;
 import com.mira.mira_backend.service.InvalidCredentialsException;
 import com.mira.mira_backend.service.InvalidRegistrationException;
 import com.mira.mira_backend.service.UserNotFoundException;
+import com.mira.mira_backend.service.ConversationNotFoundException;
+import com.mira.mira_backend.service.InvalidRequestException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -19,6 +21,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -161,6 +164,45 @@ public class ApiExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "internal_error",
                 "An unexpected error occurred."
+        );
+    }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidRequest(
+            InvalidRequestException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                "invalid_request",
+                exception.getMessage()
+        );
+    }
+    
+    @ExceptionHandler(ConversationNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleConversationNotFound(
+            ConversationNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                request,
+                HttpStatus.NOT_FOUND,
+                "resource_not_found",
+                "The requested resource was not found."
+        );
+    }
+    
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                "invalid_request",
+                "Parameter '" + exception.getName() + "' is invalid."
         );
     }
 

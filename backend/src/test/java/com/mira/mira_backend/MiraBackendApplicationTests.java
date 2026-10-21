@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -594,6 +595,43 @@ class MiraBackendApplicationTests {
                 List.of(first.getId()),
                 secondPage.stream().map(Conversation::getId).toList()
         );
+    }
+
+    @Test
+    void errorResponsesExposeRequestIdHeaderAndBody() throws Exception {
+        mockMvc.perform(get("/api/v1/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().exists("X-Request-Id"))
+                .andExpect(jsonPath("$.error")
+                        .value("authentication_required"))
+                .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+    
+    @Test
+    void suppliedRequestIdIsEchoed() throws Exception {
+        String requestId = "test-request-123";
+    
+        mockMvc.perform(get("/api/v1/me")
+                        .header("X-Request-Id", requestId))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("X-Request-Id", requestId))
+                .andExpect(jsonPath("$.requestId").value(requestId));
+    }
+    
+    @Test
+    void validationErrorsIncludeFieldDetails() throws Exception {
+        var request = new com.mira.mira_backend.dto.RegisterRequest(
+                "valid-" + UUID.randomUUID() + "@example.com",
+                "short"
+        );
+    
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"))
+                .andExpect(jsonPath("$.details[0].field").value("password"))
+                .andExpect(jsonPath("$.details[0].reason").isNotEmpty());
     }
 
     private static String newTokenHash() {

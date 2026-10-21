@@ -112,7 +112,7 @@ Phase 1 objectives:
 
 ### 3.1 Phase 0 Carry-Over
 
-- [ ] Run `.\gradlew.bat assembleDebug` in `android/` and confirm a debug APK is produced.
+- [x] Run `.\gradlew.bat assembleDebug` in `android/` and confirm a debug APK is produced.
 - [ ] Install the APK on an emulator or physical device and confirm the scaffold launches.
 - [ ] Record the Android SDK/build-tools versions used for the verified build.
 

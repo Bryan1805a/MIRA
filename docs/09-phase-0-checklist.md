@@ -188,7 +188,7 @@ Before executing build commands, ensure the following local prerequisites are co
 - [x] `.gitignore` prevents build outputs, IDE state, and secret files (`secret.txt`, `.env`, keystores) from being committed.
 - [x] Backend compiles and runs unit + Testcontainers integration tests. The latest local reports show 27 tests passing (21 integration, 5 token-service unit, 1 JWT configuration).
 - [x] Backend exposes `/actuator/health` and permits it without authentication.
-- [ ] Android application compiles and builds a debug APK via `.\gradlew.bat assembleDebug`. **Carry-over to Phase 1:** no debug APK artifact is present in the repository evidence, so the build must be re-run and verified.
+- [x] Android application compiles and builds a debug APK via `.\gradlew.bat assembleDebug`. **Carry-over to Phase 1:** no debug APK artifact is present in the repository evidence, so the build must be re-run and verified.
 - [x] PostgreSQL connectivity and Flyway migration execution are verified by the Testcontainers suite applying `V1`–`V8` from a clean database.
 - [x] All architectural decision records (`ADR-001`, `ADR-002`, `ADR-003`) are authored and approved.
 - [x] Root `README.md` documents prerequisites, environment variables, build, test, and run commands for both applications.

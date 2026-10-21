@@ -2,10 +2,20 @@ package com.mira.mira_backend;
 
 import com.mira.mira_backend.entity.UserAccount;
 import com.mira.mira_backend.entity.UserSession;
+import com.mira.mira_backend.entity.Conversation;
+import com.mira.mira_backend.entity.AiProcessingAttempt;
+import com.mira.mira_backend.entity.AiResponse;
+import com.mira.mira_backend.entity.AiResponseStatus;
+import com.mira.mira_backend.entity.AttemptOutcome;
+import com.mira.mira_backend.entity.Message;
+import com.mira.mira_backend.entity.MessageRole;
+
+import com.mira.mira_backend.repository.AiProcessingAttemptRepository;
+import com.mira.mira_backend.repository.AiResponseRepository;
+import com.mira.mira_backend.repository.MessageRepository;
 import com.mira.mira_backend.repository.ConversationRepository;
 import com.mira.mira_backend.repository.UserAccountRepository;
 import com.mira.mira_backend.repository.UserSessionRepository;
-import com.mira.mira_backend.entity.Conversation;
 
 import com.mira.mira_backend.service.DuplicateEmailException;
 import com.mira.mira_backend.service.InvalidRegistrationException;
@@ -87,6 +97,15 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private ConversationRepository conversationRepository;
+
+    @Autowired
+    private MessageRepository messageRepository;
+    
+    @Autowired
+    private AiResponseRepository aiResponseRepository;
+    
+    @Autowired
+    private AiProcessingAttemptRepository aiProcessingAttemptRepository;
 
     @Test
     void contextLoads() {
@@ -819,6 +838,120 @@ class MiraBackendApplicationTests {
                         ))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
+    }
+
+    @Test
+    void messagingRowsPersistThroughTheResponseLifecycle() {
+        UserAccount user = userAccountRepository.saveAndFlush(
+                new UserAccount(
+                        "message-" + UUID.randomUUID() + "@example.com",
+                        "test-password-hash"
+                )
+        );
+    
+        Conversation conversation = conversationRepository.saveAndFlush(
+                new Conversation(user, "Messaging")
+        );
+    
+        Message userMessage = messageRepository.saveAndFlush(
+                new Message(
+                        conversation,
+                        MessageRole.USER,
+                        "Hello"
+                )
+        );
+    
+        AiResponse response = aiResponseRepository.saveAndFlush(
+                new AiResponse(
+                        user,
+                        conversation,
+                        userMessage,
+                        "MESSAGE_SEND",
+                        "idem-" + UUID.randomUUID(),
+                        "a".repeat(64)
+                )
+        );
+    
+        assertEquals(AiResponseStatus.PENDING, response.getStatus());
+    
+        AiProcessingAttempt attempt =
+                aiProcessingAttemptRepository.saveAndFlush(
+                        new AiProcessingAttempt(response, 1)
+                );
+    
+        assertEquals(AttemptOutcome.IN_PROGRESS, attempt.getOutcome());
+        assertNull(attempt.getFinishedAt());
+    
+        Message assistantMessage = messageRepository.saveAndFlush(
+                new Message(
+                        conversation,
+                        MessageRole.ASSISTANT,
+                        "Hi there"
+                )
+        );
+    
+        response.markCompleted(assistantMessage);
+        attempt.succeed();
+    
+        aiResponseRepository.saveAndFlush(response);
+        aiProcessingAttemptRepository.saveAndFlush(attempt);
+    
+        assertEquals(AiResponseStatus.COMPLETED, response.getStatus());
+        assertEquals(
+                assistantMessage.getId(),
+                response.getAssistantMessage().getId()
+        );
+        assertEquals(AttemptOutcome.SUCCESS, attempt.getOutcome());
+        assertNotNull(attempt.getFinishedAt());
+    }
+    
+    @Test
+    void aiResponseIdempotencyKeyIsUniquePerUserAndOperation() {
+        UserAccount user = userAccountRepository.saveAndFlush(
+                new UserAccount(
+                        "idempotency-" + UUID.randomUUID() + "@example.com",
+                        "test-password-hash"
+                )
+        );
+    
+        Conversation conversation = conversationRepository.saveAndFlush(
+                new Conversation(user, "Idempotency")
+        );
+    
+        Message firstMessage = messageRepository.saveAndFlush(
+                new Message(conversation, MessageRole.USER, "First")
+        );
+    
+        Message secondMessage = messageRepository.saveAndFlush(
+                new Message(conversation, MessageRole.USER, "Second")
+        );
+    
+        String key = "idem-" + UUID.randomUUID();
+    
+        aiResponseRepository.saveAndFlush(
+                new AiResponse(
+                        user,
+                        conversation,
+                        firstMessage,
+                        "MESSAGE_SEND",
+                        key,
+                        "a".repeat(64)
+                )
+        );
+    
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> aiResponseRepository.saveAndFlush(
+                        new AiResponse(
+                                user,
+                                conversation,
+                                secondMessage,
+                                "MESSAGE_SEND",
+                                key,
+                                "b".repeat(64)
+                        )
+                )
+        );
     }
 
     private static String newTokenHash() {

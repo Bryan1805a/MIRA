@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
@@ -34,7 +35,9 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
                 response.getOutputStream(),
                 new ApiErrorResponse(
                         "access_denied",
-                        "You do not have permission to perform this action."
+                        "You do not have permission to perform this action.",
+                        RequestIdFilter.requestId(request),
+                        List.of()
                 )
         );
     }

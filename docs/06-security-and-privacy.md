@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-SEC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-10-11 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-10-21 |
 | **Author / Lead** | Bryan / MIRA Security & Privacy Lead |
 | **Compliance Baseline** | OWASP Mobile & API Top 10, Data Minimization Standards |
 
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 0.1.0 | 2026-10-10 | Security Team | Initial draft threat model and credential handling guidelines. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated STRIDE threat matrix, visual Mermaid token sequence, Android Keystore specs, and consolidated all draft updates. |
+| 1.1.0 | 2026-10-21 | Bryan | Reconciled refresh-token rotation/replay behavior, signing-secret configuration, and mobile/CI security status with the implemented backend. |
 
 ---
 
@@ -89,42 +90,50 @@ sequenceDiagram
     API->>DB: Query user by normalized email
     API->>API: Verify password with Argon2id
     API->>API: Generate random 256-bit Refresh Token (RT1)
-    API->>DB: Store SHA-256(RT1) in user_session
+    API->>DB: Store SHA-256(RT1) in user_session + initial history row
     API-->>Client: 200 OK (access_token: 15m, RT1: 30d)
     Client->>Client: Store RT1 in EncryptedSharedPreferences
 
     Note over Client, DB: 2. Atomic Token Rotation
     Client->>API: POST /api/v1/auth/refresh (RT1)
-    API->>DB: Query user_session where hash == SHA-256(RT1)
-    alt Session Valid & Active
-        API->>DB: Atomically set revoked_at = NOW() on RT1 session
+    API->>DB: Resolve session from refresh_token_history (SHA-256(RT1))
+    API->>DB: SELECT user_session ... FOR UPDATE
+    alt Session Valid, RT1 Not Consumed
+        API->>DB: Mark RT1 consumed_at = NOW() in history
         API->>API: Generate new Refresh Token (RT2)
-        API->>DB: Insert new user_session with SHA-256(RT2)
-        API-->>Client: 200 OK (new access_token: 15m, RT2: 30d)
+        API->>DB: Update user_session.refresh_token_hash = SHA-256(RT2)
+        API->>DB: Insert refresh_token_history(RT2)
+        API-->>Client: 200 OK (new access_token: 15m, RT2, sessionId)
         Client->>Client: Atomically overwrite stored refresh token with RT2
-    else Session Already Revoked (Token Reuse Detected!)
-        API->>DB: Revoke ALL sessions for this user_id immediately!
-        API-->>Client: 401 Unauthorized (SESSION_REVOKED)
+    else RT1 Already Consumed (Replay Detected)
+        API->>DB: Revoke the implicated user_session
+        API-->>Client: 401 Unauthorized (invalid_credentials)
     end
 ```
+
+> [!NOTE]
+> Revoking **all** sessions for the user on replay is a stronger defense recommended by the original draft but not yet implemented. Current behavior revokes only the session whose token was replayed. Global revocation is listed as a Phase 1 hardening item in [10-phase-1-checklist.md](./10-phase-1-checklist.md).
 
 ### 3.1 Token Lifecycle Invariants
 * **Access Tokens:**
   * Lifetime: Exactly 15 minutes.
-  * Signed via HMAC-SHA256 (or RSA/ECDSA) with a server-managed private key (`JWT_SIGNING_KEY`).
-  * Statelessly verified by Spring Security filters on every protected endpoint.
+  * Signed via HMAC-SHA256 with a server-managed secret provided as `MIRA_JWT_SECRET_BASE64`. The secret must decode to at least 32 bytes; startup fails otherwise.
+  * Claims are `iss`, `sub` (user ID), `iat`, `exp`, and `jti`. The token is statelessly verified by Spring Security on every protected endpoint.
+  * Logout does not revoke an already-issued access token; it remains valid until expiry while the associated refresh token is revoked immediately.
 * **Refresh Tokens:**
-  * Lifetime: 30 days.
-  * Generated from `java.security.SecureRandom` (minimum 32 bytes / 256 bits of cryptographic entropy).
+  * Lifetime: 30 days from session creation; rotation does not extend the absolute session expiry.
+  * Generated from `java.security.SecureRandom` (32 bytes / 256 bits of cryptographic entropy).
   * Backend stores only the SHA-256 hash. The plaintext refresh token is returned once to the client and never logged.
+  * `refresh_token_history` records every issued hash and its `consumed_at` time. Rotation updates `user_session.refresh_token_hash` in place and appends the successor to history.
 * **Reuse Detection Defense:**
-  * If an already-rotated refresh token is submitted again, it indicates potential token interception. The backend immediately revokes **all** active sessions belonging to that account, terminating potential attacker access.
+  * If an already-consumed refresh token is submitted again, it indicates potential token interception. The backend revokes the **implicated session** and returns `401 Unauthorized`.
+  * Revoking every session for the account on replay is a recommended hardening step but is not current behavior; see the note in section 3.
 
 ---
 
 ## 4. Mobile Client Security Baseline (Android)
 
-1. **Hardware-Backed Cryptography:** Tokens and authentication state on Android must be persisted using `EncryptedSharedPreferences` backed by the **Android Keystore System**. Plaintext `SharedPreferences` or local SQLite without encryption is prohibited.
+1. **Hardware-Backed Cryptography:** Tokens and authentication state on Android must be persisted using `EncryptedSharedPreferences` backed by the **Android Keystore System**. Plaintext `SharedPreferences` or local SQLite without encryption is prohibited. This is part of the Phase 1 Android workstream; the current app is still the scaffold.
 2. **Network Security Configuration:** Android applications must enforce a strict `network_security_config.xml` requiring TLS 1.3 and prohibiting cleartext traffic (`android:usesCleartextTraffic="false"`).
 3. **Log Sanitization:** Android code must strip sensitive tokens and conversational data from debug logs (`Log.d`, `Log.v`). In release builds, `BuildConfig.DEBUG` guards or ProGuard/R8 rules must strip logging calls entirely.
 4. **Zero Exported Components:** Application Activities, BroadcastReceivers, and Services must have `android:exported="false"` unless explicitly required for OS entry points.
@@ -149,7 +158,7 @@ flowchart LR
 * **Server-Side Quota Enforcement:** Per-account request throttling limits brute-force generation or API depletion.
 * **Payload Constraints:** Strict maximum character lengths prevent large context submissions that could inflate billing tokens.
 * **Timeout & Circuit Breaking:** HTTP requests to DeepSeek enforce a 5-second connection timeout and 30-second read timeout. Network failures transition the request to `UNKNOWN` or `FAILED` rather than initiating unbounded retry storms.
-* **Mock Implementations in Test Suites:** CI/CD builds and automated tests execute strictly against `MockAIProvider`. No automated build or integration test touches the live DeepSeek API, ensuring zero unintentional billing.
+* **Mock Implementations in Test Suites:** CI/CD builds and automated tests execute strictly against `MockAIProvider` once provider integration lands in Phase 1. No automated build or integration test may touch the live DeepSeek API, ensuring zero unintentional billing.
 
 ---
 
@@ -164,4 +173,22 @@ flowchart LR
    * Users can permanently delete their style memory via `DELETE /api/v1/memory/style`, which increments the generation counter and ensures delayed background jobs cannot recreate the profile.
 3. **Log Sanitization:**
    * Log formatters automatically mask Authorization headers, passwords, and prompt message bodies.
-   * Internal diagnostics utilize unique request tracking UUIDs (`requestId`) to trace errors across log streams without exposing user data.
+   * Internal diagnostics will utilize unique request tracking UUIDs (`requestId`) to trace errors across log streams without exposing user data. Request-ID propagation and inclusion in error bodies are Phase 1 work; the current error envelope has no `requestId` field.
+
+---
+
+## 7. Implementation Status (2026-10-21)
+
+| Control | Status |
+| :--- | :--- |
+| Argon2id password hashing | Implemented |
+| SHA-256 refresh-token hashing | Implemented |
+| Rotating refresh tokens with replay detection | Implemented (revokes implicated session only) |
+| HS256 JWT validation, 15-minute expiry | Implemented |
+| Stateless security filter chain and JSON 401/403 responses | Implemented |
+| Uniform error envelope with `requestId`/`details` | Phase 1 |
+| Per-account rate limiting | Phase 1 |
+| Sanitized structured logging and request-ID correlation | Phase 1 |
+| Android Keystore / `EncryptedSharedPreferences` | Phase 1 |
+| TLS-only network security config | Phase 1 |
+| Memory privacy restrictions and generation guards | Phase 2 |

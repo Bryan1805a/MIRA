@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-PRS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-10-11 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-10-21 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, Product, Quality Assurance |
 
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 0.1.0 | 2026-10-10 | Architecture Team | Draft baseline specification of functional and non-functional requirements. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: added document control block, formal traceability matrix, enhanced failure recovery FRs, and explicit MVP scope boundaries. |
+| 1.1.0 | 2026-10-21 | Bryan | Reconciled requirement status and traceability with the implemented system; aligned FR-011 with the current error envelope and documented the Phase 1 delivery boundary. |
 
 ---
 
@@ -41,7 +42,7 @@ This specification defines the functional requirements (FRs), non-functional req
 * Extraction or storage of biographical, personal knowledge, or financial data.
 * Direct device-to-provider API communication.
 * Public sharing or multi-user collaborative conversation sessions.
-* Multimodal attachment processing (PDF and image question-answering are deferred to Phase 2).
+* Multimodal attachment processing (PDF and image question-answering are deferred until after the Phase 2 memory milestone).
 
 ---
 
@@ -175,7 +176,7 @@ flowchart TD
 #### FR-011: Uniform Error Formatting
 * **Description:** The API shall return deterministic, structured JSON errors for all failure modes.
 * **Acceptance Criteria:**
-  1. Error responses conform to the standard structure containing `code`, `message`, `requestId`, and optional `details`.
+  1. Error responses conform to the standard structure containing `error`, `message`, and — from Phase 1 onward — `requestId` and optional `details`.
   2. Internal stack traces, raw SQL queries, and third-party API keys are never included in error bodies.
   3. Client applications can unambiguously categorize recoverable vs. non-recoverable errors based on HTTP status and error codes.
 
@@ -185,7 +186,7 @@ flowchart TD
 
 ### NFR-001: Security & Confidentiality
 * **NFR-001.1:** All network traffic between Android clients and the backend must enforce TLS 1.3 (HTTPS).
-* **NFR-001.2:** Third-party AI provider credentials (`DEEPSEEK_API_KEY`) and database passwords must reside strictly in server environment variables and never be included in client binaries or source control.
+* **NFR-001.2:** Third-party AI provider credentials (`DEEPSEEK_API_KEY`), database passwords, and the JWT signing secret (`MIRA_JWT_SECRET_BASE64`) must reside strictly in server environment variables and never be included in client binaries or source control.
 * **NFR-001.3:** Passwords must be hashed using Argon2id or bcrypt. Refresh tokens must be hashed (SHA-256) at rest.
 
 ### NFR-002: Privacy & Data Minimization
@@ -212,20 +213,30 @@ flowchart TD
 
 ## 5. Requirements Traceability Matrix (RTM)
 
-| Requirement ID | Domain Area | Architecture Reference | API Endpoint | Verification Test Suite |
-| :--- | :--- | :--- | :--- | :--- |
-| **FR-001** | Account Registration | `02-architecture.md#4.1` | `POST /api/v1/auth/register` | `AuthIntegrationTest` |
-| **FR-002** | Auth & Session | `02-architecture.md#2.2` | `POST /api/v1/auth/login`, `/refresh` | `SessionLifecycleTest` |
-| **FR-003** | Conversation Mgmt | `02-architecture.md#4.2` | `GET`, `POST`, `DELETE /conversations` | `ConversationSecurityTest` |
-| **FR-004** | Chat Orchestration | `02-architecture.md#2.1` | `POST /conversations/{id}/messages` | `ChatOrchestrationTest` |
-| **FR-005** | Idempotent Retries | `02-architecture.md#2.1` | `POST /conversations/{id}/messages` | `IdempotencyConcurrencyTest` |
-| **FR-006** | Profile Retrieval | `02-architecture.md#4.3` | `GET /api/v1/memory/style` | `MemoryProfileTest` |
-| **FR-007** | Memory Gate | `05-memory-lifecycle.md#5.7` | Internal Service Boundary | `MemoryEligibilityTest` |
-| **FR-008** | Memory Merging (OCC)| `05-memory-lifecycle.md#6` | `PUT /api/v1/memory/style` | `MemoryConflictResolutionTest` |
-| **FR-009** | Memory Governance | `05-memory-lifecycle.md#9` | `PATCH`, `DELETE /memory/style` | `MemoryDeletionRaceTest` |
-| **FR-010** | Data Isolation | `06-security-and-privacy.md#5`| All Endpoints | `CrossAccountSecurityTest` |
-| **FR-011** | Error Formatting | `04-api-contract.md#7` | Global Exception Handler | `ApiErrorContractTest` |
-| **NFR-001** | Transport & Key Sec | `06-security-and-privacy.md#7`| Server Configuration | `SecurityHeadersTest` |
-| **NFR-002** | Privacy Minimization| `06-security-and-privacy.md#9`| Memory Validation Engine | `MemoryPrivacyAuditTest` |
-| **NFR-003** | Fault Isolation | `02-architecture.md#8` | Provider Abstraction Layer | `ProviderFailureRecoveryTest` |
-| **NFR-006** | Testability | `07-testing-strategy.md#2`| Maven Build Verification | `CI Pipeline / Testcontainers` |
+**Status legend**
+
+- **Implemented** — behavior exists in the current codebase and is covered by automated tests.
+- **Partial** — part of the requirement exists; the remaining work is scheduled in Phase 1.
+- **Phase 1** — scheduled in [`10-phase-1-checklist.md`](./10-phase-1-checklist.md).
+- **Phase 2** — scheduled with the memory subsystem.
+
+| Requirement ID | Domain Area | Architecture Reference | API Endpoint | Verification Test Suite | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **FR-001** | Account Registration | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `POST /api/v1/auth/register` | `MiraBackendApplicationTests` | Implemented |
+| **FR-002** | Auth & Session | [`02-architecture.md#4`](./02-architecture.md#4-authentication--session-security-architecture) | `POST /api/v1/auth/login`, `/refresh`, `/logout` | `MiraBackendApplicationTests`, `TokenServiceTests` | Implemented (session-scoped replay revocation) |
+| **FR-003** | Conversation Mgmt | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `GET`, `POST`, `DELETE /conversations` | `MiraBackendApplicationTests` (repository-level), `ConversationSecurityTest` | Partial — entity/repository done; HTTP layer Phase 1 |
+| **FR-004** | Chat Orchestration | [`02-architecture.md#3`](./02-architecture.md#3-message-processing--failure-semantics) | `POST /conversations/{id}/messages` | `ChatOrchestrationTest` | Phase 1 |
+| **FR-005** | Idempotent Retries | [`02-architecture.md#32`](./02-architecture.md#32-bounded-retry--idempotency-rules) | `POST /conversations/{id}/messages` | `IdempotencyConcurrencyTest` | Phase 1 |
+| **FR-006** | Profile Retrieval | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `GET /api/v1/memory/style` | `MemoryProfileTest` | Phase 2 |
+| **FR-007** | Memory Gate | [`05-memory-lifecycle.md#2`](./05-memory-lifecycle.md#2-memory-extraction--ingestion-pipeline) | Internal Service Boundary | `MemoryEligibilityTest` | Phase 2 |
+| **FR-008** | Memory Merging (OCC)| [`05-memory-lifecycle.md#4`](./05-memory-lifecycle.md#4-candidate-classification--the-hybrid-persistence-policy) | `PUT /api/v1/memory/style` | `MemoryConflictResolutionTest` | Phase 2 |
+| **FR-009** | Memory Governance | [`05-memory-lifecycle.md#6`](./05-memory-lifecycle.md#6-memory-governance-operations) | `PATCH`, `DELETE /memory/style` | `MemoryDeletionRaceTest` | Phase 2 |
+| **FR-010** | Data Isolation | [`02-architecture.md#5`](./02-architecture.md#5-security--boundary-controls) | All Endpoints | `CrossAccountSecurityTest` | Partial — auth complete; conversation HTTP layer Phase 1 |
+| **FR-011** | Error Formatting | [`04-api-contract.md#6`](./04-api-contract.md#6-standardized-error-handling) | Global Exception Handler | `ApiErrorContractTest` | Partial — uniform flat envelope; `requestId`/`details` Phase 1 |
+| **NFR-001** | Transport & Key Sec | [`06-security-and-privacy.md#3`](./06-security-and-privacy.md#3-authentication--token-session-architecture) | Server Configuration | `SecurityHeadersTest` | Implemented (HS256, Argon2id, hashed tokens); TLS at deployment |
+| **NFR-002** | Privacy Minimization| [`06-security-and-privacy.md#6`](./06-security-and-privacy.md#6-privacy--data-minimization-governance) | Memory Validation Engine | `MemoryPrivacyAuditTest` | Phase 2 |
+| **NFR-003** | Fault Isolation | [`02-architecture.md#3`](./02-architecture.md#3-message-processing--failure-semantics) | Provider Abstraction Layer | `ProviderFailureRecoveryTest` | Partial — lifecycle schema ready; orchestration Phase 1 |
+| **NFR-006** | Testability | [`07-testing-strategy.md#2`](./07-testing-strategy.md#2-multi-tier-testing-pyramid) | Maven Build Verification | `CI Pipeline / Testcontainers` | Implemented (Testcontainers) |
+
+> [!NOTE]
+> Phase 1 is the delivery boundary for the end-to-end text chat loop. It deliberately does not implement style-memory extraction or governance; those remain scheduled for Phase 2 and are specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).

@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-10-11 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-10-21 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
 
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 0.1.0 | 2026-10-10 | Operations Team | Initial deployment topology and environment variable draft. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid deployment topology, rollback runbook, health check actuary specs, and secret management standards. |
+| 1.1.0 | 2026-10-21 | Bryan | Reconciled runtime versions, environment-variable names, migration range, and actuator behavior with the implemented backend. |
 
 ---
 
@@ -36,7 +37,7 @@ flowchart TD
     end
 
     subgraph ComputePerimeter ["Compute Perimeter (Docker / JAR Container)"]
-        SpringApp["Spring Boot 3 Modular Monolith\n(Java 17 Runtime)\n- Port ${PORT:8080}\n- Actuator Health Endpoints\n- Secret-Isolated Environment"]
+        SpringApp["Spring Boot 4.1.x Modular Monolith\n(Java 21 Runtime)\n- Port ${SERVER_PORT:8080}\n- Actuator Health Endpoints\n- Secret-Isolated Environment"]
     end
 
     subgraph DataPerimeter ["Managed Data Perimeter"]
@@ -60,17 +61,20 @@ Configuration is strictly divided between non-secret environment properties and 
 
 | Variable Name | Classification | Environment | Purpose / Value Description |
 | :--- | :--- | :--- | :--- |
-| `SERVER_PORT` | Non-Secret | All | HTTP listening port (defaults to `${PORT:8080}`). |
+| `SERVER_PORT` | Non-Secret | All | HTTP listening port (defaults to `8080`). |
 | `SPRING_PROFILES_ACTIVE` | Non-Secret | All | Active profile (`dev`, `test`, `prod`). |
-| `DATABASE_URL` | Secret | Prod / Dev | Full JDBC connection string (e.g., `jdbc:postgresql://ep-...neon.tech/mira?sslmode=require`). |
-| `DATABASE_USERNAME` | Secret | Prod / Dev | Managed database user account. |
-| `DATABASE_PASSWORD` | Secret | Prod / Dev | Secure database password. |
-| `DEEPSEEK_API_KEY` | Secret | Prod Only | Server-side bearer token for DeepSeek API. |
-| `JWT_SIGNING_KEY` | Secret | Prod Only | 256-bit cryptographically secure secret for signing access tokens. |
+| `SPRING_DATASOURCE_URL` | Secret | Prod / Dev | JDBC connection string (e.g., `jdbc:postgresql://ep-...neon.tech/mira?sslmode=require`). |
+| `SPRING_DATASOURCE_USERNAME` | Secret | Prod / Dev | Managed database user account. |
+| `SPRING_DATASOURCE_PASSWORD` | Secret | Prod / Dev | Secure database password. |
+| `DEEPSEEK_API_KEY` | Secret | Phase 1+ | Server-side bearer token for DeepSeek API. Not needed until provider integration lands. |
+| `MIRA_JWT_SECRET_BASE64` | Secret | All | Base64-encoded HMAC-SHA256 signing key; must decode to at least 32 bytes. Application startup fails if missing or invalid. |
 
 > [!CAUTION]
 > **Zero Secret Check-in Rule:**
-> Secrets must **never** be committed to Git, hardcoded in `application.properties`, or compiled into Android APKs. In local development, use an untracked `.env` file; in production, inject values via the hosting platform's secure secret manager.
+> Secrets must **never** be committed to Git, hardcoded in `application.properties`, or compiled into Android APKs. In local development, use an untracked `.env` file or process environment variables; in production, inject values via the hosting platform's secure secret manager.
+
+> [!IMPORTANT]
+> `backend/src/main/resources/application.properties` does not contain a default datasource. `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` must be supplied in every environment, including local development. Integration tests provide them dynamically through Testcontainers.
 
 ---
 
@@ -115,11 +119,13 @@ When making schema modifications (e.g., renaming columns or adding constraints):
 MIRA leverages **Spring Boot Actuator** to provide secure, non-leaking health telemetry for load balancers and orchestrators.
 
 ### 4.1 Health Check Endpoints
-* **Liveness Probe:** `GET /actuator/health/liveness`
-  * Checks if the internal JVM process is responsive. Returns `200 OK` (`{"status":"UP"}`).
-* **Readiness Probe:** `GET /actuator/health/readiness`
-  * Verifies database connectivity via HikariCP. Returns `200 OK` when ready to serve API traffic.
-* **Security Guard:** Full Actuator details, environment configurations, and heap dumps are strictly disabled on the public web interface to prevent sensitive credential disclosure.
+* **Current Endpoint:** `GET /actuator/health`
+  * Exposed and permitted without authentication. Spring Boot's default health contributor set includes database connectivity through the datasource.
+* **Liveness Probe:** `GET /actuator/health/liveness` — **Phase 1 target.**
+  * Will check that the JVM process is responsive and return `200 OK` (`{"status":"UP"}`).
+* **Readiness Probe:** `GET /actuator/health/readiness` — **Phase 1 target.**
+  * Will verify database connectivity before the instance receives traffic.
+* **Security Guard:** Full Actuator details, environment configurations, and heap dumps are strictly disabled on the public web interface to prevent sensitive credential disclosure. The health endpoint must be the only exposed actuator endpoint in production.
 
 ### 4.2 Logging Standards
 * Structured JSON logging via SLF4J / Logback.
@@ -147,22 +153,25 @@ flowchart TD
 ```
 
 ### 5.1 Secret Rotation Protocol
-If a sensitive secret (e.g., `DEEPSEEK_API_KEY` or `JWT_SIGNING_KEY`) is accidentally exposed:
+If a sensitive secret (e.g., `DEEPSEEK_API_KEY` or `MIRA_JWT_SECRET_BASE64`) is accidentally exposed:
 1. Immediately generate a replacement key in the respective provider portal.
 2. Update the secret in the cloud platform environment settings.
 3. Trigger a graceful restart of the backend service.
 4. Revoke the compromised key in the provider portal.
-5. Invalidate all active user sessions to force re-authentication if `JWT_SIGNING_KEY` was compromised.
+5. Invalidate all active user sessions to force re-authentication if `MIRA_JWT_SECRET_BASE64` was compromised.
 
 ---
 
 ## 6. Pre-Production Release Verification Checklist
 
+> [!NOTE]
+> MIRA is not yet deployed. Production deployment is a Phase 3 activity, performed after the Phase 1 chat loop and Phase 2 memory subsystem are complete and verified.
+
 Before opening the deployed service to physical Android client connections, verify the following:
 
 - [ ] Backend builds reproducibly using `./mvnw clean verify`.
 - [ ] Neon PostgreSQL SSL connections enforce certificate verification (`sslmode=require`).
-- [ ] Flyway successfully applies all versioned migrations (`V1` through `V5`).
+- [ ] Flyway successfully applies all versioned migrations (`V1` through `V8`).
 - [ ] Public endpoint enforces TLS 1.3; plain HTTP traffic is redirected or rejected.
 - [ ] Actuator health check returns `{"status":"UP"}` on `/actuator/health`.
 - [ ] Rate limiting actively blocks rapid unauthenticated requests.

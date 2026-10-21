@@ -73,5 +73,10 @@ We need to decide:
 
 ## Consequences & Follow-up Actions
 
-* Implement `USER_STYLE_PROFILE` in PostgreSQL using JSONB with `version` and `generation` columns.
+* Implement `USER_STYLE_PROFILE` in PostgreSQL using JSONB with an OCC `version` column.
+* Store the durable `generation` counter in a separate `USER_MEMORY_CONTROL` row so it survives physical deletion of the profile (implemented in Flyway `V5`/`V6`).
 * Build automated concurrency test suites validating that stale tasks abort upon version or generation divergence.
+
+### Delivery Status (2026-10-21)
+
+The schema portion of this decision is implemented. `user_style_profile.profile`, `version`, and `enabled` are defined in `V5`; `user_memory_control.generation` is defined in `V6`. The extraction pipeline, governance endpoints, prompt injection, and concurrency suites are scheduled for Phase 2 as described in [10-phase-1-checklist.md](../10-phase-1-checklist.md#9-phase-2-preview).

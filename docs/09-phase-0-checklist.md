@@ -5,10 +5,10 @@
 | **Document ID** | MIRA-CHK-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-10-11 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-10-21 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
-| **Phase Milestone** | Phase 0 — Reproducible Project Foundation |
+| **Phase Milestone** | Phase 0 — Reproducible Project Foundation (complete; Android APK verification carried into Phase 1) |
 
 ---
 
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 0.1.0 | 2026-10-10 | Engineering Team | Initial draft of local development prerequisites and repository setup. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid execution roadmap, concrete skeleton milestones, Flyway setup, and exit gating criteria. |
+| 1.1.0 | 2026-10-21 | Bryan | Marked Phase 0 complete, reconciled the actual stack (Java 21, Spring Boot 4.1.x), package layout, dependency list, migration range, and verified exit criteria. |
 
 ---
 
@@ -26,10 +27,10 @@
 Phase 0 establishes a reproducible development environment, structured monorepo, clean build toolchains, and initial application skeletons **prior** to developing functional MVP features (authentication, chat orchestration, and memory extraction).
 
 ### 1.1 Core Objectives
-* Verify development toolchains (JDK 17+, Maven Wrapper, Android Studio, Gradle, PostgreSQL).
+* Verify development toolchains (JDK 21, Maven Wrapper, Android Studio, Gradle, PostgreSQL).
 * Establish the official repository structure with strict `.gitignore` rules.
-* Scaffold a minimal, compiling Spring Boot 3.x backend application with Actuator health checks.
-* Scaffold a minimal, compiling native Android Java application with Gradle wrapper.
+* Scaffold a minimal, compiling Spring Boot 4.1.x backend application with Actuator health checks.
+* Scaffold a native Android Java application with Gradle wrapper.
 * Establish version-controlled database migrations via Flyway.
 * Provide comprehensive local run instructions so any engineer can clone, compile, and test the project in minutes without guesswork.
 
@@ -37,7 +38,7 @@ Phase 0 establishes a reproducible development environment, structured monorepo,
 flowchart TD
     subgraph Phase0Plan ["Phase 0 Execution Flowchart"]
         RepoSetup["1. Monorepo Setup\n(.gitignore, README, docs layout)"]
-        BackendSkel["2. Backend Skeleton\n(Spring Boot 3, Maven Wrapper, Actuator)"]
+        BackendSkel["2. Backend Skeleton\n(Spring Boot 4.1.x, Java 21, Maven Wrapper, Actuator)"]
         AndroidSkel["3. Android Skeleton\n(Java, Gradle Wrapper, Basic Activity)"]
         DBSkel["4. Database & Flyway\n(Neon Connection, Migration Baseline)"]
         Verification["5. Multi-Project Verification\n(mvn test, gradlew assembleDebug)"]
@@ -64,29 +65,33 @@ mira/
 │   ├── app/
 │   │   ├── src/
 │   │   │   ├── main/
-│   │   │   │   ├── java/com/mira/android/
+│   │   │   │   ├── java/com/mira/app/
 │   │   │   │   └── res/
-│   │   │   └── test/
-│   │   └── build.gradle
+│   │   │   ├── test/
+│   │   │   └── androidTest/
+│   │   └── build.gradle.kts
 │   ├── gradle/
-│   ├── build.gradle
-│   ├── settings.gradle
+│   ├── build.gradle.kts
+│   ├── settings.gradle.kts
 │   ├── gradlew
 │   └── gradlew.bat
 │
-├── backend/                        # Spring Boot Modular Monolith (Java 17 / Maven)
+├── backend/                        # Spring Boot Modular Monolith (Java 21 / Maven)
 │   ├── src/
 │   │   ├── main/
-│   │   │   ├── java/com/mira/
-│   │   │   │   ├── MiraApplication.java
-│   │   │   │   ├── common/
-│   │   │   │   ├── auth/
-│   │   │   │   ├── chat/
-│   │   │   │   ├── memory/
-│   │   │   │   └── ai/
+│   │   │   ├── java/com/mira/mira_backend/
+│   │   │   │   ├── MiraBackendApplication.java
+│   │   │   │   ├── config/
+│   │   │   │   ├── controller/
+│   │   │   │   ├── dto/
+│   │   │   │   ├── entity/
+│   │   │   │   ├── exception/
+│   │   │   │   ├── repository/
+│   │   │   │   ├── security/
+│   │   │   │   └── service/
 │   │   │   └── resources/
 │   │   │       ├── application.properties
-│   │   │       └── db/migration/   # Flyway SQL migrations
+│   │   │       └── db/migration/   # Flyway SQL migrations (V1–V8)
 │   │   └── test/
 │   ├── pom.xml
 │   ├── mvnw
@@ -103,6 +108,7 @@ mira/
     ├── 07-testing-strategy.md
     ├── 08-deployment-plan.md
     ├── 09-phase-0-checklist.md
+    ├── 10-phase-1-checklist.md
     └── decisions/                  # Architecture Decision Records (ADRs)
         ├── ADR-001-backend-stack.md
         ├── ADR-002-memory-model.md
@@ -116,9 +122,10 @@ mira/
 Before executing build commands, ensure the following local prerequisites are confirmed:
 
 - [ ] **Git:** Installed and configured (`git --version`).
-- [ ] **Java Development Kit (JDK):** JDK 17 or higher configured (`java -version`).
+- [ ] **Java Development Kit (JDK):** JDK 21 configured (`java -version`).
 - [ ] **Android Studio & SDK:** Android SDK platform tools and build tools installed.
 - [ ] **PostgreSQL:** Local PostgreSQL or access to Neon cloud development database.
+- [ ] **Docker:** Docker Desktop or another Docker runtime for Testcontainers integration tests.
 - [ ] **Network Connectivity:** Unrestricted access to Maven Central and Google Maven repositories.
 
 ---
@@ -134,30 +141,33 @@ Before executing build commands, ensure the following local prerequisites are co
 * Ensure documentation links and paths are standardized.
 
 ### Step 2: Initialize Spring Boot Backend Skeleton
-* Configure `backend/pom.xml` with dependencies:
-  * `spring-boot-starter-web`
+* Configure `backend/pom.xml` with the delivered dependency set:
+  * `spring-boot-starter-webmvc`
   * `spring-boot-starter-validation`
   * `spring-boot-starter-actuator`
   * `spring-boot-starter-data-jpa`
   * `postgresql` JDBC driver
-  * `flyway-core`
-  * `spring-boot-starter-test`
-* Scaffold entry point: `com.mira.MiraApplication.java`.
-* Configure `application.properties` with environment-variable placeholders.
-* Expose `/actuator/health` endpoint.
-* Verify clean build via `.\mvnw.cmd clean test`.
+  * `spring-boot-starter-flyway` + `flyway-database-postgresql`
+  * `spring-boot-starter-security` + `spring-boot-starter-oauth2-resource-server` + `spring-security-oauth2-jose`
+  * `spring-security-crypto` + `bcprov-jdk18on` (Argon2id)
+  * `testcontainers-postgresql` + `testcontainers-junit-jupiter`
+  * `spring-boot-starter-test` equivalents (`*-test` starters)
+* Scaffold entry point: `com.mira.mira_backend.MiraBackendApplication`.
+* Configure `application.properties` with Flyway, JPA validation, and the `MIRA_JWT_SECRET_BASE64` placeholder. Datasource settings come from the `SPRING_DATASOURCE_*` environment variables.
+* Expose `/actuator/health`.
+* Verify clean build via `.\mvnw.cmd clean verify`.
 
 ### Step 3: Initialize Native Android Skeleton
 * Initialize Android project under `android/` using Java.
 * Configure minimal `MainActivity.java` with a placeholder launch screen.
-* Verify Android compilation via `.\gradlew.bat assembleDebug`.
-* Confirm debug APK installs on an emulator or physical device.
+* Android project skeleton is delivered.
+* **Carry-over to Phase 1:** run `.\gradlew.bat assembleDebug` and confirm the debug APK installs on an emulator or physical device. The build verification is not yet recorded in the repository.
 
 ### Step 4: Configure Database & Migration Baseline
 * Connect backend to the development PostgreSQL instance.
 * Create Flyway migration directory `backend/src/main/resources/db/migration/`.
-* Add initial baseline migration `V1__init_user_account.sql`.
-* Run backend startup and verify that Flyway executes the migration without errors.
+* Add the initial migrations `V1__init_user_account.sql` through `V8__add_refresh_token_history.sql`.
+* Run backend startup and verify that Flyway executes all migrations without errors. The Testcontainers integration suite exercises the same migrations from a clean database.
 
 ### Step 5: Root Documentation & Developer Onboarding (README)
 * Author the root [README.md](../README.md) documenting:
@@ -172,13 +182,16 @@ Before executing build commands, ensure the following local prerequisites are co
 
 ## 5. Phase 0 Exit & Acceptance Gate
 
-Phase 0 is formally complete only when every item below is verified:
+**Status: complete on 2026-10-21, with one carry-over item.**
 
-- [ ] Monorepo structure conforms to the specification.
-- [ ] `.gitignore` prevents build outputs, IDE state, and secret files from being committed.
-- [ ] Backend compiles and runs tests via `.\mvnw.cmd clean verify`.
-- [ ] Backend exposes functional health telemetry on `/actuator/health`.
-- [ ] Android application compiles and builds an APK via `.\gradlew.bat assembleDebug`.
-- [ ] PostgreSQL connection is verified and Flyway migration initializes the schema.
-- [ ] All architectural decision records (`ADR-001`, `ADR-002`, `ADR-003`) are formally authored and approved.
-- [ ] Root `README.md` allows a new developer to set up and run the project locally without guessing.
+- [x] Monorepo structure conforms to the specification (backend, Android, docs, ADRs).
+- [x] `.gitignore` prevents build outputs, IDE state, and secret files (`secret.txt`, `.env`, keystores) from being committed.
+- [x] Backend compiles and runs unit + Testcontainers integration tests. The latest local reports show 27 tests passing (21 integration, 5 token-service unit, 1 JWT configuration).
+- [x] Backend exposes `/actuator/health` and permits it without authentication.
+- [ ] Android application compiles and builds a debug APK via `.\gradlew.bat assembleDebug`. **Carry-over to Phase 1:** no debug APK artifact is present in the repository evidence, so the build must be re-run and verified.
+- [x] PostgreSQL connectivity and Flyway migration execution are verified by the Testcontainers suite applying `V1`–`V8` from a clean database.
+- [x] All architectural decision records (`ADR-001`, `ADR-002`, `ADR-003`) are authored and approved.
+- [x] Root `README.md` documents prerequisites, environment variables, build, test, and run commands for both applications.
+
+> [!NOTE]
+> The Android debug-build verification is the only open Phase 0 gate. It is tracked as a Phase 1 prerequisite so the conversation/chat client work starts from a known-good APK build.

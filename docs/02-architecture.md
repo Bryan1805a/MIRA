@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-10-11 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-10-21 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
 
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 0.1.0 | 2026-10-10 | Architecture Team | Initial modular monolith architectural design and draft component definitions. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated response lifecycle state machine, session rotation models, message retry semantics, and unified all pending draft updates. |
+| 1.1.0 | 2026-10-21 | Bryan | Reconciled runtime versions, physical package layout, refresh-token rotation mechanics, and implementation status with the delivered backend. |
 
 ---
 
@@ -29,8 +30,8 @@ MIRA adopts a **Modular Monolith** architecture pattern.
 For an early-stage system, distributed microservices, message queues (e.g., Kafka, RabbitMQ), and distributed caches introduce severe operational overhead, distributed transaction hazards, and network latency without providing tangible scaling benefits.
 
 Instead, MIRA enforces strict modularity at the application packaging boundary:
-* **Single Deployment Unit:** Deployed as an executable Spring Boot fat JAR.
-* **Domain Isolation:** Package-private visibility and decoupled service interfaces guarantee that modules do not leak implementation internals or bypass domain logic.
+* **Single Deployment Unit:** Deployed as an executable Spring Boot 4.1.x fat JAR on Java 21.
+* **Domain Isolation:** Service interfaces, DTO boundaries, and repository ownership queries keep modules decoupled. The current layer-first layout relies on these contracts rather than strict package-private enforcement; visibility can be tightened during a future feature-package refactor.
 * **Unified ACID Persistence:** Modules share an enterprise-grade managed PostgreSQL instance, ensuring atomic state transitions without two-phase commits.
 * **Extensibility:** Modules interact via clearly defined service interfaces, enabling clean future extraction into microservices if specific scale invariants demand it.
 
@@ -40,10 +41,10 @@ flowchart TD
         AndroidClient["Android Client Application\n(Java / Android SDK)\n- UI Layer (Activities/Fragments)\n- Retrofit/OkHttp REST Client\n- Encrypted SharedPreferences"]
     end
 
-    subgraph BackendBoundary ["MIRA Backend Application (Spring Boot Modular Monolith)"]
+    subgraph BackendBoundary ["MIRA Backend Application (Spring Boot 4.1.x Modular Monolith, Java 21)"]
         subgraph Gateway ["Web & Security Gateway Layer"]
             SecFilter["Security Filter Chain\n(Bearer Token Auth)"]
-            RateLimiter["Rate Limiting & Validation"]
+            RateLimiter["Rate Limiting (Phase 1) & Validation"]
         end
 
         subgraph CoreModules ["Core Domain Modules"]
@@ -78,18 +79,18 @@ flowchart TD
 
 ## 2. Core Subsystem Modules
 
-### 2.1 Authentication & Session Management Module (`com.mira.auth`)
+### 2.1 Authentication & Session Management Module (`auth` domain)
 * **Primary Scope:** Account creation, password hashing, credential verification, and token session lifecycles.
 * **Core Responsibilities:**
   * Validate normalized email identity and enforce database uniqueness.
   * Execute adaptive password hashing using Argon2id/bcrypt.
-  * Issue short-lived access tokens (15-minute JWT or cryptographically signed opaque tokens).
+  * Issue short-lived 15-minute HS256 JWT access tokens.
   * Issue cryptographically random, revocable refresh tokens.
-  * Store only SHA-256 hashes of refresh tokens in the `USER_SESSION` table.
-  * Enforce atomic single-use refresh token rotation: using a valid refresh token yields a new token and permanently invalidates its predecessor.
-  * Detect refresh token reuse (potential token theft) and trigger immediate revocation of the associated session.
+  * Store only SHA-256 hashes of refresh tokens in the `USER_SESSION` table, and retain an append-only issuance/consumption audit trail in `REFRESH_TOKEN_HISTORY`.
+  * Enforce atomic single-use refresh token rotation: using a valid refresh token yields a new token, marks the presented token consumed, and updates the session's current token hash in place.
+  * Detect refresh token reuse (potential token theft) and immediately revoke the implicated session.
 
-### 2.2 Chat Orchestration Module (`com.mira.chat`)
+### 2.2 Chat Orchestration Module (`chat` domain)
 * **Primary Scope:** Conversation management, message persistence, context aggregation, and interaction orchestration.
 * **Core Responsibilities:**
   * Enforce server-side ownership: verify that the authenticated caller owns the target conversation before any read or write.
@@ -99,7 +100,7 @@ flowchart TD
   * Retrieve the latest conversation history within bounded context limits (e.g., last 10 messages).
   * Record and track the logical assistant response and its individual processing attempts.
 
-### 2.3 Memory Subsystem Module (`com.mira.memory`)
+### 2.3 Memory Subsystem Module (`memory` domain)
 * **Primary Scope:** Style memory extraction, validation, conflict resolution, versioning, and user governance.
 * **Core Responsibilities:**
   * Manage persistent `USER_STYLE_PROFILE` records.
@@ -109,7 +110,7 @@ flowchart TD
   * Enforce **Optimistic Concurrency Control (OCC)** using an incremental `version` field to block stale asynchronous extraction updates from overwriting newer user changes.
   * Enforce **Generation Tracking** to ensure that purged style profiles cannot be resurrected by delayed background tasks.
 
-### 2.4 AI Integration Module (`com.mira.ai`)
+### 2.4 AI Integration Module (`ai` domain)
 * **Primary Scope:** Third-party LLM communication, request assembly, timeout management, and response normalization.
 * **Core Responsibilities:**
   * Implement an abstracted provider interface:
@@ -122,6 +123,26 @@ flowchart TD
   * Enforce bounded HTTP client connection (5s) and socket read (30s) timeouts.
   * Map provider-specific HTTP and JSON errors into normalized internal domain exceptions.
   * Facilitate deterministic local testing by providing mock implementations (`MockAIProvider`) that run without internet access or financial cost.
+
+### 2.5 Physical Package Layout
+
+The current implementation uses a **layer-first** package layout under `com.mira.mira_backend`. Domain isolation is maintained through service boundaries, repository ownership queries, and DTO contracts rather than package-private feature modules:
+
+| Package | Responsibility |
+| :--- | :--- |
+| `config` | Spring Security filter chain, JWT encoder/decoder, password encoder |
+| `controller` | REST endpoints (`AuthController`, `MeController`) |
+| `dto` | Java records for request/response payloads |
+| `entity` | JPA entities (`UserAccount`, `UserSession`, `RefreshTokenHistory`, `Conversation`) |
+| `exception` | `@RestControllerAdvice` and domain exception mapping |
+| `repository` | Spring Data JPA repositories and ownership/locking queries |
+| `security` | REST authentication entry point and access-denied handler |
+| `service` | Authentication, token rotation, account, and refresh-token services |
+
+> [!NOTE]
+> The original architecture targeted feature packages (`com.mira.auth`, `com.mira.chat`, `com.mira.memory`, `com.mira.ai`). The delivered scaffold uses the layer-first layout above. This is a packaging difference, not a change to the modular-boundary intent. A feature-package refactor can be performed later without changing the API or schema; it is not required for the MVP.
+>
+> Phase 1 will add a narrow `com.mira.mira_backend.ai` package for the `AIProvider` abstraction and provider implementations. This exception keeps provider-specific code out of the generic service layer; the remaining packages stay layer-first.
 
 ---
 
@@ -200,14 +221,17 @@ sequenceDiagram
 
 ### 4.1 Token Specifications
 * **Access Tokens:**
-  * Short-lived (15 minutes).
-  * Bearer token containing user ID, session ID, and issuance/expiration claims.
-  * Validated statelessly on every protected endpoint.
+  * Lifetime: 15 minutes.
+  * HS256 JWT signed with `MIRA_JWT_SECRET_BASE64` (a Base64-encoded secret of at least 32 bytes).
+  * Claims: `iss`, `sub` (user ID), `iat`, `exp`, and `jti`. The session ID is returned in the login/refresh response body rather than embedded in the token.
+  * Validated statelessly on every protected endpoint. Because access tokens are stateless, logout does not invalidate an already-issued access token; it remains valid until its 15-minute expiry while the refresh token is revoked immediately.
 * **Refresh Tokens:**
-  * Long-lived (e.g., 30 days).
-  * High-entropy cryptographically random string (256-bit).
+  * Lifetime: 30 days from session creation. Rotation does **not** extend the absolute session expiry.
+  * High-entropy cryptographically random string (32 bytes, Base64 URL-safe without padding).
   * Stored on the backend strictly as a SHA-256 hash.
-  * Rotated on every single refresh operation.
+  * `USER_SESSION.refresh_token_hash` holds the current token hash; `REFRESH_TOKEN_HISTORY` is an append-only audit trail of every issued token and its `consumed_at` timestamp.
+  * Rotation runs in a single transaction: lock the session with `SELECT ... FOR UPDATE`, re-read history under the lock, mark the presented token consumed, update the session hash in place, append the successor history row, and issue a new access token.
+  * Presenting a consumed history row is treated as replay. The implicated session is revoked before the request is rejected with `401 Unauthorized`.
 
 ---
 
@@ -216,7 +240,7 @@ sequenceDiagram
 1. **Client Isolation:** The Android client communicates strictly with `/api/v1/*` over TLS 1.3. Direct client access to PostgreSQL or DeepSeek is architecturally impossible.
 2. **Object-Level Authorization:** Handled via Spring Security and custom service assertions. Every database query filters by `user_id = authenticatedPrincipal.getId()`. Knowing another user's UUID yields a generic `404 Not Found`.
 3. **Secret Isolation:**
-   * `DEEPSEEK_API_KEY`, `DATABASE_URL`, and token signing keys are injected exclusively via system environment variables.
+   * `DEEPSEEK_API_KEY`, `SPRING_DATASOURCE_*`, and `MIRA_JWT_SECRET_BASE64` are injected exclusively via system environment variables.
    * Android APK builds contain only the public backend API URL.
 4. **Log Sanitization:** Sensitive payload fields (passwords, tokens, raw conversational prompts) are excluded from server logs using structured logging filters.
 
@@ -228,6 +252,24 @@ The following formal decisions govern MIRA's architecture:
 
 | ADR ID | Title | Status | Core Rationale |
 | :--- | :--- | :--- | :--- |
-| **ADR-001** | [Backend Technology Stack](./decisions/ADR-001-backend-stack.md) | Approved | Java 17 + Spring Boot 3 modular monolith delivers enterprise stability, fast development, and strong typing. |
+| **ADR-001** | [Backend Technology Stack](./decisions/ADR-001-backend-stack.md) | Approved | Java 21 + Spring Boot 4.1.x modular monolith delivers enterprise stability, fast development, and strong typing. |
 | **ADR-002** | [Memory Model & Concurrency](./decisions/ADR-002-memory-model.md) | Approved | Hybrid persistence policy with OCC versioning prevents stale background overwrites and protects user privacy. |
-| **ADR-003** | [Multimodal Processing Phasing](./decisions/ADR-003-file-processing.md) | Approved | Defer image and PDF processing to Phase 2 to ensure core text chat, idempotency, and memory mechanics are 100% verified first. |
+| **ADR-003** | [Multimodal Processing Phasing](./decisions/ADR-003-file-processing.md) | Approved | Defer image and PDF processing until the text chat, idempotency, and memory mechanics are verified; it is not part of Phase 1 or Phase 2. |
+
+---
+
+## 7. Current Implementation Status (2026-10-21)
+
+| Capability | Status |
+| :--- | :--- |
+| Registration, login, JWT validation | Implemented |
+| Refresh-token rotation, history, replay rejection | Implemented (session-scoped revocation) |
+| Logout, `/me` | Implemented |
+| Conversation entity, ownership query, cursor pagination query | Implemented |
+| Conversation HTTP endpoints | Phase 1 |
+| Message persistence, response lifecycle, retries, idempotency | Phase 1 |
+| `AIProvider` abstraction and DeepSeek client | Phase 1 |
+| Android authentication and chat client | Phase 1 |
+| Style-memory governance and extraction | Phase 2 |
+
+The active work breakdown is maintained in [10-phase-1-checklist.md](./10-phase-1-checklist.md).

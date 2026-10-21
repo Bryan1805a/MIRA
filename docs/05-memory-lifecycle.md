@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-MEM-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-10-11 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-10-21 |
 | **Author / Lead** | Bryan / MIRA Personalization & Memory Team |
 | **Scope** | Persistent Communication-Style Preferences |
 
@@ -19,6 +19,18 @@
 | 0.1.0 | 2026-10-10 | Memory Team | Initial memory scope, schema draft, and extraction lifecycle definition. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid extraction pipeline, eligibility gate specification, and generation tombstone mechanics. |
 | 1.1.0 | 2026-10-11 | Bryan | Integrated durable `USER_MEMORY_CONTROL` generation table, atomic row-level locking deletion protocol, and robust deletion-race verification suite. |
+| 1.2.0 | 2026-10-21 | Bryan | Added the delivery-phase status, confirmed the generation/profile table split against Flyway V5–V6, and clarified that this specification is the Phase 2 target. |
+
+---
+
+## Implementation Status (2026-10-21)
+
+The durable schema for this specification is in place:
+
+- `user_style_profile` (`V5`) stores the JSONB profile, `version`, and `enabled`.
+- `user_memory_control` (`V6`) stores the durable `generation` tombstone counter.
+
+The application-layer memory services, extraction workers, governance endpoints, and concurrency tests are **Phase 2** work. This document remains the normative target for that phase. Phase 1 deliberately omits style-memory injection from prompt assembly; context assembly in Phase 1 uses conversation history only.
 
 ---
 

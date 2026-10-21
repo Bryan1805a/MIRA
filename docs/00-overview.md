@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-10-11 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-10-21 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
 
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 0.1.0 | 2026-10-10 | Architecture Team | Initial concept baseline and product overview draft. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: added document control block, architecture flowchart, and cross-specification linkages. |
+| 1.1.0 | 2026-10-21 | Bryan | Reconciled the runtime baseline with the implemented scaffold (Java 21, Spring Boot 4.1.x) and added the Phase 1 milestone to the specification roadmap. |
 
 ---
 
@@ -92,7 +93,7 @@ MIRA establishes a decoupled, persistent user style profile that automatically i
 * **No Foundation Model Training:** MIRA does not pre-train or fine-tune models; it orchestrates external provider APIs.
 * **No Biographical Knowledge Graph:** Personal life details, financial data, health information, and political opinions are strictly excluded from memory extraction.
 * **No Autonomous Multi-Agent Graphs:** The system focuses on robust single-agent assistant conversations rather than unbounded multi-agent task execution.
-* **Deferred Multimodal Ingestion:** Ingestion of PDFs and images is deferred to Phase 2 to ensure maximum reliability of the core text and memory engine.
+* **Deferred Multimodal Ingestion:** Ingestion of PDFs and images is deferred until after the Phase 1 chat core and Phase 2 memory subsystem are verified.
 
 ---
 
@@ -103,7 +104,7 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 | Subsystem | Selected Technology | Architectural Rationale |
 | :--- | :--- | :--- |
 | **Mobile Client** | Android (Java, Gradle) | Native performance, standard OS security (Keystore), device document pickers. |
-| **Backend Service** | Java 17+, Spring Boot 3.x, Maven | Enterprise-grade type safety, robust transaction management, modular structure. |
+| **Backend Service** | Java 21, Spring Boot 4.1.x, Maven | Enterprise-grade type safety, robust transaction management, modular structure. |
 | **Database Engine** | PostgreSQL (Neon Managed) | ACID guarantees, JSONB document querying, rock-solid schema migrations via Flyway. |
 | **AI Inference Provider** | DeepSeek API | High-performance reasoning and conversational intelligence via an abstracted provider interface. |
 | **Protocol & Transport** | HTTPS / REST / JSON | Uniform `/api/v1` contract, deterministic error payloads, and Bearer authentication. |
@@ -119,6 +120,17 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 4. **Resilient Failure Semantics:** If an external AI provider experiences an outage or timeout, conversation integrity is preserved, idempotency guards prevent duplicate billing, and failure states are reported cleanly.
 5. **Deterministic Verifiability:** Core workflows, authorization invariants, and memory merge logic must be 100% testable using simulated test doubles (Mocks/Testcontainers) without incurred API costs.
 
+### 5.1 Delivery Phases
+
+| Phase | Status | Scope |
+| :--- | :--- | :--- |
+| **Phase 0** | Complete (Android APK verification carried into Phase 1) | Repository, toolchain, backend/Android skeletons, Flyway baseline |
+| **Phase 1** | **Active** | Conversation API, message orchestration, AI provider abstraction, Android auth/chat client, hardening, CI |
+| **Phase 2** | Planned | Communication-style memory governance, extraction, OCC/generation concurrency, memory UI |
+| **Phase 3** | Planned | Production hardening, deployment, release signing, operational readiness |
+
+Phase 1 deliberately delivers a usable text-chat loop without memory. Memory is the Phase 2 differentiator and remains specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+
 ---
 
 ## 6. Specification Document Roadmap
@@ -133,7 +145,8 @@ The complete engineering specification is partitioned into modular, version-cont
 * [06-security-and-privacy.md](./06-security-and-privacy.md) — Threat Modeling, Token Lifecycles, and Data Privacy Standards.
 * [07-testing-strategy.md](./07-testing-strategy.md) — Multi-Tier Quality Assurance, Testcontainers, and Mocking Strategy.
 * [08-deployment-plan.md](./08-deployment-plan.md) — Cloud Infrastructure Topology, Flyway Migrations, and Release Runbooks.
-* [09-phase-0-checklist.md](./09-phase-0-checklist.md) — Phase 0 Repository Baseline, Verification Steps, and Readiness Gates.
+* [09-phase-0-checklist.md](./09-phase-0-checklist.md) — Phase 0 Repository Baseline, Verification Steps, and Readiness Gates (complete; Android APK verification carried into Phase 1).
+* [10-phase-1-checklist.md](./10-phase-1-checklist.md) — Phase 1 Conversation & Chat Core milestone, workstreams, and exit gate.
 * [ADR-001-backend-stack.md](./decisions/ADR-001-backend-stack.md) — Architectural Decision Record: Backend Technology Selection.
 * [ADR-002-memory-model.md](./decisions/ADR-002-memory-model.md) — Architectural Decision Record: Memory Lifecycle & Concurrency Model.
 * [ADR-003-file-processing.md](./decisions/ADR-003-file-processing.md) — Architectural Decision Record: Multimodal Processing Phasing.

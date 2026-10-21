@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-10-11 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-10-21 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
 
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 0.1.0 | 2026-10-10 | QA Team | Initial test pyramid, unit test scope, and mock strategy draft. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid test pyramid, CI pipeline, lifecycle retry test matrix, session revocation tests, and consolidated all draft updates. |
+| 1.1.0 | 2026-10-21 | Bryan | Reconciled the test baseline with the implemented suites, Java 21/Testcontainers versions, Flyway V1–V8, and the Phase 1/Phase 2 delivery split. |
 
 ---
 
@@ -65,7 +66,7 @@ flowchart TD
 ### 3.2 Database Integration Testing (Testcontainers)
 * **Framework:** Spring Boot Test (`@DataJpaTest`), Testcontainers PostgreSQL.
 * **Verification Scope:**
-  * **Flyway Migrations:** Verify that all versioned migrations (`V1` through `V5`) execute successfully from a clean database.
+  * **Flyway Migrations:** Verify that all versioned migrations (`V1` through `V8`) execute successfully from a clean database. The current suite uses `postgres:18-alpine` through Testcontainers.
   * **Relational Constraints:** Verify that deleting a `user_account` cascades to `conversation` and `message` records, but leaves unrelated data intact.
   * **Optimistic Concurrency Control (OCC):** Verify that concurrent `UPDATE user_style_profile` operations with identical `expectedVersion` integers permit only one update and trigger a version conflict on the second.
   * **Idempotency Uniqueness:** Verify that inserting duplicate `(conversation_id, idempotency_key)` tuples violates database unique constraints.
@@ -73,8 +74,8 @@ flowchart TD
 ### 3.3 API Contract & Security Testing
 * **Framework:** Spring MockMvc / WebTestClient with Spring Security context.
 * **Verification Scope:**
-  * **Authentication:** Verify registration, login, token rotation, and invalid credential rejections.
-  * **Session Revocation & Reuse:** Verify that using an already-rotated refresh token revokes all user sessions and rejects further requests.
+  * **Authentication:** Verify registration, login, token rotation, and invalid credential rejections. Registration, login, refresh, logout, and `/me` are implemented and covered; dedicated rotation/replay tests remain Phase 1.
+  * **Session Revocation & Reuse:** Verify that using an already-rotated refresh token revokes the implicated session and rejects further use of that token. Current tests cover logout revocation and post-logout refresh rejection; replay-specific tests are Phase 1.
   * **Object-Level Authorization (IDOR):** Verify that User A attempting to read, modify, or delete User B's conversation receives `404 Not Found`.
   * **Uniform Error Formatting:** Verify that invalid inputs return the standard JSON error schema with appropriate error codes.
 
@@ -101,22 +102,32 @@ flowchart LR
 
 The `MockAIProvider` enables deterministic simulation of complex edge cases without spending API credits or encountering live network flakiness.
 
+### 3.5 Current Test Inventory (2026-10-21)
+
+| Suite | Type | Tests | Scope |
+| :--- | :--- | :--- | :--- |
+| `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 21 | Registration, duplicate email, login/logout/refresh, `/me`, protected-endpoint authentication, conversation ownership, and cursor pagination. |
+| `TokenServiceTests` | Unit | 5 | JWT claims and expiry, refresh-token uniqueness/URL safety, deterministic SHA-256 hashing. |
+| `JwtConfigurationTests` | Unit | 1 | Secret validation and decoder configuration. |
+
+The suite runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V8`. No test contacts DeepSeek. The classes should be split by domain as the Phase 1 surface grows; the current consolidated class is a baseline, not the target structure.
+
 ---
 
 ## 4. Lifecycle, Retry & Concurrency Test Matrix
 
-| Test Suite Category | Scenario Description | Input / Setup | Expected Observable Assertion |
-| :--- | :--- | :--- | :--- |
-| **Response Lifecycle** | Successful Response | User submits valid prompt. | Logical response transitions to `COMPLETED`; assistant message persisted; eligible for memory extraction. |
-| **Response Lifecycle** | Provider Timeout | `MockAIProvider` throws `TimeoutException`. | Logical response transitions to `UNKNOWN`; user message remains intact; attempt logged as `TIMEOUT`. |
-| **Response Lifecycle** | Provider Terminal Failure | `MockAIProvider` returns HTTP 500 error. | Logical response transitions to `FAILED`; attempt logged as `ERROR`. |
-| **Idempotent Retry** | Client Submits Identical Key | Re-send request with same `Idempotency-Key` and payload. | Returns existing response without dispatching duplicate AI request or duplicating messages. |
-| **Idempotent Retry** | Client Reuses Key with New Body | Re-send same `Idempotency-Key` with different message. | Server rejects request with `409 Conflict` and error code `IDEMPOTENCY_CONFLICT`. |
-| **Memory Gating** | Extraction from Incomplete Response | Response is `PENDING`, `FAILED`, or `UNKNOWN`. | Extraction service strictly skips task; zero memory updates committed. |
-| **Memory Concurrency** | OCC Version Collision | Two threads attempt update with `expectedVersion: 4`. | Thread 1 succeeds (version becomes 5); Thread 2 receives `409 Conflict` (`VERSION_CONFLICT`). |
-| **Memory Deletion Race**| Background Extraction vs User Purge | Extraction task starts; User executes `DELETE /memory/style`; Extraction finishes. | Extraction task detects incremented `generation` counter and aborts; profile remains completely purged. |
-| **Session Security** | Refresh Token Rotation | Client calls `POST /auth/refresh` with valid RT1. | Old RT1 is invalidated; new RT2 is issued and verified active. |
-| **Session Security** | Token Reuse Interception | Client attempts to reuse invalidated RT1. | Server detects reuse, revokes all sessions for user, and returns `401 Unauthorized`. |
+| Test Suite Category | Scenario Description | Input / Setup | Expected Observable Assertion | Phase |
+| :--- | :--- | :--- | :--- | :--- |
+| **Response Lifecycle** | Successful Response | User submits valid prompt. | Logical response transitions to `COMPLETED`; assistant message persisted; eligible for memory extraction. | Phase 1 |
+| **Response Lifecycle** | Provider Timeout | `MockAIProvider` throws `TimeoutException`. | Logical response transitions to `UNKNOWN`; user message remains intact; attempt logged as `TIMEOUT`. | Phase 1 |
+| **Response Lifecycle** | Provider Terminal Failure | `MockAIProvider` returns HTTP 500 error. | Logical response transitions to `FAILED`; attempt logged as `ERROR`. | Phase 1 |
+| **Idempotent Retry** | Client Submits Identical Key | Re-send request with same `Idempotency-Key` and payload. | Returns existing response without dispatching duplicate AI request or duplicating messages. | Phase 1 |
+| **Idempotent Retry** | Client Reuses Key with New Body | Re-send same `Idempotency-Key` with different message. | Server rejects request with `409 Conflict` and error code `idempotency_conflict`. | Phase 1 |
+| **Memory Gating** | Extraction from Incomplete Response | Response is `PENDING`, `FAILED`, or `UNKNOWN`. | Extraction service strictly skips task; zero memory updates committed. | Phase 2 |
+| **Memory Concurrency** | OCC Version Collision | Two threads attempt update with `expectedVersion: 4`. | Thread 1 succeeds (version becomes 5); Thread 2 receives `409 Conflict` (`version_conflict`). | Phase 2 |
+| **Memory Deletion Race**| Background Extraction vs User Purge | Extraction task starts; User executes `DELETE /memory/style`; Extraction finishes. | Extraction task detects incremented `generation` counter and aborts; profile remains completely purged. | Phase 2 |
+| **Session Security** | Refresh Token Rotation | Client calls `POST /auth/refresh` with valid RT1. | RT1 is marked consumed; RT2 is issued and verified active; the session ID is unchanged. | Phase 1 (dedicated test) |
+| **Session Security** | Token Reuse Interception | Client attempts to reuse consumed RT1. | Server detects reuse, revokes the implicated session, and returns `401 Unauthorized`. Global all-session revocation is a hardening item. | Phase 1 (dedicated test) |
 
 ---
 
@@ -129,7 +140,7 @@ flowchart TD
     end
 
     subgraph BackendPipeline ["Backend CI Pipeline (Maven)"]
-        Compile["1. Compile Java 17 Sources"]
+        Compile["1. Compile Java 21 Sources"]
         UnitTests["2. Run Unit Tests (JUnit 5)"]
         Testcontainers["3. Run Testcontainers Integration Tests (PostgreSQL)"]
         Lint["4. Static Code & Security Analysis"]
@@ -156,6 +167,9 @@ flowchart TD
         CheckSuccess -- No --> BlockMerge["Block Merge & Alert Engineering"]
     end
 ```
+
+> [!NOTE]
+> GitHub Actions workflows are **not yet configured** in this repository. The pipeline above is the Phase 1 target; until it exists, run `.\mvnw.cmd clean verify` locally before merging backend changes.
 
 ---
 

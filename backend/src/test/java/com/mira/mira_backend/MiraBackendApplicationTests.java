@@ -40,7 +40,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import org.springframework.test.web.servlet.MvcResult;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -596,6 +597,230 @@ class MiraBackendApplicationTests {
         );
     }
 
+    @Test
+    void errorResponsesExposeRequestIdHeaderAndBody() throws Exception {
+        mockMvc.perform(get("/api/v1/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().exists("X-Request-Id"))
+                .andExpect(jsonPath("$.error")
+                        .value("authentication_required"))
+                .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+    
+    @Test
+    void suppliedRequestIdIsEchoed() throws Exception {
+        String requestId = "test-request-123";
+    
+        mockMvc.perform(get("/api/v1/me")
+                        .header("X-Request-Id", requestId))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("X-Request-Id", requestId))
+                .andExpect(jsonPath("$.requestId").value(requestId));
+    }
+    
+    @Test
+    void validationErrorsIncludeFieldDetails() throws Exception {
+        var request = new com.mira.mira_backend.dto.RegisterRequest(
+                "valid-" + UUID.randomUUID() + "@example.com",
+                "short"
+        );
+    
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"))
+                .andExpect(jsonPath("$.details[0].field").value("password"))
+                .andExpect(jsonPath("$.details[0].reason").isNotEmpty());
+    }
+
+    @Test
+    void conversationCanBeCreatedListedAndDeleted() throws Exception {
+        String email = "conversation-api-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "  Phase 1 conversation  "
+        );
+    
+        mockMvc.perform(get("/api/v1/conversations")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id")
+                        .value(conversationId.toString()))
+                .andExpect(jsonPath("$.items[0].title")
+                        .value("Phase 1 conversation"));
+    
+        mockMvc.perform(delete(
+                                "/api/v1/conversations/{id}",
+                                conversationId
+                        )
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+    
+        mockMvc.perform(get("/api/v1/conversations")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty());
+    }
+    
+    @Test
+    void conversationListPaginatesWithAnOpaqueCursor() throws Exception {
+        String email = "conversation-page-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID first = createConversation(tokens.accessToken(), "First");
+        Thread.sleep(5);
+        UUID second = createConversation(tokens.accessToken(), "Second");
+        Thread.sleep(5);
+        UUID third = createConversation(tokens.accessToken(), "Third");
+    
+        MvcResult firstPageResult = mockMvc.perform(
+                        get("/api/v1/conversations")
+                                .param("limit", "2")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokens.accessToken()
+                                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.nextCursor").isNotEmpty())
+                .andReturn();
+    
+        var firstPage = objectMapper.readTree(
+                firstPageResult.getResponse().getContentAsString()
+        );
+    
+        String cursor = firstPage.get("nextCursor").stringValue();
+    
+        MvcResult secondPageResult = mockMvc.perform(
+                        get("/api/v1/conversations")
+                                .param("limit", "2")
+                                .param("cursor", cursor)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokens.accessToken()
+                                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andReturn();
+    
+        var secondPage = objectMapper.readTree(
+                secondPageResult.getResponse().getContentAsString()
+        );
+    
+        var ids = new java.util.HashSet<String>();
+    
+        firstPage.get("items").forEach(
+                item -> ids.add(item.get("id").stringValue())
+        );
+        secondPage.get("items").forEach(
+                item -> ids.add(item.get("id").stringValue())
+        );
+    
+        assertEquals(3, ids.size());
+        assertTrue(ids.containsAll(java.util.List.of(
+                first.toString(),
+                second.toString(),
+                third.toString()
+        )));
+    }
+    
+    @Test
+    void userCannotDeleteAnotherUsersConversation() throws Exception {
+        String password = "Correct-Horse-123!";
+        String emailA = "conversation-owner-" + UUID.randomUUID()
+                + "@example.com";
+        String emailB = "conversation-other-" + UUID.randomUUID()
+                + "@example.com";
+    
+        register(emailA, password);
+        register(emailB, password);
+    
+        LoginTokens owner = login(emailA, password);
+        LoginTokens other = login(emailB, password);
+    
+        UUID conversationId = createConversation(
+                owner.accessToken(),
+                "Owner only"
+        );
+    
+        mockMvc.perform(delete(
+                                "/api/v1/conversations/{id}",
+                                conversationId
+                        )
+                        .header(
+                                "Authorization",
+                                "Bearer " + other.accessToken()
+                        ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error")
+                        .value("resource_not_found"));
+    
+        mockMvc.perform(get("/api/v1/conversations")
+                        .header(
+                                "Authorization",
+                                "Bearer " + owner.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id")
+                        .value(conversationId.toString()));
+    }
+    
+    @Test
+    void conversationListRejectsInvalidPaginationInput() throws Exception {
+        String email = "conversation-invalid-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        mockMvc.perform(get("/api/v1/conversations")
+                        .param("limit", "51")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"));
+    
+        mockMvc.perform(get("/api/v1/conversations")
+                        .param("cursor", "not-a-cursor")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"));
+    
+        mockMvc.perform(delete("/api/v1/conversations/not-a-uuid")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"));
+    }
+
     private static String newTokenHash() {
         return UUID.randomUUID().toString().replace("-", "")
                 + UUID.randomUUID().toString().replace("-", "");
@@ -642,5 +867,33 @@ class MiraBackendApplicationTests {
             String refreshToken,
             UUID sessionId
     ) {
+    }
+
+    private UUID createConversation(
+            String accessToken,
+            String title
+    ) throws Exception {
+        MvcResult result = mockMvc.perform(
+                        post("/api/v1/conversations")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + accessToken
+                                )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(
+                                        new com.mira.mira_backend.dto.CreateConversationRequest(
+                                                title
+                                        )
+                                )))
+                .andExpect(status().isCreated())
+                .andReturn();
+    
+        return UUID.fromString(
+                objectMapper.readTree(
+                                result.getResponse().getContentAsString()
+                        )
+                        .get("id")
+                        .stringValue()
+        );
     }
 }

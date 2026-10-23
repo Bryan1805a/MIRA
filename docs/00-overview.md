@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-10-21 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-10-23 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
 
@@ -19,6 +19,7 @@
 | 0.1.0 | 2026-10-10 | Architecture Team | Initial concept baseline and product overview draft. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: added document control block, architecture flowchart, and cross-specification linkages. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled the runtime baseline with the implemented scaffold (Java 21, Spring Boot 4.1.x) and added the Phase 1 milestone to the specification roadmap. |
+| 1.2.0 | 2026-10-23 | Bryan | Reconciled Phase 1 delivery progress: conversation management, messaging orchestration, response lifecycle, and MockAIProvider completed on backend. |
 
 ---
 

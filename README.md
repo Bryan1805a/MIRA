@@ -12,11 +12,13 @@
 
 ## Development Status
 
-**Phase 0 is complete, with one verification carried into Phase 1: producing and installing an Android debug APK. Phase 1 (Conversation & Chat Core) is the active milestone.**
+**Phase 0 is complete. Phase 1 (Conversation & Chat Core) is the active milestone, with the backend conversation and messaging core implemented.**
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented.
-- The conversation entity and ownership/cursor-pagination repository are implemented.
-- The Android application is still the Phase 0 scaffold; the client work is part of Phase 1.
+- Conversation management (CRUD + cursor pagination) is implemented on the backend.
+- Message sending, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, idempotency key/payload verification, attempt tracking, and bounded retries are implemented on the backend.
+- The backend test suite passes with 52 automated tests against PostgreSQL Testcontainers.
+- The Android application is currently the Phase 0 scaffold; Android UI, network integration, and the real DeepSeek HTTP client remain active Phase 1 deliverables.
 - Memory extraction and memory governance are deferred to Phase 2.
 
 See [`docs/10-phase-1-checklist.md`](docs/10-phase-1-checklist.md) for the active plan and exit gate.
@@ -52,7 +54,7 @@ mira/
 │   │   ├── security/               # REST authentication/authorization handlers
 │   │   └── service/                # Domain services
 │   ├── src/main/resources/
-│   │   └── db/migration/           # Flyway migrations (V1–V8)
+│   │   └── db/migration/           # Flyway migrations (V1–V9)
 │   └── src/test/                   # Unit and Testcontainers integration tests
 ├── docs/                           # Requirements, architecture, API, security, testing, deployment
 └── README.md
@@ -121,7 +123,7 @@ cd android
 
 Open the `android/` directory in Android Studio to run on an emulator or physical device. The current application is the Phase 0 scaffold; authentication, conversation, and chat screens are Phase 1 work.
 
-## Implemented API (as of 2026-10-21)
+## Implemented API (as of 2026-10-23)
 
 | Method | Endpoint | Status |
 | :--- | :--- | :--- |
@@ -130,12 +132,12 @@ Open the `android/` directory in Android Studio to run on an emulator or physica
 | `POST` | `/api/v1/auth/refresh` | Implemented (rotating refresh tokens) |
 | `POST` | `/api/v1/auth/logout` | Implemented (revokes the presented session) |
 | `GET` | `/api/v1/me` | Implemented |
-| `GET` | `/api/v1/conversations` | Phase 1 |
-| `POST` | `/api/v1/conversations` | Phase 1 |
-| `DELETE` | `/api/v1/conversations/{conversationId}` | Phase 1 |
-| `GET` | `/api/v1/conversations/{conversationId}/messages` | Phase 1 |
-| `POST` | `/api/v1/conversations/{conversationId}/messages` | Phase 1 |
-| `POST` | `/api/v1/conversations/{conversationId}/responses/{responseId}/retry` | Phase 1 |
+| `GET` | `/api/v1/conversations` | Implemented (Backend) |
+| `POST` | `/api/v1/conversations` | Implemented (Backend) |
+| `DELETE` | `/api/v1/conversations/{conversationId}` | Implemented (Backend) |
+| `GET` | `/api/v1/conversations/{conversationId}/messages` | Implemented (Backend) |
+| `POST` | `/api/v1/conversations/{conversationId}/messages` | Implemented (Backend) |
+| `POST` | `/api/v1/conversations/{conversationId}/responses/{responseId}/retry` | Implemented (Backend) |
 | `GET/PUT/PATCH/DELETE` | `/api/v1/memory/style` | Phase 2 |
 
 ## Documentation

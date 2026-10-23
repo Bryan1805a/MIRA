@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Optional;
 
 public interface AiProcessingAttemptRepository
         extends JpaRepository<AiProcessingAttempt, UUID> {
@@ -22,5 +23,17 @@ public interface AiProcessingAttemptRepository
             """)
     int findMaxAttemptNumber(
             @Param("responseId") UUID responseId
+    );
+
+    Optional<AiProcessingAttempt> findByIdAndResponseId(
+        UUID attemptId,
+        UUID responseId
+    );
+    
+    long countByResponseId(UUID responseId);
+
+    Optional<AiProcessingAttempt> findByResponseIdAndIdempotencyKey(
+        UUID responseId,
+        String idempotencyKey
     );
 }

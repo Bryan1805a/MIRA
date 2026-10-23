@@ -48,4 +48,17 @@ public interface MessageRepository
             @Param("cursorId") UUID cursorId,
             Pageable pageable
     );
+
+    @Query("""
+        SELECT m
+        FROM Message m
+        WHERE m.conversation.id = :conversationId
+          AND m.conversation.user.id = :userId
+        ORDER BY m.createdAt DESC, m.id DESC
+        """)
+    List<Message> findRecent(
+            @Param("conversationId") UUID conversationId,
+            @Param("userId") UUID userId,
+            Pageable pageable
+    );
 }

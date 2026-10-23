@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DAT-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-10-21 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-10-23 |
 | **Author / Lead** | Bryan / MIRA Data Engineering Team |
 | **Database Engine** | PostgreSQL 15+ (Neon Managed Database; PostgreSQL 18 in Testcontainers) |
 | **Migration Tool** | Flyway |
@@ -20,6 +20,7 @@
 | 0.1.0 | 2026-10-10 | Data Team | Initial entity overview and relational draft schema. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid ERD, detailed DDL specifications, session tracking, attempt audits, and optimistic concurrency versioning. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled the documented schema with Flyway migrations V1–V8: refresh-token history, final `ai_response` shape, composite ownership FKs, and the separation of generation control from the style profile. |
+| 1.2.0 | 2026-10-23 | Bryan | Reconciled migration baseline with Flyway V1–V9, adding `idempotency_key` and unique partial index `uq_ai_attempt_idempotency` to `ai_processing_attempt`. |
 
 ---
 
@@ -31,7 +32,7 @@
 4. **Decoupled Memory Life Cycle:** Deleting a conversation cascades to its messages and AI response records, but **never** deletes the user's communication-style profile. Memory profile deletion must execute via an explicit, dedicated user action.
 5. **Concurrency-Safe Mutations:** Concurrent style-memory extractions and client edits are governed by Optimistic Concurrency Control (OCC) using an incremental `version`, while a durable `generation` counter in `user_memory_control` prevents deleted profiles from being resurrected.
 6. **Token Auditability:** Only SHA-256 hashes of refresh tokens are stored. The session row holds the current hash; `refresh_token_history` preserves every issued hash and its consumption time for replay detection.
-7. **Migrations Are Authoritative:** The DDL below reflects the consolidated state after Flyway migrations `V1`–`V8`. If this document and a migration disagree, the migration is the source of truth and this document must be corrected.
+7. **Migrations Are Authoritative:** The DDL below reflects the consolidated state after Flyway migrations `V1`–`V9`. If this document and a migration disagree, the migration is the source of truth and this document must be corrected.
 
 ---
 
@@ -110,6 +111,7 @@ erDiagram
         integer attempt_number "UK with response_id"
         varchar outcome "IN_PROGRESS, SUCCESS, TIMEOUT, ERROR"
         varchar error_category "Nullable"
+        varchar idempotency_key "Nullable, UK with response_id"
         timestamptz started_at
         timestamptz finished_at "Nullable while in progress"
     }
@@ -337,6 +339,7 @@ CREATE TABLE ai_processing_attempt (
     error_category VARCHAR(50) NULL,
     started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     finished_at TIMESTAMPTZ NULL,
+    idempotency_key VARCHAR(128) NULL,
 
     CONSTRAINT ck_ai_attempt_number
         CHECK (attempt_number >= 1),
@@ -354,6 +357,10 @@ CREATE TABLE ai_processing_attempt (
     CONSTRAINT uq_ai_attempt_number
         UNIQUE (response_id, attempt_number)
 );
+
+CREATE UNIQUE INDEX uq_ai_attempt_idempotency
+    ON ai_processing_attempt (response_id, idempotency_key)
+    WHERE idempotency_key IS NOT NULL;
 ```
 * **Integrity Rules:**
   * `uq_ai_response_idempotency` guarantees that a client key maps to exactly one logical response per user and operation.
@@ -362,6 +369,7 @@ CREATE TABLE ai_processing_attempt (
   * `request_hash` stores a canonical hash of the request payload so that key reuse with a different body can be rejected with `409 Conflict`.
   * Each execution is recorded independently in `ai_processing_attempt`; `IN_PROGRESS` rows have no `finished_at`, while terminal outcomes require one.
   * V7 added the partial unique index on `assistant_message_id` and dropped the duplicate non-unique attempt index. The unique constraint `uq_ai_attempt_number` remains the supporting index for attempt lookups.
+  * V9 added the nullable `idempotency_key` column to `ai_processing_attempt` and the partial unique index `uq_ai_attempt_idempotency` to enforce that retry submissions with the same key map to the same attempt.
 
 ---
 
@@ -428,6 +436,7 @@ All physical schema definitions are maintained using **Flyway** under `backend/s
 | `V6__init_user_memory_control.sql` | Create the durable `user_memory_control` generation table. |
 | `V7__tighten_uniqueness_constraints.sql` | Make refresh-token hashes unique, make assistant-message links unique, and drop a duplicate attempt index. |
 | `V8__add_refresh_token_history.sql` | Create `refresh_token_history` and backfill existing session token hashes. |
+| `V9__add_attempt_idempotency.sql` | Add nullable `idempotency_key` column and partial unique index `uq_ai_attempt_idempotency` on `(response_id, idempotency_key)` to `ai_processing_attempt`. |
 
 > [!NOTE]
 > Database migrations must be forward-compatible. Destructive migrations (e.g., dropping columns) must follow a multi-step expand-and-contract deployment pattern. The redundant `idx_user_session_token_hash` index from V2 is retained for now; dropping it is a non-destructive cleanup candidate for a future migration.

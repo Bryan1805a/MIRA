@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-10-21 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-10-23 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
 
@@ -19,6 +19,7 @@
 | 0.1.0 | 2026-10-10 | Architecture Team | Initial modular monolith architectural design and draft component definitions. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated response lifecycle state machine, session rotation models, message retry semantics, and unified all pending draft updates. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled runtime versions, physical package layout, refresh-token rotation mechanics, and implementation status with the delivered backend. |
+| 1.2.0 | 2026-10-23 | Bryan | Updated implementation status table to reflect completed backend chat core, response lifecycle, idempotency, bounded retries, and MockAIProvider. |
 
 ---
 
@@ -258,7 +259,7 @@ The following formal decisions govern MIRA's architecture:
 
 ---
 
-## 7. Current Implementation Status (2026-10-21)
+## 7. Current Implementation Status (2026-10-23)
 
 | Capability | Status |
 | :--- | :--- |
@@ -266,10 +267,11 @@ The following formal decisions govern MIRA's architecture:
 | Refresh-token rotation, history, replay rejection | Implemented (session-scoped revocation) |
 | Logout, `/me` | Implemented |
 | Conversation entity, ownership query, cursor pagination query | Implemented |
-| Conversation HTTP endpoints | Phase 1 |
-| Message persistence, response lifecycle, retries, idempotency | Phase 1 |
-| `AIProvider` abstraction and DeepSeek client | Phase 1 |
-| Android authentication and chat client | Phase 1 |
+| Conversation HTTP endpoints | Implemented (Backend) |
+| Message persistence, response lifecycle, retries, idempotency | Implemented (Backend) |
+| `AIProvider` abstraction and `MockAIProvider` | Implemented (Backend) |
+| Live DeepSeek HTTP client | Phase 1 |
+| Android authentication and chat client | Phase 1 (Scaffold complete, build working) |
 | Style-memory governance and extraction | Phase 2 |
 
 The active work breakdown is maintained in [10-phase-1-checklist.md](./10-phase-1-checklist.md).

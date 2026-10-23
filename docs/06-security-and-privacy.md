@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-SEC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-10-21 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-10-23 |
 | **Author / Lead** | Bryan / MIRA Security & Privacy Lead |
 | **Compliance Baseline** | OWASP Mobile & API Top 10, Data Minimization Standards |
 
@@ -19,6 +19,7 @@
 | 0.1.0 | 2026-10-10 | Security Team | Initial draft threat model and credential handling guidelines. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated STRIDE threat matrix, visual Mermaid token sequence, Android Keystore specs, and consolidated all draft updates. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled refresh-token rotation/replay behavior, signing-secret configuration, and mobile/CI security status with the implemented backend. |
+| 1.2.0 | 2026-10-23 | Bryan | Updated implementation status to reflect implemented RequestIdFilter, MDC request correlation, and enriched error envelope on the backend. |
 
 ---
 
@@ -173,11 +174,11 @@ flowchart LR
    * Users can permanently delete their style memory via `DELETE /api/v1/memory/style`, which increments the generation counter and ensures delayed background jobs cannot recreate the profile.
 3. **Log Sanitization:**
    * Log formatters automatically mask Authorization headers, passwords, and prompt message bodies.
-   * Internal diagnostics will utilize unique request tracking UUIDs (`requestId`) to trace errors across log streams without exposing user data. Request-ID propagation and inclusion in error bodies are Phase 1 work; the current error envelope has no `requestId` field.
+   * Internal diagnostics utilize unique request tracking UUIDs (`requestId`) via `RequestIdFilter` and MDC logging to trace errors across log streams without exposing user data. The `requestId` is returned in headers and in standard error responses.
 
 ---
 
-## 7. Implementation Status (2026-10-21)
+## 7. Implementation Status (2026-10-23)
 
 | Control | Status |
 | :--- | :--- |
@@ -186,9 +187,9 @@ flowchart LR
 | Rotating refresh tokens with replay detection | Implemented (revokes implicated session only) |
 | HS256 JWT validation, 15-minute expiry | Implemented |
 | Stateless security filter chain and JSON 401/403 responses | Implemented |
-| Uniform error envelope with `requestId`/`details` | Phase 1 |
+| Uniform error envelope with `requestId`/`details` | Implemented (Backend) |
 | Per-account rate limiting | Phase 1 |
-| Sanitized structured logging and request-ID correlation | Phase 1 |
+| Sanitized structured logging and request-ID correlation | Implemented (Backend) |
 | Android Keystore / `EncryptedSharedPreferences` | Phase 1 |
 | TLS-only network security config | Phase 1 |
 | Memory privacy restrictions and generation guards | Phase 2 |

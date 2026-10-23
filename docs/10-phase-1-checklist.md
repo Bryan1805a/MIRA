@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-10-21 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-10-23 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 1 — End-to-End Text Chat |
 
@@ -17,6 +17,7 @@
 | Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
 | 1.0.0 | 2026-10-21 | Bryan | Initial Phase 1 baseline: conversation API, message orchestration, provider abstraction, Android client, hardening, CI, and exit gate. |
+| 1.1.0 | 2026-10-23 | Bryan | Reconciled completed backend deliverables: conversation endpoints, message orchestration, response lifecycle, idempotency checking, bounded retries, MockAIProvider, request IDs, and enriched error envelope (52 passing tests). |
 
 ---
 
@@ -104,11 +105,15 @@ Phase 1 objectives:
 | JWT resource-server security and JSON 401/403 responses | Implemented |
 | Refresh-token rotation and replay rejection | Implemented (session-scoped revocation) |
 | `conversation` table, entity, ownership query, cursor query | Implemented |
-| Schema `V1`–`V8` | Implemented |
-| Backend test suite | 27 passing tests in the latest local reports |
-| Android application | Phase 0 scaffold only |
+| Conversation API (CRUD, cursor pagination) | Implemented (Backend) |
+| Messaging API, response lifecycle, retries, idempotency | Implemented (Backend) |
+| `AIProvider` abstraction and `MockAIProvider` | Implemented (Backend) |
+| Request-ID propagation and enriched error envelope | Implemented (Backend) |
+| Schema `V1`–`V9` | Implemented |
+| Backend test suite | 52 passing tests in local Testcontainers suites |
+| Android application | Phase 0 scaffold (Java 21 daemon toolchain configured; compiles via `assembleDebug`) |
 | CI workflows | Not configured |
-| Android debug APK verification | **Carry-over from Phase 0** |
+| Android debug APK verification | Carry-over from Phase 0 (build verified) |
 
 ### 3.1 Phase 0 Carry-Over
 
@@ -122,17 +127,17 @@ Phase 1 objectives:
 
 ### 4.1 Platform & Contract Hardening
 
-- [ ] Add a request-ID filter/servlet component:
-  - Read `X-Request-Id` if supplied and well-formed, otherwise generate a UUID.
-  - Put the value in the logging MDC and the response header.
-  - Include it in every error body as `requestId`.
-- [ ] Extend `ApiErrorResponse` to `{ error, message, requestId, details? }` without breaking `error`/`message`.
-- [ ] Add a catch-all exception handler returning `500 internal_error` with a sanitized message.
-- [ ] Populate `details` for bean-validation failures (`field`, `reason`); avoid leaking class names or SQL.
-- [ ] Enforce request limits:
-  - [ ] Message content: non-blank, max 4,000 characters.
-  - [ ] Conversation title: max 200 characters, trimmed; blank becomes `null`.
-  - [ ] List limits: conversations default 20/max 50, messages default 50/max 100.
+- [x] Add a request-ID filter/servlet component (`RequestIdFilter`):
+  - [x] Read `X-Request-Id` if supplied and well-formed, otherwise generate a UUID.
+  - [x] Put the value in the logging MDC and the response header.
+  - [x] Include it in every error body as `requestId`.
+- [x] Extend `ApiErrorResponse` to `{ error, message, requestId, details? }` without breaking `error`/`message`.
+- [x] Add a catch-all exception handler returning `500 internal_error` with a sanitized message.
+- [x] Populate `details` for bean-validation failures (`field`, `reason`); avoid leaking class names or SQL.
+- [x] Enforce request limits:
+  - [x] Message content: non-blank, max 4,000 characters.
+  - [x] Conversation title: max 200 characters, trimmed; blank becomes `null`.
+  - [x] List limits: conversations default 20/max 50, messages default 50/max 100.
 - [ ] Implement per-account rate limiting for message sends (target: 10 requests/minute) returning `429 rate_limited`.
   - Choose a single-instance in-memory token bucket for the MVP and document the limitation.
   - Do not rate-limit health checks or authentication by the same bucket; use separate policies if auth throttling is added.
@@ -144,90 +149,90 @@ Phase 1 objectives:
 
 ### 4.2 Conversation API
 
-- [ ] Add DTOs:
+- [x] Add DTOs:
   - `CreateConversationRequest(String title)`
   - `ConversationResponse(UUID id, String title, Instant createdAt, Instant updatedAt)`
   - `ConversationPageResponse(List<ConversationResponse> items, String nextCursor)`
-- [ ] Add `ConversationService`:
-  - [ ] `create(userId, title)`.
-  - [ ] `list(userId, limit, cursor)` ordered by `updatedAt DESC, id DESC`.
-  - [ ] `delete(userId, conversationId)` with ownership check.
-- [ ] Encode the cursor as an opaque token containing `(updatedAt, id)`; reject malformed cursors with `400 invalid_request`.
-- [ ] Add `ConversationController`:
-  - [ ] `GET /api/v1/conversations` → `200`.
-  - [ ] `POST /api/v1/conversations` → `201`.
-  - [ ] `DELETE /api/v1/conversations/{conversationId}` → `204`.
-- [ ] Return `404 resource_not_found` for unknown or unowned conversations, never `403`, to avoid IDOR enumeration.
-- [ ] Ensure conversation deletion cascades to messages and AI responses and does not touch memory state.
-- [ ] Tests:
-  - [ ] Create/list/delete happy paths.
-  - [ ] Newest-first ordering and cursor pagination across pages.
-  - [ ] Cross-account list isolation and delete attempts return `404`.
-  - [ ] Invalid limit/cursor returns `400`.
-  - [ ] Unauthenticated access returns `401`.
+- [x] Add `ConversationService`:
+  - [x] `create(userId, title)`.
+  - [x] `list(userId, limit, cursor)` ordered by `updatedAt DESC, id DESC`.
+  - [x] `delete(userId, conversationId)` with ownership check.
+- [x] Encode the cursor as an opaque token containing `(updatedAt, id)`; reject malformed cursors with `400 invalid_request`.
+- [x] Add `ConversationController`:
+  - [x] `GET /api/v1/conversations` → `200`.
+  - [x] `POST /api/v1/conversations` → `201`.
+  - [x] `DELETE /api/v1/conversations/{conversationId}` → `204`.
+- [x] Return `404 resource_not_found` for unknown or unowned conversations, never `403`, to avoid IDOR enumeration.
+- [x] Ensure conversation deletion cascades to messages and AI responses and does not touch memory state.
+- [x] Tests:
+  - [x] Create/list/delete happy paths.
+  - [x] Newest-first ordering and cursor pagination across pages.
+  - [x] Cross-account list isolation and delete attempts return `404`.
+  - [x] Invalid limit/cursor returns `400`.
+  - [x] Unauthenticated access returns `401`.
 
 ### 4.3 Messaging & Response Lifecycle
 
-- [ ] Add JPA entities and enums:
-  - `Message` with `MessageRole { USER, ASSISTANT }`.
-  - `AiResponse` with `AiResponseStatus { PENDING, COMPLETED, FAILED, UNKNOWN }`.
-  - `AiProcessingAttempt` with `AttemptOutcome { IN_PROGRESS, SUCCESS, TIMEOUT, ERROR }`.
-- [ ] Add repositories:
-  - [ ] Message history by conversation with deterministic cursor ordering.
-  - [ ] Idempotency lookup by `(userId, operation, idempotencyKey)`.
-  - [ ] Attempt lookup/next-number with a lock safe for concurrent retries.
-- [ ] Implement `sendMessage(userId, conversationId, content, idempotencyKey)`:
-  - [ ] Validate ownership and content before writing.
-  - [ ] Require the `Idempotency-Key` header; missing key returns `400 invalid_request`.
-  - [ ] Compute a canonical `request_hash` (for example SHA-256 over conversation ID + normalized content).
-  - [ ] In one transaction: persist the user message, create the logical `PENDING` response, and create attempt `IN_PROGRESS`.
-  - [ ] On duplicate key with the same hash: return the existing response/status without creating another message or provider call.
-  - [ ] On duplicate key with a different hash: return `409 idempotency_conflict`.
-- [ ] Assemble provider context:
-  - [ ] System instruction establishing the assistant role and current-instruction dominance.
-  - [ ] Last 10 messages in chronological order (bounded by a character/token budget).
-  - [ ] No style-memory injection in Phase 1.
-- [ ] Call the provider outside the persistence transaction; write the outcome in a new transaction.
-- [ ] Transition the response:
-  - [ ] Success → persist assistant message, link `assistant_message_id`, set `COMPLETED`, attempt `SUCCESS`.
-  - [ ] Terminal provider error → `FAILED`, attempt `ERROR` with `error_category`.
-  - [ ] Timeout/ambiguous network failure → `UNKNOWN`, attempt `TIMEOUT`; keep the user message.
-- [ ] Implement `GET /api/v1/conversations/{conversationId}/messages` with cursor pagination.
-  - [ ] Include a `response` object (`id`, `status`, `attemptCount`) on user messages so the client can render and retry `FAILED`/`UNKNOWN` responses that have no assistant message row.
-- [ ] Implement retry:
-  - [ ] `POST /api/v1/conversations/{conversationId}/responses/{responseId}/retry`.
-  - [ ] Only `FAILED` or `UNKNOWN` responses are retryable; otherwise `409` or `400` with a stable code.
-  - [ ] Maximum 3 total attempts per logical response (configurable, never unbounded).
-  - [ ] Add a new `ai_processing_attempt`; never duplicate the user message or response row.
-  - [ ] Reuse the original user prompt for regeneration.
-  - [ ] Apply idempotency to retry under `operation = RETRY`; the same key for the same response returns the existing result, and reuse for a different response returns `409 idempotency_conflict`.
-- [ ] Tests:
-  - [ ] Successful send returns user message + completed assistant response.
-  - [ ] Timeout maps to `UNKNOWN` and preserves the user message.
-  - [ ] Provider terminal error maps to `FAILED`.
-  - [ ] Same key + same payload returns the existing result without a second dispatch.
-  - [ ] Same key + different payload returns `409 idempotency_conflict`.
-  - [ ] Retry succeeds and increments attempt count; retry limit is enforced.
-  - [ ] Cross-account send/list/retry returns `404`.
-  - [ ] Empty and oversized content return `400`.
+- [x] Add JPA entities and enums:
+  - [x] `Message` with `MessageRole { USER, ASSISTANT }`.
+  - [x] `AiResponse` with `AiResponseStatus { PENDING, COMPLETED, FAILED, UNKNOWN }`.
+  - [x] `AiProcessingAttempt` with `AttemptOutcome { IN_PROGRESS, SUCCESS, TIMEOUT, ERROR }`.
+- [x] Add repositories:
+  - [x] Message history by conversation with deterministic cursor ordering.
+  - [x] Idempotency lookup by `(userId, operation, idempotencyKey)`.
+  - [x] Attempt lookup/next-number with a lock safe for concurrent retries.
+- [x] Implement `sendMessage(userId, conversationId, content, idempotencyKey)`:
+  - [x] Validate ownership and content before writing.
+  - [x] Require the `Idempotency-Key` header; missing key returns `400 invalid_request`.
+  - [x] Compute a canonical `request_hash` (for example SHA-256 over conversation ID + normalized content).
+  - [x] In one transaction: persist the user message, create the logical `PENDING` response, and create attempt `IN_PROGRESS`.
+  - [x] On duplicate key with the same hash: return the existing response/status without creating another message or provider call.
+  - [x] On duplicate key with a different hash: return `409 idempotency_conflict`.
+- [x] Assemble provider context:
+  - [x] System instruction establishing the assistant role and current-instruction dominance.
+  - [x] Last 10 messages in chronological order (bounded by a character/token budget).
+  - [x] No style-memory injection in Phase 1.
+- [x] Call the provider outside the persistence transaction; write the outcome in a new transaction.
+- [x] Transition the response:
+  - [x] Success → persist assistant message, link `assistant_message_id`, set `COMPLETED`, attempt `SUCCESS`.
+  - [x] Terminal provider error → `FAILED`, attempt `ERROR` with `error_category`.
+  - [x] Timeout/ambiguous network failure → `UNKNOWN`, attempt `TIMEOUT`; keep the user message.
+- [x] Implement `GET /api/v1/conversations/{conversationId}/messages` with cursor pagination.
+  - [x] Include a `response` object (`id`, `status`, `attemptCount`) on user messages so the client can render and retry `FAILED`/`UNKNOWN` responses that have no assistant message row.
+- [x] Implement retry:
+  - [x] `POST /api/v1/conversations/{conversationId}/responses/{responseId}/retry`.
+  - [x] Only `FAILED` or `UNKNOWN` responses are retryable; otherwise `409` or `400` with a stable code.
+  - [x] Maximum 3 total attempts per logical response (configurable, never unbounded).
+  - [x] Add a new `ai_processing_attempt`; never duplicate the user message or response row.
+  - [x] Reuse the original user prompt for regeneration.
+  - [x] Apply idempotency to retry under `operation = RETRY`; the same key for the same response returns the existing result, and reuse for a different response returns `409 idempotency_conflict`.
+- [x] Tests:
+  - [x] Successful send returns user message + completed assistant response.
+  - [x] Timeout maps to `UNKNOWN` and preserves the user message.
+  - [x] Provider terminal error maps to `FAILED`.
+  - [x] Same key + same payload returns the existing result without a second dispatch.
+  - [x] Same key + different payload returns `409 idempotency_conflict`.
+  - [x] Retry succeeds and increments attempt count; retry limit is enforced.
+  - [x] Cross-account send/list/retry returns `404`.
+  - [x] Empty and oversized content return `400`.
 
 ### 4.4 AI Provider Abstraction
 
-- [ ] Define `com.mira.mira_backend.ai.AIProvider` with request/response records and a normalized `AIProviderException` hierarchy (timeout, rate limited, unavailable, invalid output).
+- [x] Define `com.mira.mira_backend.ai.AIProvider` with request/response records and a normalized `AIProviderException` hierarchy (timeout, rate limited, unavailable, invalid output).
 - [ ] Implement `DeepSeekAIProvider`:
   - [ ] Use Spring's HTTP client (`RestClient`) with connection timeout 5s and read timeout 30s.
   - [ ] Read `DEEPSEEK_API_KEY`, base URL, and model from configuration; fail fast when the key is missing in non-test profiles.
   - [ ] Map provider HTTP status and JSON errors to domain exceptions.
   - [ ] Never log the API key, prompt, or raw completion body.
-- [ ] Implement `MockAIProvider` with configurable scenarios:
-  - [ ] Instant success.
-  - [ ] Timeout.
-  - [ ] HTTP 429 / rate limited.
-  - [ ] HTTP 5xx / unavailable.
-  - [ ] Malformed/empty output.
-- [ ] Add provider selection via Spring profiles/configuration so tests always use the mock.
+- [x] Implement `MockAIProvider` with configurable scenarios:
+  - [x] Instant success.
+  - [x] Timeout.
+  - [x] HTTP 429 / rate limited.
+  - [x] HTTP 5xx / unavailable.
+  - [x] Malformed/empty output.
+- [x] Add provider selection via Spring profiles/configuration so tests always use the mock.
 - [ ] Add HTTP-client tests (for example `MockRestServiceServer`) for status/error mapping; do not require network access.
-- [ ] Add a startup guard that prevents the real provider from being used in the `test` profile.
+- [x] Add a startup guard that prevents the real provider from being used in the `test` profile.
 
 ### 4.5 Android Client
 
@@ -266,10 +271,10 @@ Phase 1 objectives:
   - [ ] JDK 21, Android SDK setup, `assembleDebug`, `testDebugUnitTest`, lint.
 - [ ] Upload test reports and the debug APK as workflow artifacts.
 - [ ] Require both workflows for merges to the main branch.
-- [ ] Update [04-api-contract.md](./04-api-contract.md) examples to match the delivered implementation (including the enriched error envelope).
-- [ ] Add new Flyway migrations as `V9+` for any schema change; never edit an applied migration.
-- [ ] Keep [03-domain-model.md](./03-domain-model.md) synchronized with the final schema.
-- [ ] Update [README.md](../README.md) with Phase 1 status and run instructions.
+- [x] Update [04-api-contract.md](./04-api-contract.md) examples to match the delivered implementation (including the enriched error envelope).
+- [x] Add new Flyway migrations as `V9+` for any schema change; never edit an applied migration.
+- [x] Keep [03-domain-model.md](./03-domain-model.md) synchronized with the final schema.
+- [x] Update [README.md](../README.md) with Phase 1 status and run instructions.
 
 ---
 
@@ -322,19 +327,19 @@ Tests must run without internet access or paid DeepSeek calls. Testcontainers re
 
 Phase 1 is complete only when every item is verified:
 
-- [ ] `backend`: `.\mvnw.cmd clean verify` passes with zero failures.
-- [ ] All new backend tests pass using Testcontainers and `MockAIProvider`; no live DeepSeek calls.
-- [ ] Conversation API supports create, list, and delete with ownership and cursor pagination.
-- [ ] Sending a message persists the user message before provider dispatch and records the logical response and attempts.
-- [ ] Idempotent replay and payload-conflict behavior are covered by tests, including a concurrent duplicate case.
-- [ ] Retry is bounded, creates attempts rather than duplicate messages, and only applies to `FAILED`/`UNKNOWN`.
-- [ ] The error envelope includes `requestId`, validation `details`, and a sanitized `500` fallback.
+- [x] `backend`: `.\mvnw.cmd clean verify` passes with zero failures.
+- [x] All new backend tests pass using Testcontainers and `MockAIProvider`; no live DeepSeek calls.
+- [x] Conversation API supports create, list, and delete with ownership and cursor pagination.
+- [x] Sending a message persists the user message before provider dispatch and records the logical response and attempts.
+- [x] Idempotent replay and payload-conflict behavior are covered by tests, including a concurrent duplicate case.
+- [x] Retry is bounded, creates attempts rather than duplicate messages, and only applies to `FAILED`/`UNKNOWN`.
+- [x] The error envelope includes `requestId`, validation `details`, and a sanitized `500` fallback.
 - [ ] Rate limiting returns `429 rate_limited` under the configured threshold.
 - [ ] Android builds a debug APK, stores tokens encrypted, refreshes on `401`, and completes the manual chat smoke flow on an emulator or device.
 - [ ] Android network security config prohibits cleartext traffic.
 - [ ] Backend and Android CI workflows pass on the main branch.
-- [ ] `README.md` and `04-api-contract.md` match the delivered behavior; `03-domain-model.md` matches all migrations.
-- [ ] No secrets, prompts, completions, or tokens appear in logs or committed files.
+- [x] `README.md` and `04-api-contract.md` match the delivered behavior; `03-domain-model.md` matches all migrations.
+- [x] No secrets, prompts, completions, or tokens appear in logs or committed files.
 
 ---
 

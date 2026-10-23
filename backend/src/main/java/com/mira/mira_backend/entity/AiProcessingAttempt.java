@@ -41,6 +41,13 @@ public class AiProcessingAttempt {
     )
     private int attemptNumber;
 
+    @Column(
+        name = "idempotency_key",
+        length = 128,
+        updatable = false
+    )
+    private String idempotencyKey;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "outcome", nullable = false, length = 20)
     private AttemptOutcome outcome = AttemptOutcome.IN_PROGRESS;
@@ -59,20 +66,37 @@ public class AiProcessingAttempt {
     }
 
     public AiProcessingAttempt(
+        AiResponse response,
+        int attemptNumber
+    ) {
+        this(response, attemptNumber, null);
+    }
+    
+    public AiProcessingAttempt(
             AiResponse response,
-            int attemptNumber
+            int attemptNumber,
+            String idempotencyKey
     ) {
         if (attemptNumber < 1) {
             throw new IllegalArgumentException(
                     "attemptNumber must be at least 1"
             );
         }
-
+    
+        if (idempotencyKey != null
+                && (idempotencyKey.isBlank()
+                    || idempotencyKey.length() > 128)) {
+            throw new IllegalArgumentException(
+                    "idempotencyKey must be between 1 and 128 characters"
+            );
+        }
+    
         this.response = Objects.requireNonNull(
                 response,
                 "response must not be null"
         );
         this.attemptNumber = attemptNumber;
+        this.idempotencyKey = idempotencyKey;
         this.outcome = AttemptOutcome.IN_PROGRESS;
     }
 
@@ -151,5 +175,9 @@ public class AiProcessingAttempt {
 
     public Instant getFinishedAt() {
         return finishedAt;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
     }
 }

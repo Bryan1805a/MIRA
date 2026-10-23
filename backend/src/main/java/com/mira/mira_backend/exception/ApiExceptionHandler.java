@@ -8,6 +8,7 @@ import com.mira.mira_backend.service.InvalidRegistrationException;
 import com.mira.mira_backend.service.UserNotFoundException;
 import com.mira.mira_backend.service.ConversationNotFoundException;
 import com.mira.mira_backend.service.InvalidRequestException;
+import com.mira.mira_backend.service.IdempotencyConflictException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -203,6 +204,19 @@ public class ApiExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 "invalid_request",
                 "Parameter '" + exception.getName() + "' is invalid."
+        );
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleIdempotencyConflict(
+            IdempotencyConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                request,
+                HttpStatus.CONFLICT,
+                "idempotency_conflict",
+                exception.getMessage()
         );
     }
 

@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-10-21 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-10-23 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
 | **Data Format** | JSON (UTF-8 Encoded) |
@@ -20,6 +20,7 @@
 | 0.1.0 | 2026-10-10 | Backend Team | Initial draft of public REST endpoints. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated session refresh/logout endpoints, response retry contracts, idempotency specifications, and consolidated draft notes. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled auth payloads and the error envelope with the implementation; marked conversation, messaging, and memory endpoints with their delivery phase. |
+| 1.2.0 | 2026-10-23 | Bryan | Reconciled conversation, messaging, and retry endpoints with the implemented backend controller and service layer; updated error code registry and error envelope status. |
 
 ---
 
@@ -46,12 +47,12 @@
 | Area | Status | Notes |
 | :--- | :--- | :--- |
 | Registration, login, refresh, logout, `/me` | **Implemented** | See sections 2.1–2.5. |
-| Standard error envelope | **Partial** | Flat `{ "error", "message" }` is implemented; `requestId` and `details` are Phase 1 work. |
-| Conversation endpoints | **Phase 1** | Entity and repository exist; controllers/DTOs are pending. |
-| Message send/list and retry | **Phase 1** | Lifecycle tables exist; orchestration is pending. |
+| Standard error envelope | **Implemented** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler` and `RequestIdFilter`. |
+| Conversation endpoints | **Implemented (Backend)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation. |
+| Message send/list and retry | **Implemented (Backend)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, idempotency key/hash, and bounded retries. |
 | Style-memory endpoints | **Phase 2** | Schema exists; services and controllers are pending. |
 
-Endpoints marked Phase 1 or Phase 2 are normative targets. Implemented behavior takes precedence where this document and the code differ.
+Endpoints marked Implemented (Backend) are live and covered by automated test suites. Android client integration and DeepSeek live HTTP integration remain active Phase 1 tasks.
 
 ---
 
@@ -181,7 +182,7 @@ Endpoints marked Phase 1 or Phase 2 are normative targets. Implemented behavior 
 
 ## 3. Conversation Management Endpoints
 
-> **Delivery status:** Phase 1. The `conversation` entity, ownership query, and cursor-pagination repository exist; the HTTP layer and DTOs are still to be implemented.
+> **Delivery status:** Implemented on backend. `ConversationController`, `ConversationService`, DTOs, and cursor pagination are live and verified by tests. Android client UI integration is in progress under Phase 1.
 
 ### 3.1 List Conversations
 * **Endpoint:** `GET /api/v1/conversations`
@@ -242,7 +243,7 @@ Endpoints marked Phase 1 or Phase 2 are normative targets. Implemented behavior 
 
 ## 4. Messaging & AI Response Endpoints
 
-> **Delivery status:** Phase 1. The lifecycle tables (`ai_response`, `ai_processing_attempt`) and constraints exist; orchestration, provider integration, and endpoints are still to be implemented.
+> **Delivery status:** Implemented on backend. Synchronous message orchestration, `MockAIProvider`, message cursor listing, response lifecycle transitions, attempt tracking, and bounded retries are live and verified by tests. Real DeepSeek HTTP client integration and Android client UI are active in Phase 1.
 
 ### 4.1 List Conversation Messages
 * **Endpoint:** `GET /api/v1/conversations/{conversationId}/messages`
@@ -459,30 +460,14 @@ If an upstream AI provider times out after the user message has been safely pers
 
 ## 6. Standardized Error Handling
 
-### 6.1 Current Error Envelope (Implemented)
+### 6.1 Standard Error Envelope (Implemented)
 
-All handled error responses currently use a flat schema:
-
-```json
-{
-  "error": "invalid_request",
-  "message": "Request fields are missing or invalid."
-}
-```
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `error` | String | Stable, lower-snake-case error code. Clients compare this value, not the message. |
-| `message` | String | Safe, human-readable description. Never contains stack traces, SQL, tokens, or provider payloads. |
-
-### 6.2 Planned Enrichment (Phase 1)
-
-Phase 1 adds `requestId` and optional `details` without removing the existing fields, preserving backward compatibility:
+All handled error responses use a uniform, enriched envelope:
 
 ```json
 {
   "error": "invalid_request",
-  "message": "The request contains invalid fields.",
+  "message": "Request fields are missing or invalid.",
   "requestId": "4a7f92b4-7b12-421b-8041-382901309fef",
   "details": [
     {
@@ -493,9 +478,16 @@ Phase 1 adds `requestId` and optional `details` without removing the existing fi
 }
 ```
 
-A catch-all `500` handler is also part of Phase 1. Until it is added, an unexpected backend fault may fall through to the container's default error response instead of the uniform envelope.
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `error` | String | Stable, lower-snake-case error code. Clients compare this value, not the message. |
+| `message` | String | Safe, human-readable description. Never contains stack traces, SQL, tokens, or provider payloads. |
+| `requestId` | String | Unique request correlation UUID propagated from `X-Request-Id` or generated on ingress via `RequestIdFilter`. |
+| `details` | Array | Optional list of specific validation failures (`field`, `reason`). Empty for non-validation errors. |
 
-### 6.3 Standard Error Code Registry
+A catch-all `500` handler in `ApiExceptionHandler` guarantees unexpected backend faults emit `internal_error` in this uniform envelope with the associated `requestId` logged for correlation.
+
+### 6.2 Standard Error Code Registry
 
 | HTTP Status | Error Code | Occurrence | Status |
 | :--- | :--- | :--- | :--- |
@@ -507,12 +499,12 @@ A catch-all `500` handler is also part of Phase 1. Until it is added, an unexpec
 | `403 Forbidden` | `access_denied` | Authenticated caller lacks permission. | Implemented |
 | `404 Not Found` | `resource_not_found` | Resource does not exist or is not owned by the caller. | Implemented |
 | `409 Conflict` | `email_already_registered` | Normalized email already exists. | Implemented |
-| `409 Conflict` | `idempotency_conflict` | Idempotency key reused with a different payload hash. | Phase 1 |
+| `409 Conflict` | `idempotency_conflict` | Idempotency key reused with a different payload hash. | Implemented |
 | `409 Conflict` | `version_conflict` | OCC `expectedVersion` mismatch on style-memory update. | Phase 2 |
 | `429 Too Many Requests`| `rate_limited` | Exceeded per-account request quota. | Phase 1 |
 | `502 Bad Gateway` | `ai_provider_unavailable` | External AI provider returned unusable output. | Phase 1 |
 | `504 Gateway Timeout` | `ai_provider_timeout` | Upstream provider failed to respond within the timeout window. | Phase 1 |
-| `500 Internal Error` | `internal_error` | Unexpected backend fault (sanitized and logged). | Phase 1 |
+| `500 Internal Error` | `internal_error` | Unexpected backend fault (sanitized and logged with request ID). | Implemented |
 
 > [!IMPORTANT]
 > Error codes are lower snake_case. Older drafts used uppercase constants; clients must treat the current strings above as authoritative.

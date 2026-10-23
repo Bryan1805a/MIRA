@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-10-21 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-10-23 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
 
@@ -19,6 +19,7 @@
 | 0.1.0 | 2026-10-10 | Operations Team | Initial deployment topology and environment variable draft. |
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid deployment topology, rollback runbook, health check actuary specs, and secret management standards. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled runtime versions, environment-variable names, migration range, and actuator behavior with the implemented backend. |
+| 1.2.0 | 2026-10-23 | Bryan | Updated pre-production verification checklist to include Flyway migrations V1 through V9. |
 
 ---
 
@@ -171,7 +172,7 @@ Before opening the deployed service to physical Android client connections, veri
 
 - [ ] Backend builds reproducibly using `./mvnw clean verify`.
 - [ ] Neon PostgreSQL SSL connections enforce certificate verification (`sslmode=require`).
-- [ ] Flyway successfully applies all versioned migrations (`V1` through `V8`).
+- [ ] Flyway successfully applies all versioned migrations (`V1` through `V9`).
 - [ ] Public endpoint enforces TLS 1.3; plain HTTP traffic is redirected or rejected.
 - [ ] Actuator health check returns `{"status":"UP"}` on `/actuator/health`.
 - [ ] Rate limiting actively blocks rapid unauthenticated requests.

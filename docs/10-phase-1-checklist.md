@@ -110,7 +110,7 @@ Phase 1 objectives:
 | `AIProvider` abstraction and `MockAIProvider` | Implemented (Backend) |
 | Request-ID propagation and enriched error envelope | Implemented (Backend) |
 | Schema `V1`–`V9` | Implemented |
-| Backend test suite | 52 passing tests in local Testcontainers suites |
+| Backend test suite | 58 passing tests in local Testcontainers suites |
 | Android application | Phase 0 scaffold (Java 21 daemon toolchain configured; compiles via `assembleDebug`) |
 | CI workflows | Not configured |
 | Android debug APK verification | Carry-over from Phase 0 (build verified) |
@@ -219,11 +219,11 @@ Phase 1 objectives:
 ### 4.4 AI Provider Abstraction
 
 - [x] Define `com.mira.mira_backend.ai.AIProvider` with request/response records and a normalized `AIProviderException` hierarchy (timeout, rate limited, unavailable, invalid output).
-- [ ] Implement `DeepSeekAIProvider`:
-  - [ ] Use Spring's HTTP client (`RestClient`) with connection timeout 5s and read timeout 30s.
-  - [ ] Read `DEEPSEEK_API_KEY`, base URL, and model from configuration; fail fast when the key is missing in non-test profiles.
-  - [ ] Map provider HTTP status and JSON errors to domain exceptions.
-  - [ ] Never log the API key, prompt, or raw completion body.
+- [x] Implement `DeepSeekAIProvider`:
+  - [x] Use Spring's HTTP client (`RestClient`) with connection timeout 5s and read timeout 30s.
+  - [x] Read `DEEPSEEK_API_KEY`, base URL, and model from configuration; fail fast when the key is missing in non-test profiles.
+  - [x] Map provider HTTP status and JSON errors to domain exceptions.
+  - [x] Never log the API key, prompt, or raw completion body.
 - [x] Implement `MockAIProvider` with configurable scenarios:
   - [x] Instant success.
   - [x] Timeout.
@@ -231,7 +231,7 @@ Phase 1 objectives:
   - [x] HTTP 5xx / unavailable.
   - [x] Malformed/empty output.
 - [x] Add provider selection via Spring profiles/configuration so tests always use the mock.
-- [ ] Add HTTP-client tests (for example `MockRestServiceServer`) for status/error mapping; do not require network access.
+- [x] Add HTTP-client tests (for example `MockRestServiceServer`) for status/error mapping; do not require network access.
 - [x] Add a startup guard that prevents the real provider from being used in the `test` profile.
 
 ### 4.5 Android Client

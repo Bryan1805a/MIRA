@@ -269,8 +269,7 @@ The following formal decisions govern MIRA's architecture:
 | Conversation entity, ownership query, cursor pagination query | Implemented |
 | Conversation HTTP endpoints | Implemented (Backend) |
 | Message persistence, response lifecycle, retries, idempotency | Implemented (Backend) |
-| `AIProvider` abstraction and `MockAIProvider` | Implemented (Backend) |
-| Live DeepSeek HTTP client | Phase 1 |
+| `AIProvider` abstraction, `MockAIProvider`, and `DeepSeekAIProvider` | Implemented (Backend) |
 | Android authentication and chat client | Phase 1 (Scaffold complete, build working) |
 | Style-memory governance and extraction | Phase 2 |
 

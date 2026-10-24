@@ -1,24 +1,117 @@
 package com.mira.app;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+
+import com.mira.app.data.AuthCallback;
+import com.mira.app.data.AuthRepository;
+import com.mira.app.data.model.CurrentUserResponse;
+import com.mira.app.data.session.TokenStore;
+import com.mira.app.databinding.ActivityMainBinding;
+import com.mira.app.util.WindowInsetsHelper;
 
 public class MainActivity extends AppCompatActivity {
+
+    private ActivityMainBinding binding;
+    private AuthRepository authRepository;
+    private TokenStore tokenStore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_main);
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
+
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+        WindowInsetsHelper.apply(binding.getRoot());
+
+        tokenStore = TokenStore.get(this);
+        authRepository = new AuthRepository(this);
+
+        if (!tokenStore.hasSession()) {
+            openLogin();
+            return;
+        }
+
+        String email = tokenStore.email();
+
+        if (email != null && !email.isBlank()) {
+            binding.emailText.setText(
+                    getString(R.string.signed_in_as, email)
+            );
+        }
+
+        binding.statusText.setText(R.string.checking_session);
+        binding.logoutButton.setOnClickListener(view -> logout());
+
+        verifySession();
+    }
+
+    private void verifySession() {
+        authRepository.me(new AuthCallback<CurrentUserResponse>() {
+            @Override
+            public void onSuccess(CurrentUserResponse value) {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+
+                if (value.getEmail() != null) {
+                    binding.emailText.setText(
+                            getString(
+                                    R.string.signed_in_as,
+                                    value.getEmail()
+                            )
+                    );
+                }
+
+                binding.statusText.setText(R.string.session_active);
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+
+                if (statusCode == 401) {
+                    tokenStore.clear();
+                    openLogin();
+                    return;
+                }
+
+                binding.statusText.setText(R.string.session_offline);
+            }
         });
+    }
+
+    private void logout() {
+        binding.logoutButton.setEnabled(false);
+        binding.statusText.setText(R.string.signing_out);
+
+        authRepository.logout(new AuthCallback<Void>() {
+            @Override
+            public void onSuccess(Void value) {
+                openLogin();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                openLogin();
+            }
+        });
+    }
+
+    private void openLogin() {
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TASK
+        );
+        startActivity(intent);
+        finish();
     }
 }

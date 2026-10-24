@@ -1,3 +1,30 @@
 <resources>
     <string name="app_name">MIRA</string>
+
+    <string name="login_title">Welcome back</string>
+    <string name="login_subtitle">Sign in to continue your conversations.</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="login">Sign in</string>
+    <string name="create_account">Create an account</string>
+
+    <string name="register_title">Create your account</string>
+    <string name="register_subtitle">Choose a password with at least 12 characters.</string>
+    <string name="confirm_password">Confirm password</string>
+    <string name="register">Register</string>
+    <string name="have_account">Back to sign in</string>
+    <string name="password_requirement">At least 12 characters</string>
+
+    <string name="error_required">Email and password are required.</string>
+    <string name="error_password_length">Password must be at least 12 characters.</string>
+    <string name="error_password_mismatch">Passwords do not match.</string>
+
+    <string name="loading">Loading</string>
+    <string name="signed_in_as">Signed in as %1$s</string>
+    <string name="checking_session">Checking your session…</string>
+    <string name="session_active">Session active.</string>
+    <string name="session_offline">Offline. Showing your saved session.</string>
+    <string name="signing_out">Signing out…</string>
+    <string name="conversations_placeholder">Conversations and chat arrive in the next checkpoint.</string>
+    <string name="logout">Sign out</string>
 </resources>

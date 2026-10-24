@@ -4,5 +4,6 @@ public enum AIErrorCategory {
     TIMEOUT,
     RATE_LIMITED,
     UNAVAILABLE,
-    INVALID_OUTPUT
+    INVALID_OUTPUT,
+    PROVIDER_ERROR
 }

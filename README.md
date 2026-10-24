@@ -16,9 +16,9 @@
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented.
 - Conversation management (CRUD + cursor pagination) is implemented on the backend.
-- Message sending, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, idempotency key/payload verification, attempt tracking, and bounded retries are implemented on the backend.
-- The backend test suite passes with 52 automated tests against PostgreSQL Testcontainers.
-- The Android application is currently the Phase 0 scaffold; Android UI, network integration, and the real DeepSeek HTTP client remain active Phase 1 deliverables.
+- Message sending, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), AI provider abstraction (`MockAIProvider`, `DeepSeekAIProvider`), idempotency key/payload verification, attempt tracking, and bounded retries are implemented on the backend.
+- The backend test suite passes with 58 automated tests (including unit and PostgreSQL Testcontainers suites).
+- The Android application is currently the Phase 0 scaffold; Android UI and network integration remain active Phase 1 deliverables.
 - Memory extraction and memory governance are deferred to Phase 2.
 
 See [`docs/10-phase-1-checklist.md`](docs/10-phase-1-checklist.md) for the active plan and exit gate.

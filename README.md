@@ -12,13 +12,19 @@
 
 ## Development Status
 
-**Phase 0 is complete. Phase 1 (Conversation & Chat Core) is the active milestone, with the backend conversation and messaging core implemented.**
+**Phase 0 is complete. Phase 1 (Conversation & Chat Core) core capabilities are delivered: backend conversation, messaging orchestration, rate limiting, and DeepSeek provider integration are implemented, alongside the full native Android authentication, conversation management, and chat screens.**
 
-- Authentication, token rotation, logout, and the current-user endpoint are implemented.
-- Conversation management (CRUD + cursor pagination) is implemented on the backend.
-- Message sending, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), AI provider abstraction (`MockAIProvider`, `DeepSeekAIProvider`), idempotency key/payload verification, attempt tracking, and bounded retries are implemented on the backend.
-- The backend test suite passes with 58 automated tests (including unit and PostgreSQL Testcontainers suites).
-- The Android application is currently the Phase 0 scaffold; Android UI and network integration remain active Phase 1 deliverables.
+- Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
+- Android client features full authentication flows (Login, Registration, session gate in `MainActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
+- Android client delivers full conversation management (`ConversationsActivity`) with cursor-based pagination, creation dialog, and deletion confirmation.
+- Android client delivers complete chat messaging (`ChatActivity`, `MessageAdapter`) with automatic client-side UUID idempotency key generation, response lifecycle visualization (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), and bounded retry controls (up to 3 attempts).
+- Backend conversation management (CRUD + cursor pagination) is implemented with strict ownership isolation.
+- Backend message sending, response lifecycle tracking, AI provider abstraction (`MockAIProvider`, `DeepSeekAIProvider`), idempotency key/payload verification, attempt tracking, and bounded retries are implemented.
+- Per-account message rate limiting (sliding window of 10 requests/minute returning HTTP `429 rate_limited`) and Actuator health/probe endpoints are active.
+- Local PostgreSQL environment is pre-configured via `docker-compose.yml` and `.env.example`.
+- GitHub Actions CI workflows are configured for backend verification (`.github/workflows/backend.yml`) and Android build, test, and lint (`.github/workflows/android.yml`).
+- The backend test suite passes with 63 automated tests (including unit, mock server, and PostgreSQL Testcontainers suites).
+- The Android test, build, and lint suites pass via `.\gradlew.bat clean assembleDebug testDebugUnitTest lintDebug`.
 - Memory extraction and memory governance are deferred to Phase 2.
 
 See [`docs/10-phase-1-checklist.md`](docs/10-phase-1-checklist.md) for the active plan and exit gate.
@@ -86,12 +92,20 @@ The backend reads its runtime configuration from environment variables. No datas
 Example PowerShell session:
 
 ```powershell
-$env:MIRA_JWT_SECRET_BASE64 = [Convert]::ToBase64String(
-    [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
-)
+# Quick local database start with Docker Compose
+docker compose up -d
+
+# Set environment variables for the session
+$bytes = New-Object byte[] 32; [Security.Cryptography.RNGCryptoServiceProvider]::Create().GetBytes($bytes); [Convert]::ToBase64String($bytes)
+$env:MIRA_JWT_SECRET_BASE64 = "+L53z9jm4gHIb1airMoZ8p2DVODAhmQB4Rd1F3hnVxs="
 $env:SPRING_DATASOURCE_URL = "jdbc:postgresql://localhost:5432/mira"
 $env:SPRING_DATASOURCE_USERNAME = "mira"
-$env:SPRING_DATASOURCE_PASSWORD = "<password>"
+$env:SPRING_DATASOURCE_PASSWORD = "admin123"
+
+# Optional: Run with mock AI provider if no DeepSeek API key is configured
+# $env:SPRING_PROFILES_ACTIVE = "test"
+# Or provide your key:
+# $env:DEEPSEEK_API_KEY = "your-deepseek-api-key"
 ```
 
 Deterministic test configuration lives in `backend/src/test/resources/application.properties`; tests obtain PostgreSQL from Testcontainers.
@@ -103,11 +117,14 @@ cd backend
 .\mvnw.cmd clean verify
 ```
 
-The integration suite starts a real PostgreSQL container, applies every Flyway migration, and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite.
+The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1–V9), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (63 automated tests pass).
 
 ### Run Locally
 
 ```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
 cd backend
 .\mvnw.cmd spring-boot:run
 ```
@@ -118,20 +135,20 @@ Verify the service is up at `http://localhost:8080/actuator/health`.
 
 ```powershell
 cd android
-.\gradlew.bat assembleDebug
+.\gradlew.bat assembleDebug testDebugUnitTest
 ```
 
-Open the `android/` directory in Android Studio to run on an emulator or physical device. The current application is the Phase 0 scaffold; authentication, conversation, and chat screens are Phase 1 work.
+Open the `android/` directory in Android Studio to run on an emulator or physical device. Authentication (registration, login, encrypted token storage, session verification, logout) is implemented; conversation list and chat screens are the active Phase 1 deliverables.
 
-## Implemented API (as of 2026-10-23)
+## Implemented API (as of 2026-10-24)
 
 | Method | Endpoint | Status |
 | :--- | :--- | :--- |
-| `POST` | `/api/v1/auth/register` | Implemented |
-| `POST` | `/api/v1/auth/login` | Implemented |
-| `POST` | `/api/v1/auth/refresh` | Implemented (rotating refresh tokens) |
-| `POST` | `/api/v1/auth/logout` | Implemented (revokes the presented session) |
-| `GET` | `/api/v1/me` | Implemented |
+| `POST` | `/api/v1/auth/register` | Implemented (Backend & Android) |
+| `POST` | `/api/v1/auth/login` | Implemented (Backend & Android) |
+| `POST` | `/api/v1/auth/refresh` | Implemented (Backend & Android rotating authenticator) |
+| `POST` | `/api/v1/auth/logout` | Implemented (Backend & Android) |
+| `GET` | `/api/v1/me` | Implemented (Backend & Android) |
 | `GET` | `/api/v1/conversations` | Implemented (Backend) |
 | `POST` | `/api/v1/conversations` | Implemented (Backend) |
 | `DELETE` | `/api/v1/conversations/{conversationId}` | Implemented (Backend) |

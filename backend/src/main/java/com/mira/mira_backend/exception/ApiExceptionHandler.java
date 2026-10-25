@@ -9,6 +9,7 @@ import com.mira.mira_backend.service.UserNotFoundException;
 import com.mira.mira_backend.service.ConversationNotFoundException;
 import com.mira.mira_backend.service.InvalidRequestException;
 import com.mira.mira_backend.service.IdempotencyConflictException;
+import com.mira.mira_backend.service.RateLimitExceededException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -217,6 +218,19 @@ public class ApiExceptionHandler {
                 HttpStatus.CONFLICT,
                 "idempotency_conflict",
                 exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleRateLimit(
+            RateLimitExceededException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                request,
+                HttpStatus.TOO_MANY_REQUESTS,
+                "rate_limited",
+                "Too many requests. Try again shortly."
         );
     }
 

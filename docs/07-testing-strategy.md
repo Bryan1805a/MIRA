@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-10-23 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-10-25 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
 
@@ -20,6 +20,9 @@
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid test pyramid, CI pipeline, lifecycle retry test matrix, session revocation tests, and consolidated all draft updates. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled the test baseline with the implemented suites, Java 21/Testcontainers versions, Flyway V1–V8, and the Phase 1/Phase 2 delivery split. |
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled test inventory to 52 passing tests, updated migration baseline to V1–V9, and marked completed Phase 1 lifecycle/retry test scenarios. |
+| 1.3.0 | 2026-10-24 | Bryan | Reconciled test inventory to 58 passing tests (adding DeepSeekAIProviderTests MockRestServiceServer suite) and noted Android assembleDebug / testDebugUnitTest verification. |
+| 1.4.0 | 2026-10-25 | Bryan | Reconciled test inventory to 63 passing tests (adding MessageRateLimiterTests and rate-limiting integration test) and verified Android conversation and chat unit tests. |
+| 1.5.0 | 2026-10-25 | Bryan | Documented GitHub Actions CI pipelines (`backend.yml` and `android.yml`) and Android lint verification (`lintDebug`). |
 
 ---
 
@@ -107,13 +110,14 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 
 | Suite | Type | Tests | Scope |
 | :--- | :--- | :--- | :--- |
-| `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 41 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, and cross-account isolation. |
+| `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 42 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, per-account rate limiting (`429 rate_limited`), and cross-account isolation. |
+| `MessageRateLimiterTests` | Unit | 4 | In-memory sliding-window rate limiter accounting, quota enforcement (10 req/min), multi-user isolation, and window expiration. |
 | `DeepSeekAIProviderTests` | Unit + MockRestServiceServer | 6 | OpenAI-compatible request serialization, Bearer authorization, response parsing, and HTTP status/error mapping (timeout, 429 rate limit, 5xx unavailable, 4xx provider error, invalid/blank output). |
 | `MockAIProviderTests` | Unit | 5 | Deterministic simulation of instant success, timeout, HTTP 429 rate limiting, HTTP 5xx error, and malformed response scenarios. |
 | `TokenServiceTests` | Unit | 5 | JWT claims and expiry, refresh-token uniqueness/URL safety, deterministic SHA-256 hashing. |
 | `JwtConfigurationTests` | Unit | 1 | Secret validation and decoder configuration. |
 
-The suite (58 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V9`. No test contacts DeepSeek. The classes should be split by domain as the Phase 1 surface grows; the current consolidated class is a baseline, not the target structure.
+The suite (63 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V9`. No test contacts DeepSeek. The classes should be split by domain as the Phase 1 surface grows; the current consolidated class is a baseline, not the target structure.
 
 ---
 
@@ -172,7 +176,7 @@ flowchart TD
 ```
 
 > [!NOTE]
-> GitHub Actions workflows are **not yet configured** in this repository. The pipeline above is the Phase 1 target; until it exists, run `.\mvnw.cmd clean verify` locally before merging backend changes.
+> GitHub Actions workflows are configured in `.github/workflows/backend.yml` (Maven verify with Testcontainers) and `.github/workflows/android.yml` (Gradle build, testDebugUnitTest, lintDebug, and APK artifact upload). Both pipelines run on push, pull request, and manual dispatch.
 
 ---
 

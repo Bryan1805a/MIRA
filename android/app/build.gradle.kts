@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.okhttp)
     implementation(libs.security.crypto)
+    implementation(libs.recyclerview)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.espresso.core)

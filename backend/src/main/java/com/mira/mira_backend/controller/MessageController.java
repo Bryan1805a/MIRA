@@ -6,8 +6,8 @@ import com.mira.mira_backend.dto.SendMessageResponse;
 import com.mira.mira_backend.dto.RetryResponse;
 
 import com.mira.mira_backend.entity.AiResponseStatus;
-
 import com.mira.mira_backend.service.MessageService;
+import com.mira.mira_backend.service.MessageRateLimiter;
 
 import jakarta.validation.Valid;
 
@@ -31,9 +31,11 @@ import java.util.UUID;
 public class MessageController {
 
     private final MessageService messageService;
+    private final MessageRateLimiter rateLimiter;
 
-    public MessageController(MessageService messageService) {
+    public MessageController(MessageService messageService, MessageRateLimiter rateLimiter ) {
         this.messageService = messageService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/messages")
@@ -43,8 +45,12 @@ public class MessageController {
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody SendMessageRequest request
     ) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+
+        rateLimiter.check(userId);
+
         SendMessageResponse response = messageService.send(
-                UUID.fromString(jwt.getSubject()),
+                userId,
                 conversationId,
                 request.content(),
                 idempotencyKey
@@ -80,13 +86,17 @@ public class MessageController {
             @PathVariable UUID responseId,
             @RequestHeader("Idempotency-Key") String idempotencyKey
     ) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+
+        rateLimiter.check(userId);
+
         SendMessageResponse result = messageService.retry(
-                UUID.fromString(jwt.getSubject()),
+                userId,
                 conversationId,
                 responseId,
                 idempotencyKey
         );
-    
+
         return ResponseEntity.ok(
                 new RetryResponse(result.assistantResponse())
         );

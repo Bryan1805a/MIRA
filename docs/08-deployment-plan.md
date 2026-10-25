@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-10-23 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-10-25 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
 
@@ -20,6 +20,7 @@
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid deployment topology, rollback runbook, health check actuary specs, and secret management standards. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled runtime versions, environment-variable names, migration range, and actuator behavior with the implemented backend. |
 | 1.2.0 | 2026-10-23 | Bryan | Updated pre-production verification checklist to include Flyway migrations V1 through V9. |
+| 1.3.0 | 2026-10-25 | Bryan | Reconciled implemented Actuator health probes (`liveness` & `readiness` enabled and restricted to health) and documented Docker Compose local environment. |
 
 ---
 
@@ -121,12 +122,12 @@ MIRA leverages **Spring Boot Actuator** to provide secure, non-leaking health te
 
 ### 4.1 Health Check Endpoints
 * **Current Endpoint:** `GET /actuator/health`
-  * Exposed and permitted without authentication. Spring Boot's default health contributor set includes database connectivity through the datasource.
-* **Liveness Probe:** `GET /actuator/health/liveness` — **Phase 1 target.**
-  * Will check that the JVM process is responsive and return `200 OK` (`{"status":"UP"}`).
-* **Readiness Probe:** `GET /actuator/health/readiness` — **Phase 1 target.**
-  * Will verify database connectivity before the instance receives traffic.
-* **Security Guard:** Full Actuator details, environment configurations, and heap dumps are strictly disabled on the public web interface to prevent sensitive credential disclosure. The health endpoint must be the only exposed actuator endpoint in production.
+  * Exposed and permitted without authentication (`management.endpoints.web.exposure.include=health`).
+* **Liveness Probe:** `GET /actuator/health/liveness` — **Implemented.**
+  * Checks that the JVM process is responsive and returns `200 OK` (`{"status":"UP"}`).
+* **Readiness Probe:** `GET /actuator/health/readiness` — **Implemented.**
+  * Verifies database connectivity via the datasource before routing incoming traffic (`{"status":"UP"}`).
+* **Security Guard:** Full Actuator details, environment configurations, and heap dumps are strictly disabled on the public web interface to prevent sensitive credential disclosure. The health endpoint is the only exposed actuator endpoint.
 
 ### 4.2 Logging Standards
 * Structured JSON logging via SLF4J / Logback.

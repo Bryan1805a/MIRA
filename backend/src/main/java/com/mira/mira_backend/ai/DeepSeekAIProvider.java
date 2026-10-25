@@ -1,5 +1,6 @@
 package com.mira.mira_backend.ai;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
@@ -30,6 +31,7 @@ public class DeepSeekAIProvider implements AIProvider {
     private final RestClient restClient;
     private final String model;
 
+    @Autowired
     public DeepSeekAIProvider(
             RestClient.Builder restClientBuilder,
             @Value("${mira.ai.deepseek.api-key:}") String apiKey,

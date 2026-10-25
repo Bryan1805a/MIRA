@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-24 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-10-25 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
 | **Data Format** | JSON (UTF-8 Encoded) |
@@ -22,6 +22,7 @@
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled auth payloads and the error envelope with the implementation; marked conversation, messaging, and memory endpoints with their delivery phase. |
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled conversation, messaging, and retry endpoints with the implemented backend controller and service layer; updated error code registry and error envelope status. |
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled Android client authentication implementation (screens, TokenStore, auto-refresh authenticator) and DeepSeekAIProvider backend implementation. |
+| 1.4.0 | 2026-10-25 | Bryan | Reconciled Android client conversation & chat endpoint integration, and marked `rate_limited` error code as Implemented (sliding window limit on message send/retry). |
 
 ---
 
@@ -502,7 +503,7 @@ A catch-all `500` handler in `ApiExceptionHandler` guarantees unexpected backend
 | `409 Conflict` | `email_already_registered` | Normalized email already exists. | Implemented |
 | `409 Conflict` | `idempotency_conflict` | Idempotency key reused with a different payload hash. | Implemented |
 | `409 Conflict` | `version_conflict` | OCC `expectedVersion` mismatch on style-memory update. | Phase 2 |
-| `429 Too Many Requests`| `rate_limited` | Exceeded per-account request quota. | Phase 1 |
+| `429 Too Many Requests`| `rate_limited` | Exceeded per-account request quota (10 requests/minute on message send/retry). | Implemented |
 | `502 Bad Gateway` | `ai_provider_unavailable` | External AI provider returned unusable output. | Phase 1 |
 | `504 Gateway Timeout` | `ai_provider_timeout` | Upstream provider failed to respond within the timeout window. | Phase 1 |
 | `500 Internal Error` | `internal_error` | Unexpected backend fault (sanitized and logged with request ID). | Implemented |

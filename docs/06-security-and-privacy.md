@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-SEC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-24 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-10-25 |
 | **Author / Lead** | Bryan / MIRA Security & Privacy Lead |
 | **Compliance Baseline** | OWASP Mobile & API Top 10, Data Minimization Standards |
 
@@ -21,6 +21,7 @@
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled refresh-token rotation/replay behavior, signing-secret configuration, and mobile/CI security status with the implemented backend. |
 | 1.2.0 | 2026-10-23 | Bryan | Updated implementation status to reflect implemented RequestIdFilter, MDC request correlation, and enriched error envelope on the backend. |
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled Android client security controls: EncryptedSharedPreferences (TokenStore), Android Keystore master key, and network security configuration. |
+| 1.4.0 | 2026-10-25 | Bryan | Reconciled implemented per-account in-memory message rate limiting (`MessageRateLimiter`, 10 req/min per user) and Actuator probe restrictions. |
 
 ---
 
@@ -189,7 +190,7 @@ flowchart LR
 | HS256 JWT validation, 15-minute expiry | Implemented |
 | Stateless security filter chain and JSON 401/403 responses | Implemented |
 | Uniform error envelope with `requestId`/`details` | Implemented (Backend & Android) |
-| Per-account rate limiting | Phase 1 |
+| Per-account rate limiting | Implemented (Backend in-memory sliding window, 10 requests/min per user) |
 | Sanitized structured logging and request-ID correlation | Implemented (Backend) |
 | Android Keystore / `EncryptedSharedPreferences` | Implemented (Android) |
 | TLS-only network security config | Implemented (Android) |

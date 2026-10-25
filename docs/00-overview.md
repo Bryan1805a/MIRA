@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-24 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-10-25 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
 
@@ -21,6 +21,7 @@
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled the runtime baseline with the implemented scaffold (Java 21, Spring Boot 4.1.x) and added the Phase 1 milestone to the specification roadmap. |
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled Phase 1 delivery progress: conversation management, messaging orchestration, response lifecycle, and MockAIProvider completed on backend. |
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled Phase 1 progress: delivered Android client authentication slice (screens, secure token storage, auto-refresh authenticator) and DeepSeekAIProvider. |
+| 1.4.0 | 2026-10-25 | Bryan | Reconciled Phase 1 progress: delivered complete Android conversation management and chat screens (`ConversationsActivity`, `ChatActivity`), backend in-memory message rate limiting (`429 rate_limited`), actuator health probes, and Docker Compose local database environment (63 passing backend tests). |
 
 ---
 

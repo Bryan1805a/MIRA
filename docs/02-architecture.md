@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-24 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-10-25 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
 
@@ -21,6 +21,7 @@
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled runtime versions, physical package layout, refresh-token rotation mechanics, and implementation status with the delivered backend. |
 | 1.2.0 | 2026-10-23 | Bryan | Updated implementation status table to reflect completed backend chat core, response lifecycle, idempotency, bounded retries, and MockAIProvider. |
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled delivered Android authentication client (LoginActivity, RegisterActivity, MainActivity session gate & logout, TokenStore EncryptedSharedPreferences, auto-refresh TokenAuthenticator). |
+| 1.4.0 | 2026-10-25 | Bryan | Reconciled full Android conversation & chat delivery (ConversationsActivity, ChatActivity, adapters, repositories), backend message rate limiting (MessageRateLimiter), and Docker Compose local database environment. |
 
 ---
 
@@ -260,7 +261,7 @@ The following formal decisions govern MIRA's architecture:
 
 ---
 
-## 7. Current Implementation Status (2026-10-24)
+## 7. Current Implementation Status (2026-10-25)
 
 | Capability | Status |
 | :--- | :--- |
@@ -268,10 +269,14 @@ The following formal decisions govern MIRA's architecture:
 | Refresh-token rotation, history, replay rejection | Implemented (Backend & Android auto-refresh authenticator) |
 | Logout, `/me` | Implemented (Backend & Android) |
 | Conversation entity, ownership query, cursor pagination query | Implemented |
-| Conversation HTTP endpoints | Implemented (Backend) |
-| Message persistence, response lifecycle, retries, idempotency | Implemented (Backend) |
+| Conversation HTTP endpoints | Implemented (Backend & Android `ConversationsActivity`) |
+| Message persistence, response lifecycle, retries, idempotency | Implemented (Backend & Android `ChatActivity`) |
 | `AIProvider` abstraction, `MockAIProvider`, and `DeepSeekAIProvider` | Implemented (Backend) |
-| Android authentication and chat client | Auth delivered (Login, Register, session storage, auto-refresh, logout); Chat UI active Phase 1 |
+| Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min) |
+| Android authentication and chat client | Fully delivered (Auth, Conversations, Chat, Retries, Encrypted storage) |
+| Actuator health and liveness/readiness probes | Implemented (`/actuator/health`) |
+| Local database orchestration | Implemented (`docker-compose.yml`, `.env.example`) |
+| Continuous Integration pipelines | Implemented (GitHub Actions `backend.yml` & `android.yml`) |
 | Style-memory governance and extraction | Phase 2 |
 
 The active work breakdown is maintained in [10-phase-1-checklist.md](./10-phase-1-checklist.md).

@@ -12,13 +12,14 @@
 
 ## Development Status
 
-**Phase 0 is complete. Phase 1 (Conversation & Chat Core) is the active milestone, with the backend conversation and messaging core implemented.**
+**Phase 0 is complete. Phase 1 (Conversation & Chat Core) is the active milestone: backend conversation, messaging, and DeepSeek provider integration are implemented, and the Android client authentication slice is delivered.**
 
-- Authentication, token rotation, logout, and the current-user endpoint are implemented.
+- Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
+- Android client authentication flows (Login, Registration, session gate in `MainActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config) are implemented and verified.
 - Conversation management (CRUD + cursor pagination) is implemented on the backend.
 - Message sending, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), AI provider abstraction (`MockAIProvider`, `DeepSeekAIProvider`), idempotency key/payload verification, attempt tracking, and bounded retries are implemented on the backend.
-- The backend test suite passes with 58 automated tests (including unit and PostgreSQL Testcontainers suites).
-- The Android application is currently the Phase 0 scaffold; Android UI and network integration remain active Phase 1 deliverables.
+- The backend test suite passes with 58 automated tests (including unit, mock server, and PostgreSQL Testcontainers suites).
+- Active Phase 1 focus: Android conversation list, chat message interface, and send/retry integration.
 - Memory extraction and memory governance are deferred to Phase 2.
 
 See [`docs/10-phase-1-checklist.md`](docs/10-phase-1-checklist.md) for the active plan and exit gate.
@@ -118,20 +119,20 @@ Verify the service is up at `http://localhost:8080/actuator/health`.
 
 ```powershell
 cd android
-.\gradlew.bat assembleDebug
+.\gradlew.bat assembleDebug testDebugUnitTest
 ```
 
-Open the `android/` directory in Android Studio to run on an emulator or physical device. The current application is the Phase 0 scaffold; authentication, conversation, and chat screens are Phase 1 work.
+Open the `android/` directory in Android Studio to run on an emulator or physical device. Authentication (registration, login, encrypted token storage, session verification, logout) is implemented; conversation list and chat screens are the active Phase 1 deliverables.
 
-## Implemented API (as of 2026-10-23)
+## Implemented API (as of 2026-10-24)
 
 | Method | Endpoint | Status |
 | :--- | :--- | :--- |
-| `POST` | `/api/v1/auth/register` | Implemented |
-| `POST` | `/api/v1/auth/login` | Implemented |
-| `POST` | `/api/v1/auth/refresh` | Implemented (rotating refresh tokens) |
-| `POST` | `/api/v1/auth/logout` | Implemented (revokes the presented session) |
-| `GET` | `/api/v1/me` | Implemented |
+| `POST` | `/api/v1/auth/register` | Implemented (Backend & Android) |
+| `POST` | `/api/v1/auth/login` | Implemented (Backend & Android) |
+| `POST` | `/api/v1/auth/refresh` | Implemented (Backend & Android rotating authenticator) |
+| `POST` | `/api/v1/auth/logout` | Implemented (Backend & Android) |
+| `GET` | `/api/v1/me` | Implemented (Backend & Android) |
 | `GET` | `/api/v1/conversations` | Implemented (Backend) |
 | `POST` | `/api/v1/conversations` | Implemented (Backend) |
 | `DELETE` | `/api/v1/conversations/{conversationId}` | Implemented (Backend) |

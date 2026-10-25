@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-10-23 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-10-24 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
 
@@ -20,6 +20,7 @@
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid test pyramid, CI pipeline, lifecycle retry test matrix, session revocation tests, and consolidated all draft updates. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled the test baseline with the implemented suites, Java 21/Testcontainers versions, Flyway V1–V8, and the Phase 1/Phase 2 delivery split. |
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled test inventory to 52 passing tests, updated migration baseline to V1–V9, and marked completed Phase 1 lifecycle/retry test scenarios. |
+| 1.3.0 | 2026-10-24 | Bryan | Reconciled test inventory to 58 passing tests (adding DeepSeekAIProviderTests MockRestServiceServer suite) and noted Android assembleDebug / testDebugUnitTest verification. |
 
 ---
 

@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-10-23 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-10-24 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
 
@@ -20,6 +20,7 @@
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated response lifecycle state machine, session rotation models, message retry semantics, and unified all pending draft updates. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled runtime versions, physical package layout, refresh-token rotation mechanics, and implementation status with the delivered backend. |
 | 1.2.0 | 2026-10-23 | Bryan | Updated implementation status table to reflect completed backend chat core, response lifecycle, idempotency, bounded retries, and MockAIProvider. |
+| 1.3.0 | 2026-10-24 | Bryan | Reconciled delivered Android authentication client (LoginActivity, RegisterActivity, MainActivity session gate & logout, TokenStore EncryptedSharedPreferences, auto-refresh TokenAuthenticator). |
 
 ---
 
@@ -259,18 +260,18 @@ The following formal decisions govern MIRA's architecture:
 
 ---
 
-## 7. Current Implementation Status (2026-10-23)
+## 7. Current Implementation Status (2026-10-24)
 
 | Capability | Status |
 | :--- | :--- |
-| Registration, login, JWT validation | Implemented |
-| Refresh-token rotation, history, replay rejection | Implemented (session-scoped revocation) |
-| Logout, `/me` | Implemented |
+| Registration, login, JWT validation | Implemented (Backend & Android) |
+| Refresh-token rotation, history, replay rejection | Implemented (Backend & Android auto-refresh authenticator) |
+| Logout, `/me` | Implemented (Backend & Android) |
 | Conversation entity, ownership query, cursor pagination query | Implemented |
 | Conversation HTTP endpoints | Implemented (Backend) |
 | Message persistence, response lifecycle, retries, idempotency | Implemented (Backend) |
 | `AIProvider` abstraction, `MockAIProvider`, and `DeepSeekAIProvider` | Implemented (Backend) |
-| Android authentication and chat client | Phase 1 (Scaffold complete, build working) |
+| Android authentication and chat client | Auth delivered (Login, Register, session storage, auto-refresh, logout); Chat UI active Phase 1 |
 | Style-memory governance and extraction | Phase 2 |
 
 The active work breakdown is maintained in [10-phase-1-checklist.md](./10-phase-1-checklist.md).

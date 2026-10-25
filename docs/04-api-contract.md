@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-10-23 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-10-24 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
 | **Data Format** | JSON (UTF-8 Encoded) |
@@ -21,6 +21,7 @@
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated session refresh/logout endpoints, response retry contracts, idempotency specifications, and consolidated draft notes. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled auth payloads and the error envelope with the implementation; marked conversation, messaging, and memory endpoints with their delivery phase. |
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled conversation, messaging, and retry endpoints with the implemented backend controller and service layer; updated error code registry and error envelope status. |
+| 1.3.0 | 2026-10-24 | Bryan | Reconciled Android client authentication implementation (screens, TokenStore, auto-refresh authenticator) and DeepSeekAIProvider backend implementation. |
 
 ---
 
@@ -46,13 +47,13 @@
 
 | Area | Status | Notes |
 | :--- | :--- | :--- |
-| Registration, login, refresh, logout, `/me` | **Implemented** | See sections 2.1–2.5. |
-| Standard error envelope | **Implemented** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler` and `RequestIdFilter`. |
-| Conversation endpoints | **Implemented (Backend)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation. |
-| Message send/list and retry | **Implemented (Backend)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, idempotency key/hash, and bounded retries. |
+| Registration, login, refresh, logout, `/me` | **Implemented (Backend & Android)** | Live on backend; Android authentication UI and session storage delivered. See sections 2.1–2.5. |
+| Standard error envelope | **Implemented (Backend & Android)** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler`/`RequestIdFilter` and mapped via `ApiError` in Android. |
+| Conversation endpoints | **Implemented (Backend)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation. Android UI in progress. |
+| Message send/list and retry | **Implemented (Backend)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, and bounded retries. Android UI in progress. |
 | Style-memory endpoints | **Phase 2** | Schema exists; services and controllers are pending. |
 
-Endpoints marked Implemented (Backend) are live and covered by automated test suites. Android client integration and DeepSeek live HTTP integration remain active Phase 1 tasks.
+Endpoints marked Implemented (Backend) are live and covered by automated test suites. Android client authentication is delivered; conversation list and chat UI remain the active Phase 1 deliverables.
 
 ---
 
@@ -243,7 +244,7 @@ Endpoints marked Implemented (Backend) are live and covered by automated test su
 
 ## 4. Messaging & AI Response Endpoints
 
-> **Delivery status:** Implemented on backend. Synchronous message orchestration, `MockAIProvider`, message cursor listing, response lifecycle transitions, attempt tracking, and bounded retries are live and verified by tests. Real DeepSeek HTTP client integration and Android client UI are active in Phase 1.
+> **Delivery status:** Implemented on backend. Synchronous message orchestration, `MockAIProvider`, `DeepSeekAIProvider`, message cursor listing, response lifecycle transitions, attempt tracking, and bounded retries are live and verified by tests. Android client conversation and chat screens are the active Phase 1 tasks.
 
 ### 4.1 List Conversation Messages
 * **Endpoint:** `GET /api/v1/conversations/{conversationId}/messages`

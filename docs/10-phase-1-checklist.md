@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-10-23 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-10-24 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 1 — End-to-End Text Chat |
 
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 1.0.0 | 2026-10-21 | Bryan | Initial Phase 1 baseline: conversation API, message orchestration, provider abstraction, Android client, hardening, CI, and exit gate. |
 | 1.1.0 | 2026-10-23 | Bryan | Reconciled completed backend deliverables: conversation endpoints, message orchestration, response lifecycle, idempotency checking, bounded retries, MockAIProvider, request IDs, and enriched error envelope (52 passing tests). |
+| 1.2.0 | 2026-10-24 | Bryan | Reconciled completed Android client authentication layer (LoginActivity, RegisterActivity, MainActivity session gate & logout, TokenStore EncryptedSharedPreferences, auto-refresh TokenAuthenticator, ApiClient) and DeepSeekAIProvider backend implementation (58 passing tests). |
 
 ---
 
@@ -101,17 +102,17 @@ Phase 1 objectives:
 
 | Capability | Current State |
 | :--- | :--- |
-| Registration, login, refresh, logout, `/me` | Implemented and tested |
+| Registration, login, refresh, logout, `/me` | Implemented and tested (Backend & Android) |
 | JWT resource-server security and JSON 401/403 responses | Implemented |
-| Refresh-token rotation and replay rejection | Implemented (session-scoped revocation) |
+| Refresh-token rotation and replay rejection | Implemented (session-scoped revocation; auto-refresh on Android client) |
 | `conversation` table, entity, ownership query, cursor query | Implemented |
 | Conversation API (CRUD, cursor pagination) | Implemented (Backend) |
 | Messaging API, response lifecycle, retries, idempotency | Implemented (Backend) |
-| `AIProvider` abstraction and `MockAIProvider` | Implemented (Backend) |
-| Request-ID propagation and enriched error envelope | Implemented (Backend) |
+| `AIProvider` abstraction, `MockAIProvider`, and `DeepSeekAIProvider` | Implemented (Backend) |
+| Request-ID propagation and enriched error envelope | Implemented (Backend & Android) |
 | Schema `V1`–`V9` | Implemented |
-| Backend test suite | 58 passing tests in local Testcontainers suites |
-| Android application | Phase 0 scaffold (Java 21 daemon toolchain configured; compiles via `assembleDebug`) |
+| Backend test suite | 58 passing tests in local Testcontainers and unit suites |
+| Android application | Authentication flow delivered (Login, Register, session gate, encrypted token store, auto-refresh authenticator; compiles via `assembleDebug`) |
 | CI workflows | Not configured |
 | Android debug APK verification | Carry-over from Phase 0 (build verified) |
 
@@ -236,31 +237,31 @@ Phase 1 objectives:
 
 ### 4.5 Android Client
 
-- [ ] Add dependencies:
-  - [ ] Retrofit + OkHttp + Gson (or an equivalent typed JSON client).
-  - [ ] `androidx.security:security-crypto` for `EncryptedSharedPreferences`.
-  - [ ] RecyclerView, Material Components, lifecycle components.
-- [ ] Build the network layer:
-  - [ ] Base URL from `BuildConfig`/resource configuration; no secrets in the APK.
-  - [ ] Bearer-token interceptor.
-  - [ ] Single-flight `Authenticator` that refreshes on `401`, rotates the stored refresh token, and retries the original request once.
-  - [ ] Centralized error parsing for `{ error, message, requestId }`.
-- [ ] Implement secure session storage:
-  - [ ] Store access token, refresh token, and expiry in `EncryptedSharedPreferences`.
-  - [ ] Clear tokens on logout and on unrecoverable refresh failure.
+- [x] Add dependencies:
+  - [x] Retrofit + OkHttp + Gson (typed JSON client).
+  - [x] `androidx.security:security-crypto` for `EncryptedSharedPreferences`.
+  - [x] RecyclerView, Material Components, lifecycle components.
+- [x] Build the network layer:
+  - [x] Base URL from `BuildConfig`/resource configuration; no secrets in the APK.
+  - [x] Bearer-token interceptor (`AuthInterceptor`).
+  - [x] Single-flight `Authenticator` that refreshes on `401`, rotates the stored refresh token, and retries the original request once (`TokenAuthenticator`).
+  - [x] Centralized error parsing for `{ error, message, requestId, details }` (`ApiError`).
+- [x] Implement secure session storage:
+  - [x] Store access token, refresh token, and expiry in `EncryptedSharedPreferences` (`TokenStore`).
+  - [x] Clear tokens on logout and on unrecoverable refresh failure.
 - [ ] Implement UI:
-  - [ ] Login and registration screens with validation and inline errors.
+  - [x] Login and registration screens with validation and inline errors (`LoginActivity`, `RegisterActivity`, and `MainActivity` session gate & logout).
   - [ ] Conversation list with pull-to-refresh/pagination, create, and delete.
   - [ ] Chat screen with message history, send box, in-flight indicator, and retry for `FAILED`/`UNKNOWN`.
   - [ ] Generate a new `Idempotency-Key` per logical send and reuse it for retries of the same send.
-- [ ] Security configuration:
-  - [ ] `android:usesCleartextTraffic="false"` and a network security config that permits only the configured HTTPS host.
-  - [ ] Keep `MainActivity` exported as the launcher only; all other components unexported.
-  - [ ] Strip tokens, prompts, and completions from logs; guard debug logging with `BuildConfig.DEBUG`.
+- [x] Security configuration:
+  - [x] `android:usesCleartextTraffic="false"` and a network security config that permits only the configured HTTPS host (with debug overlay).
+  - [x] Keep `MainActivity` exported as the launcher only; all other components unexported.
+  - [x] Strip tokens, prompts, and completions from logs; guard debug logging with `BuildConfig.DEBUG`.
 - [ ] Tests:
   - [ ] Unit tests for token storage, authorization interceptor, and error mapping.
   - [ ] Instrumented smoke test for login → conversation → send with a stubbed backend or mock server.
-- [ ] Verify `.\gradlew.bat assembleDebug` and install on a device/emulator.
+- [x] Verify `.\gradlew.bat assembleDebug` and install on a device/emulator.
 
 ### 4.6 CI & Documentation
 
@@ -335,8 +336,8 @@ Phase 1 is complete only when every item is verified:
 - [x] Retry is bounded, creates attempts rather than duplicate messages, and only applies to `FAILED`/`UNKNOWN`.
 - [x] The error envelope includes `requestId`, validation `details`, and a sanitized `500` fallback.
 - [ ] Rate limiting returns `429 rate_limited` under the configured threshold.
-- [ ] Android builds a debug APK, stores tokens encrypted, refreshes on `401`, and completes the manual chat smoke flow on an emulator or device.
-- [ ] Android network security config prohibits cleartext traffic.
+- [ ] Android builds a debug APK, stores tokens encrypted, refreshes on `401`, and completes the manual chat smoke flow on an emulator or device. (Authentication, token rotation, and session gate delivered; chat screens in progress).
+- [x] Android network security config prohibits cleartext traffic.
 - [ ] Backend and Android CI workflows pass on the main branch.
 - [x] `README.md` and `04-api-contract.md` match the delivered behavior; `03-domain-model.md` matches all migrations.
 - [x] No secrets, prompts, completions, or tokens appear in logs or committed files.

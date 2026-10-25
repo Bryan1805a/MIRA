@@ -27,4 +27,28 @@
     <string name="signing_out">Signing out…</string>
     <string name="conversations_placeholder">Conversations and chat arrive in the next checkpoint.</string>
     <string name="logout">Sign out</string>
+
+    <string name="open_conversations">Open conversations</string>
+    <string name="conversations_title">Conversations</string>
+    <string name="new_conversation">New conversation</string>
+    <string name="untitled_conversation">Untitled conversation</string>
+    <string name="updated_at">Updated %1$s</string>
+    <string name="delete">Delete</string>
+    <string name="delete_conversation">Delete conversation?</string>
+    <string name="delete_conversation_message">This removes the conversation and all of its messages. Your style memory is not affected.</string>
+    <string name="no_conversations">No conversations yet</string>
+    <string name="no_conversations_subtitle">Create one to start chatting with MIRA.</string>
+    <string name="conversation_title_hint">Conversation title</string>
+    <string name="create">Create</string>
+    <string name="chat_placeholder">Chat will be implemented in the next checkpoint.</string>
+
+    <string name="message_hint">Message</string>
+    <string name="send">Send</string>
+    <string name="no_messages">No messages yet</string>
+    <string name="no_messages_subtitle">Send the first message to start the conversation.</string>
+    <string name="message_status_pending">Waiting for response…</string>
+    <string name="message_status_failed">Response failed.</string>
+    <string name="message_status_unknown">Outcome unknown.</string>
+    <string name="retry">Retry</string>
+    <string name="chat_title">Chat</string>
 </resources>

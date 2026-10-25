@@ -1581,6 +1581,53 @@ class MiraBackendApplicationTests {
                 UUID.fromString(body.get("sessionId").stringValue())
         );
     }
+
+    @Test
+    void messageRateLimitReturnsTooManyRequests() throws Exception {
+        String email = "rate-limit-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Rate limit test"
+        );
+    
+        for (int index = 0; index < 10; index++) {
+            MvcResult result = sendMessage(
+                    tokens.accessToken(),
+                    conversationId,
+                    "Message " + index,
+                    "rate-" + index + "-" + UUID.randomUUID()
+            );
+    
+            assertEquals(201, result.getResponse().getStatus());
+        }
+    
+        mockMvc.perform(post(
+                                "/api/v1/conversations/{id}/messages",
+                                conversationId
+                        )
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .header(
+                                "Idempotency-Key",
+                                "rate-final-" + UUID.randomUUID()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.SendMessageRequest(
+                                        "One too many"
+                                )
+                        )))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error").value("rate_limited"));
+    }
     
     private record LoginTokens(
             String accessToken,

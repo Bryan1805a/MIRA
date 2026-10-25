@@ -52,7 +52,10 @@ public class MessageAdapter extends ListAdapter<
                     return Objects.equals(
                             oldItem.getContent(),
                             newItem.getContent()
-                    ) && oldItem.getRole() == newItem.getRole()
+                    ) && Objects.equals(
+                            oldItem.getRole(),
+                            newItem.getRole()
+                    )
                             && sameResponse(
                                     oldItem.getResponse(),
                                     newItem.getResponse()
@@ -131,7 +134,10 @@ public class MessageAdapter extends ListAdapter<
                 oldResponse.getId(),
                 newResponse.getId()
         )
-                && oldResponse.getStatus() == newResponse.getStatus()
+                && Objects.equals(
+                        oldResponse.getStatus(),
+                        newResponse.getStatus()
+                )
                 && oldResponse.getAttemptCount()
                 == newResponse.getAttemptCount();
     }

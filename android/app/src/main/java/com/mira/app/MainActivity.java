@@ -3,6 +3,7 @@ package com.mira.app;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.content.Intent;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -86,6 +87,12 @@ public class MainActivity extends AppCompatActivity {
                 binding.statusText.setText(R.string.session_offline);
             }
         });
+
+        binding.conversationsButton.setOnClickListener(
+            view -> startActivity(
+                    new Intent(this, ConversationsActivity.class)
+            )
+        );
     }
 
     private void logout() {

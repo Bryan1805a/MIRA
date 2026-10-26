@@ -10,6 +10,7 @@ import com.mira.mira_backend.service.ConversationNotFoundException;
 import com.mira.mira_backend.service.InvalidRequestException;
 import com.mira.mira_backend.service.IdempotencyConflictException;
 import com.mira.mira_backend.service.RateLimitExceededException;
+import com.mira.mira_backend.service.VersionConflictException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -231,6 +232,26 @@ public class ApiExceptionHandler {
                 HttpStatus.TOO_MANY_REQUESTS,
                 "rate_limited",
                 "Too many requests. Try again shortly."
+        );
+    }
+
+    @ExceptionHandler(VersionConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleVersionConflict(
+            VersionConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                request,
+                HttpStatus.CONFLICT,
+                "version_conflict",
+                "The style profile was updated by another request.",
+                List.of(
+                        new ApiErrorResponse.Detail(
+                                "expectedVersion",
+                                "current version is "
+                                        + exception.currentVersion()
+                        )
+                )
         );
     }
 

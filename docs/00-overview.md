@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.4.0 |
-| **Last Updated** | 2026-10-25 |
+| **Version** | 1.5.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
 
@@ -22,6 +22,7 @@
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled Phase 1 delivery progress: conversation management, messaging orchestration, response lifecycle, and MockAIProvider completed on backend. |
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled Phase 1 progress: delivered Android client authentication slice (screens, secure token storage, auto-refresh authenticator) and DeepSeekAIProvider. |
 | 1.4.0 | 2026-10-25 | Bryan | Reconciled Phase 1 progress: delivered complete Android conversation management and chat screens (`ConversationsActivity`, `ChatActivity`), backend in-memory message rate limiting (`429 rate_limited`), actuator health probes, and Docker Compose local database environment (63 passing backend tests). |
+| 1.5.0 | 2026-10-26 | Bryan | Marked Phase 1 complete and merged to `main` (PR #5). Opened Phase 2 with the backend style-memory governance endpoints (`GET/PUT/PATCH/DELETE /api/v1/memory/style`), allow-list validation, OCC versioning, and generation-guarded purge implemented and covered by tests (68 passing backend tests). |
 
 ---
 
@@ -127,12 +128,12 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 
 | Phase | Status | Scope |
 | :--- | :--- | :--- |
-| **Phase 0** | Complete (Android APK verification carried into Phase 1) | Repository, toolchain, backend/Android skeletons, Flyway baseline |
-| **Phase 1** | **Active** | Conversation API, message orchestration, AI provider abstraction, Android auth/chat client, hardening, CI |
-| **Phase 2** | Planned | Communication-style memory governance, extraction, OCC/generation concurrency, memory UI |
+| **Phase 0** | Complete (Android APK install verification carried into Phase 1) | Repository, toolchain, backend/Android skeletons, Flyway baseline |
+| **Phase 1** | **Complete** (merged to `main`) | Conversation API, message orchestration, AI provider abstraction, Android auth/chat client, hardening, CI |
+| **Phase 2** | **Active** | Communication-style memory governance, extraction, OCC/generation concurrency, memory UI |
 | **Phase 3** | Planned | Production hardening, deployment, release signing, operational readiness |
 
-Phase 1 deliberately delivers a usable text-chat loop without memory. Memory is the Phase 2 differentiator and remains specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 is the active milestone: the backend style-memory governance surface (read, replace with OCC, toggle, purge with generation increment) is implemented, while extraction, hybrid-persistence staging, prompt injection, and the Android memory UI remain scheduled in [11-phase-2-checklist.md](./11-phase-2-checklist.md) and specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
 ---
 
@@ -149,7 +150,8 @@ The complete engineering specification is partitioned into modular, version-cont
 * [07-testing-strategy.md](./07-testing-strategy.md) — Multi-Tier Quality Assurance, Testcontainers, and Mocking Strategy.
 * [08-deployment-plan.md](./08-deployment-plan.md) — Cloud Infrastructure Topology, Flyway Migrations, and Release Runbooks.
 * [09-phase-0-checklist.md](./09-phase-0-checklist.md) — Phase 0 Repository Baseline, Verification Steps, and Readiness Gates (complete; Android APK verification carried into Phase 1).
-* [10-phase-1-checklist.md](./10-phase-1-checklist.md) — Phase 1 Conversation & Chat Core milestone, workstreams, and exit gate.
+* [10-phase-1-checklist.md](./10-phase-1-checklist.md) — Phase 1 Conversation & Chat Core milestone (complete; open follow-ups carried into Phase 2).
+* [11-phase-2-checklist.md](./11-phase-2-checklist.md) — Phase 2 Communication-Style Memory milestone, workstreams, and exit gate.
 * [ADR-001-backend-stack.md](./decisions/ADR-001-backend-stack.md) — Architectural Decision Record: Backend Technology Selection.
 * [ADR-002-memory-model.md](./decisions/ADR-002-memory-model.md) — Architectural Decision Record: Memory Lifecycle & Concurrency Model.
 * [ADR-003-file-processing.md](./decisions/ADR-003-file-processing.md) — Architectural Decision Record: Multimodal Processing Phasing.

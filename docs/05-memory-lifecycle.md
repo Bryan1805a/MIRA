@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-MEM-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-10-21 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA Personalization & Memory Team |
 | **Scope** | Persistent Communication-Style Preferences |
 
@@ -20,17 +20,24 @@
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid extraction pipeline, eligibility gate specification, and generation tombstone mechanics. |
 | 1.1.0 | 2026-10-11 | Bryan | Integrated durable `USER_MEMORY_CONTROL` generation table, atomic row-level locking deletion protocol, and robust deletion-race verification suite. |
 | 1.2.0 | 2026-10-21 | Bryan | Added the delivery-phase status, confirmed the generation/profile table split against Flyway V5–V6, and clarified that this specification is the Phase 2 target. |
+| 1.3.0 | 2026-10-26 | Bryan | Reconciled Phase 2 backend delivery: governance endpoints, allow-list validation, OCC conflict handling, and generation-guarded purge are implemented. Extraction, hybrid policy staging, prompt injection, Android UI, and MEM-TEST-01..07 remain pending. |
 
 ---
 
-## Implementation Status (2026-10-21)
+## Implementation Status (2026-10-26)
 
-The durable schema for this specification is in place:
+The durable schema and the backend governance surface are in place:
 
 - `user_style_profile` (`V5`) stores the JSONB profile, `version`, and `enabled`.
 - `user_memory_control` (`V6`) stores the durable `generation` tombstone counter.
+- `MemoryController` and `StyleProfileService` implement:
+  - `GET /api/v1/memory/style` with first-read provisioning (`enabled = true`, `version = 1`, empty profile).
+  - `PUT /api/v1/memory/style` with allow-list validation and OCC (`409 version_conflict`).
+  - `PATCH /api/v1/memory/style/settings` to toggle `enabled`.
+  - `DELETE /api/v1/memory/style` to purge the profile and increment `generation` under a row lock.
+- Integration tests cover provisioning, OCC conflict, allow-list rejection, toggling, and purge/generation behavior.
 
-The application-layer memory services, extraction workers, governance endpoints, and concurrency tests are **Phase 2** work. This document remains the normative target for that phase. Phase 1 deliberately omits style-memory injection from prompt assembly; context assembly in Phase 1 uses conversation history only.
+The extraction pipeline (eligibility gate, hybrid persistence/staging, asynchronous workers), prompt injection into context assembly, the Android memory UI, and the `MEM-TEST-01`..`MEM-TEST-07` concurrency suite remain Phase 2 work. Context assembly currently uses conversation history only. The active plan is [11-phase-2-checklist.md](./11-phase-2-checklist.md).
 
 ---
 
@@ -248,10 +255,10 @@ flowchart LR
 ```
 
 ### 6.1 State Transitions
-* **Inspecting Memory:** Returns the currently active preferences, version integer, and enabled state.
-* **Editing Memory:** Manually replaces preferences with full schema validation; increments the version counter.
-* **Toggling Memory:** Setting `enabled: false` immediately excludes the profile from all future AI prompt context assemblies without deleting the underlying preference configuration.
-* **Purging Memory:** Atomically increments the generation counter in `USER_MEMORY_CONTROL` and purges the profile, permanently neutralizing in-flight extraction workers.
+* **Inspecting Memory:** Returns the currently active preferences, version integer, and enabled state. *(Implemented — backend)*
+* **Editing Memory:** Manually replaces preferences with full schema validation; increments the version counter. *(Implemented — backend)*
+* **Toggling Memory:** Setting `enabled: false` immediately excludes the profile from all future AI prompt context assemblies without deleting the underlying preference configuration. *(Implemented — backend; prompt exclusion takes effect once injection lands)*
+* **Purging Memory:** Atomically increments the generation counter in `USER_MEMORY_CONTROL` and purges the profile, permanently neutralizing in-flight extraction workers. *(Implemented — backend)*
 
 ---
 
@@ -268,3 +275,6 @@ The memory subsystem must pass deterministic automated tests covering race condi
 | **MEM-TEST-05** | New Profile Post-Deletion | Memory is purged (`gen=2`). User subsequently makes explicit durable statement. | New task captures `expected_generation=2` and successfully establishes a fresh profile. |
 | **MEM-TEST-06** | OCC Version Collision | Two workers race to commit to the same generation with identical `expectedVersion`. | Exactly one worker succeeds; the second receives OCC conflict and aborts safely. |
 | **MEM-TEST-07** | Worker & Service Restart | Background extraction job persists across server restart. | Stale job still carries its immutable `expected_generation` and is rejected if memory was purged during downtime. |
+
+> [!NOTE]
+> Implemented today: governance tests for first-read provisioning, OCC conflict, allow-list rejection, settings toggle, and purge/generation increment. The race suites `MEM-TEST-01`..`MEM-TEST-07` require the extraction worker and remain open in [11-phase-2-checklist.md](./11-phase-2-checklist.md).

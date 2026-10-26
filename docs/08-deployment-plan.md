@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-25 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
 
@@ -21,6 +21,7 @@
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled runtime versions, environment-variable names, migration range, and actuator behavior with the implemented backend. |
 | 1.2.0 | 2026-10-23 | Bryan | Updated pre-production verification checklist to include Flyway migrations V1 through V9. |
 | 1.3.0 | 2026-10-25 | Bryan | Reconciled implemented Actuator health probes (`liveness` & `readiness` enabled and restricted to health) and documented Docker Compose local environment. |
+| 1.4.0 | 2026-10-26 | Bryan | Recorded Phase 1 closure and Phase 2 backend progress; deployment remains a Phase 3 activity. |
 
 ---
 
@@ -167,7 +168,7 @@ If a sensitive secret (e.g., `DEEPSEEK_API_KEY` or `MIRA_JWT_SECRET_BASE64`) is 
 ## 6. Pre-Production Release Verification Checklist
 
 > [!NOTE]
-> MIRA is not yet deployed. Production deployment is a Phase 3 activity, performed after the Phase 1 chat loop and Phase 2 memory subsystem are complete and verified.
+> MIRA is not yet deployed. Phase 1 (chat core) is complete and merged to `main`, and Phase 2 backend memory governance is in progress. Production deployment is a Phase 3 activity, performed after the Phase 2 memory subsystem is complete and verified.
 
 Before opening the deployed service to physical Android client connections, verify the following:
 

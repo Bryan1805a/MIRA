@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-SEC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.4.0 |
-| **Last Updated** | 2026-10-25 |
+| **Version** | 1.5.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA Security & Privacy Lead |
 | **Compliance Baseline** | OWASP Mobile & API Top 10, Data Minimization Standards |
 
@@ -22,6 +22,7 @@
 | 1.2.0 | 2026-10-23 | Bryan | Updated implementation status to reflect implemented RequestIdFilter, MDC request correlation, and enriched error envelope on the backend. |
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled Android client security controls: EncryptedSharedPreferences (TokenStore), Android Keystore master key, and network security configuration. |
 | 1.4.0 | 2026-10-25 | Bryan | Reconciled implemented per-account in-memory message rate limiting (`MessageRateLimiter`, 10 req/min per user) and Actuator probe restrictions. |
+| 1.5.0 | 2026-10-26 | Bryan | Corrected the Android client status (Keystore/EncryptedSharedPreferences implemented), and reconciled Phase 2 memory controls: allow-list validation and generation-guarded purge implemented; extraction privacy audit pending. |
 
 ---
 
@@ -115,7 +116,7 @@ sequenceDiagram
 ```
 
 > [!NOTE]
-> Revoking **all** sessions for the user on replay is a stronger defense recommended by the original draft but not yet implemented. Current behavior revokes only the session whose token was replayed. Global revocation is listed as a Phase 1 hardening item in [10-phase-1-checklist.md](./10-phase-1-checklist.md).
+> Revoking **all** sessions for the user on replay is a stronger defense recommended by the original draft but not yet implemented. Current behavior revokes only the session whose token was replayed. Global revocation remains an open Phase 1 follow-up carried into Phase 2 (see [11-phase-2-checklist.md](./11-phase-2-checklist.md)).
 
 ### 3.1 Token Lifecycle Invariants
 * **Access Tokens:**
@@ -130,13 +131,13 @@ sequenceDiagram
   * `refresh_token_history` records every issued hash and its `consumed_at` time. Rotation updates `user_session.refresh_token_hash` in place and appends the successor to history.
 * **Reuse Detection Defense:**
   * If an already-consumed refresh token is submitted again, it indicates potential token interception. The backend revokes the **implicated session** and returns `401 Unauthorized`.
-  * Revoking every session for the account on replay is a recommended hardening step but is not current behavior; see the note in section 3.
+  * Revoking every session for the account on replay is a recommended hardening step but is not current behavior; it remains an open Phase 1 follow-up.
 
 ---
 
 ## 4. Mobile Client Security Baseline (Android)
 
-1. **Hardware-Backed Cryptography:** Tokens and authentication state on Android must be persisted using `EncryptedSharedPreferences` backed by the **Android Keystore System**. Plaintext `SharedPreferences` or local SQLite without encryption is prohibited. This is part of the Phase 1 Android workstream; the current app is still the scaffold.
+1. **Hardware-Backed Cryptography:** Tokens and authentication state on Android must be persisted using `EncryptedSharedPreferences` backed by the **Android Keystore System**. Plaintext `SharedPreferences` or local SQLite without encryption is prohibited. **Implemented** via `TokenStore` with an Android Keystore-backed master key.
 2. **Network Security Configuration:** Android applications must enforce a strict `network_security_config.xml` requiring TLS 1.3 and prohibiting cleartext traffic (`android:usesCleartextTraffic="false"`).
 3. **Log Sanitization:** Android code must strip sensitive tokens and conversational data from debug logs (`Log.d`, `Log.v`). In release builds, `BuildConfig.DEBUG` guards or ProGuard/R8 rules must strip logging calls entirely.
 4. **Zero Exported Components:** Application Activities, BroadcastReceivers, and Services must have `android:exported="false"` unless explicitly required for OS entry points.
@@ -161,7 +162,7 @@ flowchart LR
 * **Server-Side Quota Enforcement:** Per-account request throttling limits brute-force generation or API depletion.
 * **Payload Constraints:** Strict maximum character lengths prevent large context submissions that could inflate billing tokens.
 * **Timeout & Circuit Breaking:** HTTP requests to DeepSeek enforce a 5-second connection timeout and 30-second read timeout. Network failures transition the request to `UNKNOWN` or `FAILED` rather than initiating unbounded retry storms.
-* **Mock Implementations in Test Suites:** CI/CD builds and automated tests execute strictly against `MockAIProvider` once provider integration lands in Phase 1. No automated build or integration test may touch the live DeepSeek API, ensuring zero unintentional billing.
+* **Mock Implementations in Test Suites:** CI/CD builds and automated tests execute strictly against `MockAIProvider` once provider integration lands in Phase 1. No automated build or integration test may touch the live DeepSeek API, ensuring zero unintentional billing. *Implemented: the test profile is pinned to `MockAIProvider`, and `DeepSeekAIProvider` is verified with `MockRestServiceServer`.*
 
 ---
 
@@ -180,7 +181,7 @@ flowchart LR
 
 ---
 
-## 7. Implementation Status (2026-10-24)
+## 7. Implementation Status (2026-10-26)
 
 | Control | Status |
 | :--- | :--- |
@@ -194,4 +195,5 @@ flowchart LR
 | Sanitized structured logging and request-ID correlation | Implemented (Backend) |
 | Android Keystore / `EncryptedSharedPreferences` | Implemented (Android) |
 | TLS-only network security config | Implemented (Android) |
-| Memory privacy restrictions and generation guards | Phase 2 |
+| Memory allow-list validation and generation-guarded purge | Implemented (Backend) |
+| Memory extraction privacy restrictions and audit tests | Phase 2 |

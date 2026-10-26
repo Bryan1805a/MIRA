@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.4.0 |
-| **Last Updated** | 2026-10-25 |
+| **Version** | 1.5.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
 
@@ -22,6 +22,7 @@
 | 1.2.0 | 2026-10-23 | Bryan | Updated implementation status table to reflect completed backend chat core, response lifecycle, idempotency, bounded retries, and MockAIProvider. |
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled delivered Android authentication client (LoginActivity, RegisterActivity, MainActivity session gate & logout, TokenStore EncryptedSharedPreferences, auto-refresh TokenAuthenticator). |
 | 1.4.0 | 2026-10-25 | Bryan | Reconciled full Android conversation & chat delivery (ConversationsActivity, ChatActivity, adapters, repositories), backend message rate limiting (MessageRateLimiter), and Docker Compose local database environment. |
+| 1.5.0 | 2026-10-26 | Bryan | Closed Phase 1 (merged to `main`) and documented Phase 2 backend delivery: `MemoryController`, `StyleProfileService`, allow-list validation, OCC conflict mapping, and generation-guarded purge. Extraction, hybrid policy, and prompt injection remain Phase 2. |
 
 ---
 
@@ -105,6 +106,7 @@ flowchart TD
 
 ### 2.3 Memory Subsystem Module (`memory` domain)
 * **Primary Scope:** Style memory extraction, validation, conflict resolution, versioning, and user governance.
+* **Current Delivery Status:** The governance surface and concurrency primitives are implemented in the backend: profile provisioning on first read, allow-list validation, OCC version checks with `409 version_conflict`, the enabled/disabled toggle, and atomic purge with a generation increment. Extraction, hybrid-persistence staging, prompt injection, and the Android memory UI remain Phase 2 work.
 * **Core Responsibilities:**
   * Manage persistent `USER_STYLE_PROFILE` records.
   * Gate extraction eligibility: only trigger memory extraction when a logical assistant response reaches `COMPLETED` status.
@@ -134,18 +136,18 @@ The current implementation uses a **layer-first** package layout under `com.mira
 | Package | Responsibility |
 | :--- | :--- |
 | `config` | Spring Security filter chain, JWT encoder/decoder, password encoder |
-| `controller` | REST endpoints (`AuthController`, `MeController`) |
+| `controller` | REST endpoints (`AuthController`, `MeController`, `ConversationController`, `MessageController`, `MemoryController`) |
 | `dto` | Java records for request/response payloads |
-| `entity` | JPA entities (`UserAccount`, `UserSession`, `RefreshTokenHistory`, `Conversation`) |
+| `entity` | JPA entities (`UserAccount`, `UserSession`, `RefreshTokenHistory`, `Conversation`, `Message`, `AiResponse`, `AiProcessingAttempt`, `UserStyleProfile`, `UserMemoryControl`) |
 | `exception` | `@RestControllerAdvice` and domain exception mapping |
 | `repository` | Spring Data JPA repositories and ownership/locking queries |
 | `security` | REST authentication entry point and access-denied handler |
-| `service` | Authentication, token rotation, account, and refresh-token services |
+| `service` | Authentication, token rotation, account, chat orchestration, rate limiting, and style-profile services |
 
 > [!NOTE]
 > The original architecture targeted feature packages (`com.mira.auth`, `com.mira.chat`, `com.mira.memory`, `com.mira.ai`). The delivered scaffold uses the layer-first layout above. This is a packaging difference, not a change to the modular-boundary intent. A feature-package refactor can be performed later without changing the API or schema; it is not required for the MVP.
 >
-> Phase 1 will add a narrow `com.mira.mira_backend.ai` package for the `AIProvider` abstraction and provider implementations. This exception keeps provider-specific code out of the generic service layer; the remaining packages stay layer-first.
+> Phase 1 added a narrow `com.mira.mira_backend.ai` package for the `AIProvider` abstraction and provider implementations. This exception keeps provider-specific code out of the generic service layer; the remaining packages stay layer-first.
 
 ---
 
@@ -222,6 +224,9 @@ sequenceDiagram
     API->>DB: Merge Style Memory via OCC (expectedVersion)
 ```
 
+> [!NOTE]
+> The memory fetch, extraction gate, and OCC merge shown above describe the Phase 2 target. Current Phase 2 delivery includes the governance API and OCC/generation primitives; chat prompt assembly still uses conversation history only until memory injection lands.
+
 ### 4.1 Token Specifications
 * **Access Tokens:**
   * Lifetime: 15 minutes.
@@ -261,10 +266,11 @@ The following formal decisions govern MIRA's architecture:
 
 ---
 
-## 7. Current Implementation Status (2026-10-25)
+## 7. Current Implementation Status (2026-10-26)
 
 | Capability | Status |
 | :--- | :--- |
+| Phase 1 conversation & chat core | Complete (merged to `main` via PR #5) |
 | Registration, login, JWT validation | Implemented (Backend & Android) |
 | Refresh-token rotation, history, replay rejection | Implemented (Backend & Android auto-refresh authenticator) |
 | Logout, `/me` | Implemented (Backend & Android) |
@@ -277,6 +283,7 @@ The following formal decisions govern MIRA's architecture:
 | Actuator health and liveness/readiness probes | Implemented (`/actuator/health`) |
 | Local database orchestration | Implemented (`docker-compose.yml`, `.env.example`) |
 | Continuous Integration pipelines | Implemented (GitHub Actions `backend.yml` & `android.yml`) |
-| Style-memory governance and extraction | Phase 2 |
+| Style-memory governance (read/replace/toggle/purge, OCC, generation) | Implemented (Backend `MemoryController` / `StyleProfileService`) |
+| Memory extraction, hybrid policy, prompt injection, Android memory UI | Phase 2 (in progress) |
 
-The active work breakdown is maintained in [10-phase-1-checklist.md](./10-phase-1-checklist.md).
+The active work breakdown is maintained in [11-phase-2-checklist.md](./11-phase-2-checklist.md). The closed Phase 1 checklist remains at [10-phase-1-checklist.md](./10-phase-1-checklist.md).

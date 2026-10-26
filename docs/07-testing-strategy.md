@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.4.0 |
-| **Last Updated** | 2026-10-25 |
+| **Version** | 1.6.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
 
@@ -23,6 +23,7 @@
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled test inventory to 58 passing tests (adding DeepSeekAIProviderTests MockRestServiceServer suite) and noted Android assembleDebug / testDebugUnitTest verification. |
 | 1.4.0 | 2026-10-25 | Bryan | Reconciled test inventory to 63 passing tests (adding MessageRateLimiterTests and rate-limiting integration test) and verified Android conversation and chat unit tests. |
 | 1.5.0 | 2026-10-25 | Bryan | Documented GitHub Actions CI pipelines (`backend.yml` and `android.yml`) and Android lint verification (`lintDebug`). |
+| 1.6.0 | 2026-10-26 | Bryan | Reconciled Phase 1 closure and Phase 2 backend delivery: 68 passing tests including style-memory provisioning, OCC conflict, allow-list rejection, toggle, and purge/generation coverage. |
 
 ---
 
@@ -78,8 +79,8 @@ flowchart TD
 ### 3.3 API Contract & Security Testing
 * **Framework:** Spring MockMvc / WebTestClient with Spring Security context.
 * **Verification Scope:**
-  * **Authentication:** Verify registration, login, token rotation, and invalid credential rejections. Registration, login, refresh, logout, and `/me` are implemented and covered; dedicated rotation/replay tests remain Phase 1.
-  * **Session Revocation & Reuse:** Verify that using an already-rotated refresh token revokes the implicated session and rejects further use of that token. Current tests cover logout revocation and post-logout refresh rejection; replay-specific tests are Phase 1.
+  * **Authentication:** Verify registration, login, token rotation, and invalid credential rejections. Registration, login, refresh, logout, and `/me` are implemented and covered; dedicated rotation/replay tests remain an open Phase 1 follow-up.
+  * **Session Revocation & Reuse:** Verify that using an already-rotated refresh token revokes the implicated session and rejects further use of that token. Current tests cover logout revocation and post-logout refresh rejection; replay-specific tests remain an open Phase 1 follow-up.
   * **Object-Level Authorization (IDOR):** Verify that User A attempting to read, modify, or delete User B's conversation receives `404 Not Found`.
   * **Uniform Error Formatting:** Verify that invalid inputs return the standard JSON error schema with appropriate error codes.
 
@@ -106,18 +107,18 @@ flowchart LR
 
 The `MockAIProvider` enables deterministic simulation of complex edge cases without spending API credits or encountering live network flakiness.
 
-### 3.5 Current Test Inventory (2026-10-23)
+### 3.5 Current Test Inventory (2026-10-26)
 
 | Suite | Type | Tests | Scope |
 | :--- | :--- | :--- | :--- |
-| `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 42 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, per-account rate limiting (`429 rate_limited`), and cross-account isolation. |
+| `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 47 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, per-account rate limiting (`429 rate_limited`), cross-account isolation, and style-memory governance (first-read provisioning, OCC conflict, allow-list rejection, settings toggle, purge/generation increment). |
 | `MessageRateLimiterTests` | Unit | 4 | In-memory sliding-window rate limiter accounting, quota enforcement (10 req/min), multi-user isolation, and window expiration. |
 | `DeepSeekAIProviderTests` | Unit + MockRestServiceServer | 6 | OpenAI-compatible request serialization, Bearer authorization, response parsing, and HTTP status/error mapping (timeout, 429 rate limit, 5xx unavailable, 4xx provider error, invalid/blank output). |
 | `MockAIProviderTests` | Unit | 5 | Deterministic simulation of instant success, timeout, HTTP 429 rate limiting, HTTP 5xx error, and malformed response scenarios. |
 | `TokenServiceTests` | Unit | 5 | JWT claims and expiry, refresh-token uniqueness/URL safety, deterministic SHA-256 hashing. |
 | `JwtConfigurationTests` | Unit | 1 | Secret validation and decoder configuration. |
 
-The suite (63 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V9`. No test contacts DeepSeek. The classes should be split by domain as the Phase 1 surface grows; the current consolidated class is a baseline, not the target structure.
+The suite (68 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V9`. No test contacts DeepSeek. The classes should be split by domain as the Phase 2 surface grows; the current consolidated class is a baseline, not the target structure.
 
 ---
 
@@ -130,8 +131,13 @@ The suite (63 tests total) runs against a real PostgreSQL container (`postgres:1
 | **Response Lifecycle** | Provider Terminal Failure | `MockAIProvider` returns HTTP 500 error. | Logical response transitions to `FAILED`; attempt logged as `ERROR`. | Implemented (Backend) |
 | **Idempotent Retry** | Client Submits Identical Key | Re-send request with same `Idempotency-Key` and payload. | Returns existing response without dispatching duplicate AI request or duplicating messages. | Implemented (Backend) |
 | **Idempotent Retry** | Client Reuses Key with New Body | Re-send same `Idempotency-Key` with different message. | Server rejects request with `409 Conflict` and error code `idempotency_conflict`. | Implemented (Backend) |
+| **Memory Governance** | First-read provisioning | Authenticated `GET /memory/style` with no existing profile. | `200 OK` with `enabled=true`, `version=1`, empty profile object; control row exists. | Implemented (Backend) |
+| **Memory Governance** | Allow-list rejection | `PUT /memory/style` with an unknown field or enum value. | `400 invalid_request`; stored profile unchanged. | Implemented (Backend) |
+| **Memory Governance** | OCC conflict | Second `PUT` reusing an already-consumed `expectedVersion`. | `409 version_conflict` with `details` naming `expectedVersion`. | Implemented (Backend) |
+| **Memory Governance** | Toggle settings | `PATCH /memory/style/settings` with `enabled=false` then `true`. | Flag flips and `version` increments on each mutation. | Implemented (Backend) |
+| **Memory Governance** | Purge & generation | `DELETE /memory/style` after establishing a profile. | Profile becomes empty, `generation` increments by one, `version` increments. | Implemented (Backend) |
 | **Memory Gating** | Extraction from Incomplete Response | Response is `PENDING`, `FAILED`, or `UNKNOWN`. | Extraction service strictly skips task; zero memory updates committed. | Phase 2 |
-| **Memory Concurrency** | OCC Version Collision | Two threads attempt update with `expectedVersion: 4`. | Thread 1 succeeds (version becomes 5); Thread 2 receives `409 Conflict` (`version_conflict`). | Phase 2 |
+| **Memory Concurrency** | OCC Version Collision (concurrent) | Two threads attempt update with `expectedVersion: 4`. | Thread 1 succeeds (version becomes 5); Thread 2 receives `409 Conflict` (`version_conflict`). | Phase 2 (API-level conflict implemented; two-thread race suite pending) |
 | **Memory Deletion Race**| Background Extraction vs User Purge | Extraction task starts; User executes `DELETE /memory/style`; Extraction finishes. | Extraction task detects incremented `generation` counter and aborts; profile remains completely purged. | Phase 2 |
 | **Session Security** | Refresh Token Rotation | Client calls `POST /auth/refresh` with valid RT1. | RT1 is marked consumed; RT2 is issued and verified active; the session ID is unchanged. | Implemented (Backend) |
 | **Session Security** | Token Reuse Interception | Client attempts to reuse consumed RT1. | Server detects reuse, revokes the implicated session, and returns `401 Unauthorized`. Global all-session revocation is a hardening item. | Implemented (Backend) |

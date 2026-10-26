@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DAT-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-10-23 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA Data Engineering Team |
 | **Database Engine** | PostgreSQL 15+ (Neon Managed Database; PostgreSQL 18 in Testcontainers) |
 | **Migration Tool** | Flyway |
@@ -21,6 +21,7 @@
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid ERD, detailed DDL specifications, session tracking, attempt audits, and optimistic concurrency versioning. |
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled the documented schema with Flyway migrations V1–V8: refresh-token history, final `ai_response` shape, composite ownership FKs, and the separation of generation control from the style profile. |
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled migration baseline with Flyway V1–V9, adding `idempotency_key` and unique partial index `uq_ai_attempt_idempotency` to `ai_processing_attempt`. |
+| 1.3.0 | 2026-10-26 | Bryan | Recorded Phase 2 usage of the existing `user_style_profile` and `user_memory_control` tables by the implemented governance service. No schema changes; migrations remain V1–V9. |
 
 ---
 
@@ -397,6 +398,7 @@ CREATE TABLE user_style_profile (
   * OCC updates use `WHERE user_id = :userId AND version = :expectedVersion`; on match, `version` is incremented by 1.
   * The `profile` document must be a JSON object. Application-level validation restricts keys and enum values to the allow-list in [05-memory-lifecycle.md](./05-memory-lifecycle.md#31-allowed-fields--enum-values).
   * The profile table deliberately has **no** `generation` column. Generation state lives in `USER_MEMORY_CONTROL` so that it survives physical deletion of the profile row.
+  * **Implementation status (Phase 2):** `StyleProfileService` provisions a profile row on first access (`version = 1`, `enabled = true`, empty JSONB object), validates replacement payloads against the allow-list, and applies OCC updates via the version precondition. Reads and mutations are exposed through `/api/v1/memory/style`.
 
 ---
 
@@ -419,6 +421,7 @@ CREATE TABLE user_memory_control (
   * Purging memory increments `generation` under `SELECT ... FOR UPDATE` and deletes the profile row in the same transaction.
   * Background extraction jobs capture an immutable `expected_generation`; a commit is rejected if the current generation differs.
   * A control row is preserved even when the profile is deleted, so a delayed worker cannot resurrect purged preferences.
+  * **Implementation status (Phase 2):** The purge endpoint locks the control row with `SELECT ... FOR UPDATE`, increments `generation`, and clears the profile in the same transaction. Background extraction workers that capture `expected_generation` are not implemented yet; see [11-phase-2-checklist.md](./11-phase-2-checklist.md).
 
 ---
 

@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-25 |
+| **Version** | 1.5.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 1 — End-to-End Text Chat |
 
@@ -21,6 +21,7 @@
 | 1.2.0 | 2026-10-24 | Bryan | Reconciled completed Android client authentication layer (LoginActivity, RegisterActivity, MainActivity session gate & logout, TokenStore EncryptedSharedPreferences, auto-refresh TokenAuthenticator, ApiClient) and DeepSeekAIProvider backend implementation (58 passing tests). |
 | 1.3.0 | 2026-10-25 | Bryan | Reconciled completed Android conversation management and chat UI (`ConversationsActivity`, `ChatActivity`), backend in-memory message rate limiting (`MessageRateLimiter`, 10 req/min per user), Actuator health probes, and Docker Compose local database environment (63 passing backend tests). |
 | 1.4.0 | 2026-10-25 | Bryan | Configured GitHub Actions CI workflows for backend (`backend.yml`) and Android (`android.yml`), and resolved Android lint issues (property escaping, DiffUtil equals). |
+| 1.5.0 | 2026-10-26 | Bryan | Closed Phase 1: exit gate verified (68 backend tests), merged to `main` via PR #5, and listed the remaining follow-ups carried into Phase 2. |
 
 ---
 
@@ -64,7 +65,7 @@ Phase 1 objectives:
 6. Establish CI for both projects.
 
 > [!IMPORTANT]
-> **Memory is intentionally out of scope for Phase 1.** Phase 1 prompt assembly uses conversation history only. Style-memory governance, extraction, and injection are Phase 2 work and remain specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+> **Memory is intentionally out of scope for Phase 1.** Phase 1 prompt assembly uses conversation history only. Phase 2 added the backend governance surface and remains responsible for extraction, prompt injection, and the Android memory UI, as specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
 ---
 
@@ -114,7 +115,7 @@ Phase 1 objectives:
 | Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min per user) |
 | Request-ID propagation and enriched error envelope | Implemented (Backend & Android) |
 | Schema `V1`–`V9` | Implemented |
-| Backend test suite | 63 passing tests in local Testcontainers and unit suites |
+| Backend test suite | 68 passing tests in local Testcontainers and unit suites |
 | Android application | Full UI delivered (Login, Register, session gate, encrypted token store, auto-refresh authenticator, Conversations list, Chat with retry; compiles via `assembleDebug`, passes `testDebugUnitTest`, lint-clean) |
 | CI workflows | Configured (GitHub Actions for backend verification and Android build/test/lint) |
 | Android debug APK verification | Verified (build passes cleanly) |
@@ -329,7 +330,7 @@ Tests must run without internet access or paid DeepSeek calls. Testcontainers re
 
 ## 8. Phase 1 Exit Gate
 
-Phase 1 is complete only when every item is verified:
+**Status: complete (closed 2026-10-26).** The exit gate was verified with 68 backend tests passing and the milestone was merged to `main` via PR #5.
 
 - [x] `backend`: `.\mvnw.cmd clean verify` passes with zero failures.
 - [x] All new backend tests pass using Testcontainers and `MockAIProvider`; no live DeepSeek calls.
@@ -345,13 +346,25 @@ Phase 1 is complete only when every item is verified:
 - [x] `README.md` and `04-api-contract.md` match the delivered behavior; `03-domain-model.md` matches all migrations.
 - [x] No secrets, prompts, completions, or tokens appear in logs or committed files.
 
+### 8.1 Open Follow-Ups Carried Into Phase 2
+
+These items do not block the Phase 1 chat core, but remain unchecked and are tracked in [11-phase-2-checklist.md](./11-phase-2-checklist.md):
+
+- [ ] Install the debug APK on an emulator or physical device and confirm launch.
+- [ ] Record the Android SDK/build-tools versions used for the verified build.
+- [ ] Complete the log-sanitization audit (no prompts, tokens, or completions).
+- [ ] Decide the refresh-token replay policy: account-wide revocation, or formally accept session-scoped revocation.
+- [ ] Add Android unit tests for token storage, the authorization interceptor, and API error mapping.
+- [ ] Add an instrumented smoke test for login → conversation → send.
+- [ ] Split the consolidated `MiraBackendApplicationTests` class by domain as the surface grows.
+
 ---
 
 ## 9. Phase 2 Preview
 
-Phase 2 delivers the differentiator specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md):
+Phase 2 is now active and tracked in [11-phase-2-checklist.md](./11-phase-2-checklist.md). It delivers the differentiator specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md):
 
-- Style-profile read, replace, toggle, and purge endpoints.
+- Style-profile read, replace, toggle, and purge endpoints. *(Backend implemented.)*
 - Candidate extraction gated on `COMPLETED` responses.
 - Allow-list schema validation and the hybrid persistence policy.
 - OCC version checks plus durable generation locking for deletion-race safety.

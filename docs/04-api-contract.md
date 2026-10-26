@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.4.0 |
-| **Last Updated** | 2026-10-25 |
+| **Version** | 1.5.0 |
+| **Last Updated** | 2026-10-26 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
 | **Data Format** | JSON (UTF-8 Encoded) |
@@ -23,6 +23,7 @@
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled conversation, messaging, and retry endpoints with the implemented backend controller and service layer; updated error code registry and error envelope status. |
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled Android client authentication implementation (screens, TokenStore, auto-refresh authenticator) and DeepSeekAIProvider backend implementation. |
 | 1.4.0 | 2026-10-25 | Bryan | Reconciled Android client conversation & chat endpoint integration, and marked `rate_limited` error code as Implemented (sliding window limit on message send/retry). |
+| 1.5.0 | 2026-10-26 | Bryan | Corrected stale Android status (conversation and chat screens delivered), marked style-memory governance endpoints and `version_conflict` as Implemented (Backend), and clarified that provider failures are represented by response status rather than 502/504 responses. |
 
 ---
 
@@ -50,11 +51,11 @@
 | :--- | :--- | :--- |
 | Registration, login, refresh, logout, `/me` | **Implemented (Backend & Android)** | Live on backend; Android authentication UI and session storage delivered. See sections 2.1–2.5. |
 | Standard error envelope | **Implemented (Backend & Android)** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler`/`RequestIdFilter` and mapped via `ApiError` in Android. |
-| Conversation endpoints | **Implemented (Backend)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation. Android UI in progress. |
-| Message send/list and retry | **Implemented (Backend)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, and bounded retries. Android UI in progress. |
-| Style-memory endpoints | **Phase 2** | Schema exists; services and controllers are pending. |
+| Conversation endpoints | **Implemented (Backend & Android)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation; Android `ConversationsActivity` delivered. |
+| Message send/list and retry | **Implemented (Backend & Android)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, bounded retries, and Android `ChatActivity` delivered. |
+| Style-memory governance (read/replace/toggle/purge) | **Implemented (Backend)** | Allow-list validation, OCC `version`, and generation-guarded purge are live and covered by tests. Extraction and Android memory UI remain Phase 2. |
 
-Endpoints marked Implemented (Backend) are live and covered by automated test suites. Android client authentication is delivered; conversation list and chat UI remain the active Phase 1 deliverables.
+Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; the remaining Phase 2 work is the extraction pipeline, prompt injection, and the Android memory UI.
 
 ---
 
@@ -147,7 +148,7 @@ Endpoints marked Implemented (Backend) are live and covered by automated test su
 }
 ```
 > [!NOTE]
-> Refresh token rotation is atomic. The submitted token is marked consumed in `refresh_token_history`, the session's current token hash is updated in place, and a newly generated refresh token is returned. The absolute session expiry is not extended. Presenting an already-consumed token is treated as replay: the implicated session is revoked and the request is rejected with `401 Unauthorized` (`invalid_credentials`). Global revocation across every device is a hardening item tracked in Phase 1; it is not current behavior.
+> Refresh token rotation is atomic. The submitted token is marked consumed in `refresh_token_history`, the session's current token hash is updated in place, and a newly generated refresh token is returned. The absolute session expiry is not extended. Presenting an already-consumed token is treated as replay: the implicated session is revoked and the request is rejected with `401 Unauthorized` (`invalid_credentials`). Global revocation across every device remains an open Phase 1 follow-up carried into Phase 2; it is not current behavior.
 
 ---
 
@@ -184,7 +185,7 @@ Endpoints marked Implemented (Backend) are live and covered by automated test su
 
 ## 3. Conversation Management Endpoints
 
-> **Delivery status:** Implemented on backend. `ConversationController`, `ConversationService`, DTOs, and cursor pagination are live and verified by tests. Android client UI integration is in progress under Phase 1.
+> **Delivery status:** Implemented on backend and in the Android client. `ConversationController`, `ConversationService`, DTOs, and cursor pagination are live; `ConversationsActivity` consumes the endpoints.
 
 ### 3.1 List Conversations
 * **Endpoint:** `GET /api/v1/conversations`
@@ -245,7 +246,7 @@ Endpoints marked Implemented (Backend) are live and covered by automated test su
 
 ## 4. Messaging & AI Response Endpoints
 
-> **Delivery status:** Implemented on backend. Synchronous message orchestration, `MockAIProvider`, `DeepSeekAIProvider`, message cursor listing, response lifecycle transitions, attempt tracking, and bounded retries are live and verified by tests. Android client conversation and chat screens are the active Phase 1 tasks.
+> **Delivery status:** Implemented on backend and in the Android client. Synchronous message orchestration, `MockAIProvider`, `DeepSeekAIProvider`, message cursor listing, response lifecycle transitions, attempt tracking, and bounded retries are live; `ChatActivity` consumes the endpoints.
 
 ### 4.1 List Conversation Messages
 * **Endpoint:** `GET /api/v1/conversations/{conversationId}/messages`
@@ -318,7 +319,7 @@ Endpoints marked Implemented (Backend) are live and covered by automated test su
 ```
 * `assistantResponse.id` is the logical `ai_response` UUID used by the retry endpoint. Its `content` is read from the linked assistant `message` row; `ai_response` itself stores no content.
 
-#### Error & Timeout Response (`504 Gateway Timeout` / `200 OK` with `UNKNOWN`)
+#### Error & Timeout Response (`200 OK` with `UNKNOWN`)
 If an upstream AI provider times out after the user message has been safely persisted:
 ```json
 {
@@ -336,6 +337,9 @@ If an upstream AI provider times out after the user message has been safely pers
   }
 }
 ```
+
+> [!NOTE]
+> Provider failures are represented in the response lifecycle, not as HTTP gateway errors. A timeout returns `200 OK` with status `UNKNOWN`; a terminal provider error returns `201 Created` with status `FAILED`. The user message is always preserved, and the client may retry the logical response.
 
 ---
 
@@ -366,7 +370,7 @@ If an upstream AI provider times out after the user message has been safely pers
 
 ## 5. Communication-Style Memory Endpoints
 
-> **Delivery status:** Phase 2. The `user_style_profile` and `user_memory_control` schemas exist, but the memory services, extraction pipeline, and endpoints are not implemented.
+> **Delivery status:** Backend governance is implemented. `GET`, `PUT`, `PATCH /settings`, and `DELETE /api/v1/memory/style` are live, including first-read provisioning, allow-list validation, OCC version checks, and generation-guarded purge. The extraction pipeline (eligibility gate, hybrid persistence, background workers), prompt injection, and the Android memory UI remain Phase 2 work.
 
 ### 5.1 Read Style Profile
 * **Endpoint:** `GET /api/v1/memory/style`
@@ -502,10 +506,10 @@ A catch-all `500` handler in `ApiExceptionHandler` guarantees unexpected backend
 | `404 Not Found` | `resource_not_found` | Resource does not exist or is not owned by the caller. | Implemented |
 | `409 Conflict` | `email_already_registered` | Normalized email already exists. | Implemented |
 | `409 Conflict` | `idempotency_conflict` | Idempotency key reused with a different payload hash. | Implemented |
-| `409 Conflict` | `version_conflict` | OCC `expectedVersion` mismatch on style-memory update. | Phase 2 |
+| `409 Conflict` | `version_conflict` | OCC `expectedVersion` mismatch on style-memory update. | Implemented |
 | `429 Too Many Requests`| `rate_limited` | Exceeded per-account request quota (10 requests/minute on message send/retry). | Implemented |
-| `502 Bad Gateway` | `ai_provider_unavailable` | External AI provider returned unusable output. | Phase 1 |
-| `504 Gateway Timeout` | `ai_provider_timeout` | Upstream provider failed to respond within the timeout window. | Phase 1 |
+| `502 Bad Gateway` | `ai_provider_unavailable` | Reserved. Provider terminal errors are persisted as response status `FAILED`; the API returns `201 Created` with that status rather than a gateway error. | Not emitted |
+| `504 Gateway Timeout` | `ai_provider_timeout` | Reserved. Provider timeouts are persisted as response status `UNKNOWN`; the API returns `200 OK` with that status rather than a gateway error. | Not emitted |
 | `500 Internal Error` | `internal_error` | Unexpected backend fault (sanitized and logged with request ID). | Implemented |
 
 > [!IMPORTANT]

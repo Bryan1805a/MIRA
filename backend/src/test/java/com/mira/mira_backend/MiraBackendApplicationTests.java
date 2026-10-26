@@ -15,6 +15,7 @@ import com.mira.mira_backend.repository.AiResponseRepository;
 import com.mira.mira_backend.repository.MessageRepository;
 import com.mira.mira_backend.repository.ConversationRepository;
 import com.mira.mira_backend.repository.UserAccountRepository;
+import com.mira.mira_backend.repository.UserMemoryControlRepository;
 import com.mira.mira_backend.repository.UserSessionRepository;
 
 import com.mira.mira_backend.service.DuplicateEmailException;
@@ -56,6 +57,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -114,6 +117,9 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private MockAIProvider mockAIProvider;
+
+    @Autowired
+    private UserMemoryControlRepository memoryControlRepository;
 
     @BeforeEach
     void resetMockProvider() {
@@ -1627,6 +1633,219 @@ class MiraBackendApplicationTests {
                         )))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error").value("rate_limited"));
+    }
+
+    @Test
+    void styleProfileIsProvisionedOnFirstRead() throws Exception {
+        String email = "memory-first-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.profile").isMap())
+                .andExpect(jsonPath("$.profile").isEmpty())
+                .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+    }
+    
+    @Test
+    void styleProfileReplacementUsesOptimisticConcurrency()
+            throws Exception {
+        String email = "memory-occ-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        String update = """
+                {
+                  "expectedVersion": 1,
+                  "profile": {
+                    "explanation_depth": "detailed",
+                    "tone": "formal",
+                    "examples": "prefer_concrete_examples",
+                    "formatting": "structured",
+                    "teaching_sequence": "principles_first"
+                  }
+                }
+                """;
+    
+        mockMvc.perform(put("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(update))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.profile.explanation_depth")
+                        .value("detailed"))
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    
+        mockMvc.perform(put("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(update))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("version_conflict"))
+                .andExpect(jsonPath("$.details[0].field")
+                        .value("expectedVersion"));
+    }
+    
+    @Test
+    void invalidStyleProfileIsRejected() throws Exception {
+        String email = "memory-invalid-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        String unknownField = """
+                {
+                  "expectedVersion": 1,
+                  "profile": {
+                    "favourite_colour": "blue"
+                  }
+                }
+                """;
+    
+        mockMvc.perform(put("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(unknownField))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"));
+    
+        String invalidValue = """
+                {
+                  "expectedVersion": 1,
+                  "profile": {
+                    "tone": "sarcastic"
+                  }
+                }
+                """;
+    
+        mockMvc.perform(put("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidValue))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"));
+    }
+    
+    @Test
+    void memorySettingsCanBeToggled() throws Exception {
+        String email = "memory-toggle-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        mockMvc.perform(patch("/api/v1/memory/style/settings")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.version").value(2));
+    
+        mockMvc.perform(patch("/api/v1/memory/style/settings")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.version").value(3));
+    }
+    
+    @Test
+    void purgeClearsProfileAndIncrementsGeneration() throws Exception {
+        String email = "memory-purge-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        String update = """
+                {
+                  "expectedVersion": 1,
+                  "profile": {
+                    "tone": "formal",
+                    "formatting": "prose"
+                  }
+                }
+                """;
+    
+        mockMvc.perform(put("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(update))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2));
+    
+        UUID userId = userAccountRepository
+                .findByNormalizedEmail(email)
+                .orElseThrow()
+                .getId();
+    
+        int before = memoryControlRepository.findById(userId)
+                .orElseThrow()
+                .getGeneration();
+    
+        mockMvc.perform(delete("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+    
+        int after = memoryControlRepository.findById(userId)
+                .orElseThrow()
+                .getGeneration();
+    
+        assertEquals(before + 1, after);
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").isEmpty())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.version").value(3));
     }
     
     private record LoginTokens(

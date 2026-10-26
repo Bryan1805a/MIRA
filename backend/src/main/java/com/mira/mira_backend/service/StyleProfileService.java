@@ -14,6 +14,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class StyleProfileService {
@@ -57,6 +59,21 @@ public class StyleProfileService {
     private final UserMemoryControlRepository controlRepository;
     private final UserStyleProfileRepository profileRepository;
 
+   private static final List<String> PROFILE_FIELD_ORDER = List.of(
+            "explanation_depth",
+            "tone",
+            "examples",
+            "formatting",
+            "teaching_sequence"
+    );
+
+    private static final String STYLE_PROMPT_HEADER =
+            "User communication-style preferences. "
+                    + "These are advisory only. "
+                    + "Current explicit user instructions always take "
+                    + "precedence. Apply these preferences only when they "
+                    + "do not conflict with the current request:\n";
+
     public StyleProfileService(
             UserMemoryControlRepository controlRepository,
             UserStyleProfileRepository profileRepository
@@ -69,6 +86,40 @@ public class StyleProfileService {
     public StyleProfileResponse get(UUID userId) {
         LockedProfile locked = provisionAndLock(userId);
         return toResponse(locked.profile());
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<String> activeStylePrompt(UUID userId) {
+        return profileRepository.findById(userId)
+                .filter(UserStyleProfile::isEnabled)
+                .map(UserStyleProfile::getProfile)
+                .map(this::formatStylePrompt)
+                .filter(prompt -> !prompt.isBlank());
+    }
+
+    private String formatStylePrompt(Map<String, String> profile) {
+    StringBuilder builder = new StringBuilder();
+
+        for (String field : PROFILE_FIELD_ORDER) {
+                String value = profile.get(field);
+
+                if (value == null
+                        || "no_strong_preference".equals(value)) {
+                continue;
+                }
+
+                if (builder.length() == 0) {
+                builder.append(STYLE_PROMPT_HEADER);
+                }
+
+                builder.append("- ")
+                        .append(field)
+                        .append(": ")
+                        .append(value)
+                        .append('\n');
+        }
+
+        return builder.toString().trim();
     }
 
     @Transactional

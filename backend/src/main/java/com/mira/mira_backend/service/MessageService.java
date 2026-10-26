@@ -51,6 +51,7 @@ public class MessageService {
     private final AiProcessingAttemptRepository attemptRepository;
     private final ConversationRepository conversationRepository;
     private final AIProvider aiProvider;
+    private final StyleProfileService styleProfileService;
 
     public MessageService(
             MessageTransactionService transactionService,
@@ -58,7 +59,8 @@ public class MessageService {
             AiResponseRepository aiResponseRepository,
             AiProcessingAttemptRepository attemptRepository,
             ConversationRepository conversationRepository,
-            AIProvider aiProvider
+            AIProvider aiProvider,
+            StyleProfileService styleProfileService
     ) {
         this.transactionService = transactionService;
         this.messageRepository = messageRepository;
@@ -66,6 +68,7 @@ public class MessageService {
         this.attemptRepository = attemptRepository;
         this.conversationRepository = conversationRepository;
         this.aiProvider = aiProvider;
+        this.styleProfileService = styleProfileService;
     }
 
     public SendMessageResponse send(
@@ -340,10 +343,22 @@ public class MessageService {
         Collections.reverse(chronological);
 
         List<AIMessage> messages = new ArrayList<>(
-                chronological.size() + 1
+                chronological.size() + 2
         );
 
         messages.add(new AIMessage(AIRole.SYSTEM, SYSTEM_PROMPT));
+
+        try {
+            styleProfileService.activeStylePrompt(userId)
+                    .ifPresent(stylePrompt -> messages.add(
+                            new AIMessage(AIRole.SYSTEM, stylePrompt)
+                    ));
+        } catch (RuntimeException exception) {
+            /*
+             * Memory is advisory. A profile lookup failure must never
+             * block the user's chat request.
+             */
+        }
 
         for (Message message : chronological) {
             AIRole role = message.getRole() == MessageRole.USER

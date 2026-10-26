@@ -23,6 +23,9 @@ import com.mira.mira_backend.service.InvalidRegistrationException;
 import com.mira.mira_backend.service.UserAccountService;
 
 import com.mira.mira_backend.ai.MockAIProvider;
+import com.mira.mira_backend.ai.AIMessage;
+import com.mira.mira_backend.ai.AIRequest;
+import com.mira.mira_backend.ai.AIRole;
 
 
 import org.junit.jupiter.api.Test;
@@ -1847,6 +1850,211 @@ class MiraBackendApplicationTests {
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.version").value(3));
     }
+
+    @Test
+    void enabledStyleProfileIsInjectedIntoChatContext() throws Exception {
+        String email = "memory-inject-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Memory injection"
+        );
+    
+        mockMvc.perform(put("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedVersion": 1,
+                                  "profile": {
+                                    "explanation_depth": "detailed",
+                                    "tone": "formal"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk());
+    
+        mockAIProvider.setContent("Styled reply");
+    
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "memory-send-" + UUID.randomUUID()
+        );
+    
+        assertEquals(201, sendResult.getResponse().getStatus());
+    
+        AIRequest request = mockAIProvider.lastRequest();
+    
+        assertNotNull(request);
+        assertTrue(requestHasSystemContent(
+                request,
+                "communication-style preferences"
+        ));
+        assertTrue(requestHasSystemContent(
+                request,
+                "explanation_depth: detailed"
+        ));
+        assertTrue(requestHasSystemContent(
+                request,
+                "tone: formal"
+        ));
+    
+        AIMessage lastMessage = request.messages()
+                .get(request.messages().size() - 1);
+    
+        assertEquals(AIRole.USER, lastMessage.role());
+        assertEquals("Hello", lastMessage.content());
+    }
+    
+    @Test
+    void disabledStyleProfileIsOmittedFromChatContext() throws Exception {
+        String email = "memory-disabled-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Memory disabled"
+        );
+    
+        mockMvc.perform(put("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedVersion": 1,
+                                  "profile": {
+                                    "tone": "formal"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk());
+    
+        mockMvc.perform(patch("/api/v1/memory/style/settings")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk());
+    
+        mockAIProvider.setContent("Plain reply");
+    
+        sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "memory-disabled-send-" + UUID.randomUUID()
+        );
+    
+        AIRequest request = mockAIProvider.lastRequest();
+    
+        assertNotNull(request);
+        assertFalse(requestHasSystemContent(
+                request,
+                "communication-style preferences"
+        ));
+    }
+    
+    @Test
+    void emptyStyleProfileDoesNotInjectMemory() throws Exception {
+        String email = "memory-empty-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Memory empty"
+        );
+    
+        mockAIProvider.setContent("Plain reply");
+    
+        sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "memory-empty-send-" + UUID.randomUUID()
+        );
+    
+        AIRequest request = mockAIProvider.lastRequest();
+    
+        assertNotNull(request);
+        assertFalse(requestHasSystemContent(
+                request,
+                "communication-style preferences"
+        ));
+    }
+    
+    @Test
+    void noStrongPreferenceOnlyProfileIsOmittedFromChatContext()
+            throws Exception {
+        String email = "memory-weak-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Memory weak"
+        );
+    
+        mockMvc.perform(put("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedVersion": 1,
+                                  "profile": {
+                                    "examples": "no_strong_preference",
+                                    "formatting": "no_strong_preference",
+                                    "teaching_sequence": "no_strong_preference"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk());
+    
+        mockAIProvider.setContent("Plain reply");
+    
+        sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "memory-weak-send-" + UUID.randomUUID()
+        );
+    
+        AIRequest request = mockAIProvider.lastRequest();
+    
+        assertNotNull(request);
+        assertFalse(requestHasSystemContent(
+                request,
+                "communication-style preferences"
+        ));
+    }
     
     private record LoginTokens(
             String accessToken,
@@ -1940,5 +2148,19 @@ class MiraBackendApplicationTests {
                                         idempotencyKey
                                 ))
                 .andReturn();
+    }
+
+    private boolean requestHasSystemContent(
+        AIRequest request,
+        String text
+    ) {
+        for (AIMessage message : request.messages()) {
+            if (message.role() == AIRole.SYSTEM
+                    && message.content().contains(text)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

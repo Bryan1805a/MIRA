@@ -44,17 +44,21 @@ public class AuthenticationService {
 
     @Transactional
     public LoginResult login(String email, String rawPassword) {
+        // Check valid email and rawPassword
         if (email == null || email.isBlank()
                 || rawPassword == null || rawPassword.isBlank()) {
             throw new InvalidCredentialsException();
         }
 
+        // Covert email to Lowercase and remove all space
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
 
+        // Find user email
         UserAccount account = userAccountRepository
                 .findByNormalizedEmail(normalizedEmail)
                 .orElseThrow(InvalidCredentialsException::new);
 
+        // Check if password is invalid
         if (!passwordEncoder.matches(
                 rawPassword,
                 account.getPasswordHash()
@@ -62,24 +66,24 @@ public class AuthenticationService {
             throw new InvalidCredentialsException();
         }
 
-        TokenService.AccessToken accessToken =
-                tokenService.createAccessToken(account.getId());
+        // Create access token
+        TokenService.AccessToken accessToken = tokenService.createAccessToken(account.getId());
 
+        // Create and hash refresh token
         String refreshToken = tokenService.createRefreshToken();
-        String refreshTokenHash =
-                tokenService.hashRefreshToken(refreshToken);
+        String refreshTokenHash = tokenService.hashRefreshToken(refreshToken);
 
-        Instant refreshTokenExpiresAt = Instant.now()
-                .plus(REFRESH_TOKEN_DAYS, ChronoUnit.DAYS);
+        // refreshToken exprire date
+        Instant refreshTokenExpiresAt = Instant.now().plus(REFRESH_TOKEN_DAYS, ChronoUnit.DAYS);
 
+        // Create new session for user
         UserSession session = new UserSession(
                 account,
                 refreshTokenHash,
                 refreshTokenExpiresAt
         );
 
-        UserSession savedSession =
-                userSessionRepository.saveAndFlush(session);
+        UserSession savedSession = userSessionRepository.saveAndFlush(session);
 
         RefreshTokenHistory initialHistory = new RefreshTokenHistory(
                 savedSession,
@@ -102,30 +106,28 @@ public class AuthenticationService {
 
     @Transactional
     public void logout(UUID userId, String rawRefreshToken) {
+        // Check valid userID nad rawRefreshToken
         Objects.requireNonNull(userId, "userId must not be null");
         Objects.requireNonNull(
                 rawRefreshToken,
                 "rawRefreshToken must not be null"
         );
     
-        String refreshTokenHash =
-                tokenService.hashRefreshToken(rawRefreshToken);
+        String refreshTokenHash = tokenService.hashRefreshToken(rawRefreshToken);
     
-        Optional<UserSession> lockedSession =
-                userSessionRepository.findByRefreshTokenHashForUpdate(
-                        refreshTokenHash
-                );
-    
+        Optional<UserSession> lockedSession = userSessionRepository.findByRefreshTokenHashForUpdate(refreshTokenHash);
+        // Check if lockedSession is empty
         if (lockedSession.isEmpty()) {
             return;
         }
-    
+        
+        // Get session from lockedSession
         UserSession session = lockedSession.get();
-    
         if (!session.getUser().getId().equals(userId)) {
             return;
         }
-    
+        
+        // Revoke session and logout
         session.revoke(Instant.now());
     }
 

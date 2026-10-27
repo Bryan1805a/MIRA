@@ -56,10 +56,7 @@ public class MessageController {
                 idempotencyKey
         );
 
-        HttpStatus status = response.assistantResponse().status()
-                == AiResponseStatus.UNKNOWN
-                ? HttpStatus.OK
-                : HttpStatus.CREATED;
+        HttpStatus status = response.assistantResponse().status() == AiResponseStatus.UNKNOWN ? HttpStatus.OK : HttpStatus.CREATED;
 
         return ResponseEntity.status(status).body(response);
     }

@@ -228,6 +228,19 @@ public class StyleProfileService {
         return validated;
     }
 
+    public static boolean isAllowedProfileValue(
+        String field,
+        String value
+    ) {
+        if (field == null || value == null) {
+            return false;
+        }
+
+        Set<String> allowed = ALLOWED_VALUES.get(field);
+
+        return allowed != null && allowed.contains(value);
+    }
+
     private StyleProfileResponse toResponse(UserStyleProfile profile) {
         return new StyleProfileResponse(
                 profile.isEnabled(),

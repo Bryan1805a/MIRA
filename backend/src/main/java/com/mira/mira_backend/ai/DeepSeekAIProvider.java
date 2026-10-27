@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.LinkedHashMap;
 
 @Component
 @Profile("!test")
@@ -69,31 +70,27 @@ public class DeepSeekAIProvider implements AIProvider {
             );
         }
 
-        String normalizedBaseUrl = baseUrl.endsWith("/")
-                ? baseUrl.substring(0, baseUrl.length() - 1)
-                : baseUrl;
+        String normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
 
         if (customRequestFactory != null) {
             restClientBuilder.requestFactory(customRequestFactory);
-        } else if (!hasCustomRequestFactory(restClientBuilder)) {
-            SimpleClientHttpRequestFactory requestFactory =
-                    new SimpleClientHttpRequestFactory();
+        }
+        else if (!hasCustomRequestFactory(restClientBuilder)) {
+            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
             requestFactory.setConnectTimeout(CONNECT_TIMEOUT_MS);
             requestFactory.setReadTimeout(READ_TIMEOUT_MS);
             restClientBuilder.requestFactory(requestFactory);
         }
 
-        this.restClient = restClientBuilder
-                .baseUrl(normalizedBaseUrl)
-                .defaultHeader(
-                        HttpHeaders.AUTHORIZATION,
-                        "Bearer " + apiKey
-                )
-                .defaultHeader(
-                        HttpHeaders.CONTENT_TYPE,
-                        MediaType.APPLICATION_JSON_VALUE
-                )
-                .build();
+        this.restClient = restClientBuilder.baseUrl(normalizedBaseUrl).defaultHeader(
+                                                                            HttpHeaders.AUTHORIZATION,
+                                                                            "Bearer " + apiKey
+                                                                       )
+                                                                       .defaultHeader(
+                                                                            HttpHeaders.CONTENT_TYPE,
+                                                                            MediaType.APPLICATION_JSON_VALUE
+                                                                       )
+                                                                       .build();
 
         this.model = model;
     }
@@ -124,11 +121,17 @@ public class DeepSeekAIProvider implements AIProvider {
                 ))
                 .toList();
 
-        Map<String, Object> body = Map.of(
-                "model", model,
-                "messages", messages,
-                "stream", false
-        );
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", model);
+        body.put("messages", messages);
+        body.put("stream", false);
+
+        if (request.jsonResponse()) {
+            body.put(
+                    "response_format",
+                    Map.of("type", "json_object")
+            );
+        }
 
         try {
             JsonNode response = restClient.post()

@@ -9,6 +9,10 @@ import com.mira.mira_backend.entity.AiResponseStatus;
 import com.mira.mira_backend.entity.AttemptOutcome;
 import com.mira.mira_backend.entity.Message;
 import com.mira.mira_backend.entity.MessageRole;
+import com.mira.mira_backend.entity.MemoryExtractionJob;
+import com.mira.mira_backend.entity.MemoryJobStatus;
+import com.mira.mira_backend.entity.MemoryCandidateStatus;
+import com.mira.mira_backend.entity.UserMemoryCandidate;
 
 import com.mira.mira_backend.repository.AiProcessingAttemptRepository;
 import com.mira.mira_backend.repository.AiResponseRepository;
@@ -17,10 +21,13 @@ import com.mira.mira_backend.repository.ConversationRepository;
 import com.mira.mira_backend.repository.UserAccountRepository;
 import com.mira.mira_backend.repository.UserMemoryControlRepository;
 import com.mira.mira_backend.repository.UserSessionRepository;
+import com.mira.mira_backend.repository.MemoryExtractionJobRepository;
+import com.mira.mira_backend.repository.UserMemoryCandidateRepository;
 
 import com.mira.mira_backend.service.DuplicateEmailException;
 import com.mira.mira_backend.service.InvalidRegistrationException;
 import com.mira.mira_backend.service.UserAccountService;
+import com.mira.mira_backend.service.MemoryExtractionWorker;
 
 import com.mira.mira_backend.ai.MockAIProvider;
 import com.mira.mira_backend.ai.AIMessage;
@@ -123,6 +130,15 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private UserMemoryControlRepository memoryControlRepository;
+
+    @Autowired
+    private MemoryExtractionJobRepository memoryExtractionJobRepository;
+
+    @Autowired
+    private MemoryExtractionWorker memoryExtractionWorker;
+    
+    @Autowired
+    private UserMemoryCandidateRepository userMemoryCandidateRepository;
 
     @BeforeEach
     void resetMockProvider() {
@@ -2054,6 +2070,368 @@ class MiraBackendApplicationTests {
                 request,
                 "communication-style preferences"
         ));
+    }
+
+    @Test
+    void completedResponseSchedulesMemoryExtraction() throws Exception {
+        String email = "extraction-job-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Extraction job"
+        );
+    
+        mockAIProvider.setContent("Completed reply");
+    
+        MvcResult result = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "extraction-" + UUID.randomUUID()
+        );
+    
+        assertEquals(201, result.getResponse().getStatus());
+    
+        UUID responseId = responseIdFrom(result);
+    
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+    
+        assertEquals(MemoryJobStatus.PENDING, job.getStatus());
+        assertEquals(1, job.getExpectedGeneration());
+        assertEquals(1, job.getExpectedVersion());
+        assertEquals(0, job.getAttempts());
+    }
+    
+    @Test
+    void timeoutResponseDoesNotScheduleMemoryExtraction()
+            throws Exception {
+        String email = "extraction-timeout-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "No extraction on timeout"
+        );
+    
+        mockAIProvider.setScenario(MockAIProvider.Scenario.TIMEOUT);
+    
+        MvcResult result = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "extraction-timeout-" + UUID.randomUUID()
+        );
+    
+        assertEquals(200, result.getResponse().getStatus());
+    
+        UUID responseId = responseIdFrom(result);
+    
+        assertTrue(
+                memoryExtractionJobRepository
+                        .findByResponseId(responseId)
+                        .isEmpty()
+        );
+    }
+    
+    @Test
+    void disabledMemoryDoesNotScheduleExtraction() throws Exception {
+        String email = "extraction-disabled-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Disabled extraction"
+        );
+    
+        mockMvc.perform(patch("/api/v1/memory/style/settings")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk());
+    
+        mockAIProvider.setContent("Completed reply");
+    
+        MvcResult result = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "extraction-disabled-" + UUID.randomUUID()
+        );
+    
+        UUID responseId = responseIdFrom(result);
+    
+        assertTrue(
+                memoryExtractionJobRepository
+                        .findByResponseId(responseId)
+                        .isEmpty()
+        );
+    }
+
+    @Test
+    void explicitDurableCandidateIsMergedIntoProfile() throws Exception {
+        String email = "extract-explicit-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Explicit extraction"
+        );
+    
+        mockAIProvider.setContent("Assistant reply");
+    
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Always use a formal tone.",
+                "extract-explicit-" + UUID.randomUUID()
+        );
+    
+        UUID responseId = responseIdFrom(sendResult);
+    
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+    
+        mockAIProvider.setContent("""
+                {
+                  "candidates": [
+                    {
+                      "field": "tone",
+                      "value": "formal",
+                      "classification": "EXPLICIT_DURABLE",
+                      "evidence": "Always use a formal tone."
+                    }
+                  ]
+                }
+                """);
+    
+        memoryExtractionWorker.processJob(job.getId());
+    
+        MemoryExtractionJob completed = memoryExtractionJobRepository
+                .findById(job.getId())
+                .orElseThrow();
+    
+        assertEquals(MemoryJobStatus.COMPLETED, completed.getStatus());
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    }
+    
+    @Test
+    void inferredCandidateIsStagedWithoutChangingProfile()
+            throws Exception {
+        String email = "extract-inferred-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Inferred extraction"
+        );
+    
+        mockAIProvider.setContent("Assistant reply");
+    
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "I usually prefer academic explanations.",
+                "extract-inferred-" + UUID.randomUUID()
+        );
+    
+        UUID responseId = responseIdFrom(sendResult);
+    
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+    
+        mockAIProvider.setContent("""
+                {
+                  "candidates": [
+                    {
+                      "field": "tone",
+                      "value": "academic",
+                      "classification": "INFERRED",
+                      "evidence": "I usually prefer academic explanations."
+                    }
+                  ]
+                }
+                """);
+    
+        memoryExtractionWorker.processJob(job.getId());
+    
+        assertEquals(
+                MemoryJobStatus.COMPLETED,
+                memoryExtractionJobRepository
+                        .findById(job.getId())
+                        .orElseThrow()
+                        .getStatus()
+        );
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.profile").isEmpty());
+    
+        UUID userId = userAccountRepository
+                .findByNormalizedEmail(email)
+                .orElseThrow()
+                .getId();
+    
+        UserMemoryCandidate candidate =
+                userMemoryCandidateRepository
+                        .findByUserIdAndFieldAndValueAndStatus(
+                                userId,
+                                "tone",
+                                "academic",
+                                MemoryCandidateStatus.PENDING
+                        )
+                        .orElseThrow();
+    
+        assertEquals(1, candidate.getEvidenceCount());
+    }
+    
+    @Test
+    void staleGenerationSkipsExtraction() throws Exception {
+        String email = "extract-stale-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Stale extraction"
+        );
+    
+        mockAIProvider.setContent("Assistant reply");
+    
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Always use a formal tone.",
+                "extract-stale-" + UUID.randomUUID()
+        );
+    
+        UUID responseId = responseIdFrom(sendResult);
+    
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+    
+        mockMvc.perform(delete("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+    
+        mockAIProvider.setContent("""
+                {
+                  "candidates": [
+                    {
+                      "field": "tone",
+                      "value": "formal",
+                      "classification": "EXPLICIT_DURABLE",
+                      "evidence": "Always use a formal tone."
+                    }
+                  ]
+                }
+                """);
+    
+        memoryExtractionWorker.processJob(job.getId());
+    
+        assertEquals(
+                MemoryJobStatus.SKIPPED,
+                memoryExtractionJobRepository
+                        .findById(job.getId())
+                        .orElseThrow()
+                        .getStatus()
+        );
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+    
+    @Test
+    void malformedExtractionOutputFailsTheJob() throws Exception {
+        String email = "extract-invalid-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Invalid extraction"
+        );
+    
+        mockAIProvider.setContent("Assistant reply");
+    
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "extract-invalid-" + UUID.randomUUID()
+        );
+    
+        UUID responseId = responseIdFrom(sendResult);
+    
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+    
+        mockAIProvider.setContent("This is not JSON.");
+    
+        memoryExtractionWorker.processJob(job.getId());
+    
+        MemoryExtractionJob failed = memoryExtractionJobRepository
+                .findById(job.getId())
+                .orElseThrow();
+    
+        assertEquals(MemoryJobStatus.FAILED, failed.getStatus());
+        assertEquals("INVALID_OUTPUT", failed.getErrorCategory());
     }
     
     private record LoginTokens(

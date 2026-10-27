@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.6.0 |
+| **Version** | 1.7.0 |
 | **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
@@ -24,6 +24,7 @@
 | 1.4.0 | 2026-10-26 | Bryan | Recorded Phase 1 closure and Phase 2 backend progress; deployment remains a Phase 3 activity. |
 | 1.5.0 | 2026-10-27 | Bryan | Recorded backend advisory prompt injection; deployment remains a Phase 3 activity. |
 | 1.6.0 | 2026-10-27 | Bryan | Documented extraction scheduler configuration and the in-process polling model; deployment remains a Phase 3 activity. |
+| 1.7.0 | 2026-10-27 | Bryan | Recorded backend candidate-review endpoints; deployment remains a Phase 3 activity. |
 
 ---
 
@@ -172,7 +173,7 @@ If a sensitive secret (e.g., `DEEPSEEK_API_KEY` or `MIRA_JWT_SECRET_BASE64`) is 
 ## 6. Pre-Production Release Verification Checklist
 
 > [!NOTE]
-> MIRA is not yet deployed. Phase 1 (chat core) is complete and merged to `main`. Phase 2 is in progress: backend memory governance, advisory prompt injection, and the in-process extraction pipeline are implemented, while candidate confirmation, the Android memory UI, and the concurrency/privacy suites remain outstanding. Production deployment is a Phase 3 activity, performed after the Phase 2 memory subsystem is complete and verified.
+> MIRA is not yet deployed. Phase 1 (chat core) is complete and merged to `main`. Phase 2 is in progress: backend memory governance, advisory prompt injection, the in-process extraction pipeline, and candidate review are implemented, while the Android memory UI and the concurrency/privacy suites remain outstanding. Production deployment is a Phase 3 activity, performed after the Phase 2 memory subsystem is complete and verified.
 
 > [!WARNING]
 > Extraction currently uses an in-process `@Scheduled` poller that reclaims `PENDING` jobs from PostgreSQL. It is safe for a single instance because commit is guarded by generation/version checks, but horizontal scaling requires a distributed claim or leader election and is tracked as a Phase 3 hardening item.

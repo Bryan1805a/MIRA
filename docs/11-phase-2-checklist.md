@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-002 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.2.0 |
+| **Version** | 1.3.0 |
 | **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 2 — Communication-Style Memory Subsystem |
@@ -19,6 +19,7 @@
 | 1.0.0 | 2026-10-26 | Bryan | Initial Phase 2 baseline: closed Phase 1, recorded implemented backend governance (OCC, allow-list, generation-guarded purge), and scheduled extraction, prompt injection, Android UI, and concurrency suites. |
 | 1.1.0 | 2026-10-27 | Bryan | Marked advisory prompt injection complete (enabled profiles injected, disabled/empty/unspecified omitted) and updated the suite to 72 tests. Extraction, hybrid policy, Android UI, and race suites remain. |
 | 1.2.0 | 2026-10-27 | Bryan | Marked the extraction pipeline complete: V10 job/candidate tables, `COMPLETED`-only scheduling, hybrid policy, and generation/version commit guards with seven new tests (79 total). Candidate confirmation, Android UI, and race/privacy suites remain. |
+| 1.3.0 | 2026-10-27 | Bryan | Marked backend candidate review complete: list/accept/reject pending inferred candidates with ownership, generation, and allow-list checks; purge deletes pending candidates (83 total tests). Android UI and race/privacy suites remain. |
 
 ---
 
@@ -71,7 +72,8 @@ Phase 2 objectives:
 - Allow-list schema validation and `409 version_conflict` mapping. *(Implemented.)*
 - Generation-guarded purge (`generation += 1` under row lock). *(Implemented.)*
 - Candidate extraction and eligibility gating on `COMPLETED` responses. *(Backend implemented.)*
-- Hybrid persistence classification and staging for inferred preferences. *(Backend implemented; confirmation surface pending.)*
+- Hybrid persistence classification and staging for inferred preferences. *(Backend implemented; review surfaces implemented.)*
+- Candidate review: list pending inferred candidates and accept/reject them. *(Backend implemented.)*
 - Asynchronous extraction that never blocks chat latency. *(Backend implemented via an in-process poller.)*
 - Memory injection into prompt assembly when `enabled = true`; omission when disabled, empty, or purged. *(Backend implemented.)*
 - Android memory inspection, editing, toggling, and purge UI.
@@ -101,8 +103,8 @@ Phase 2 objectives:
 | Generation-guarded purge | Implemented (backend) |
 | Advisory prompt injection | Implemented (backend; enabled, non-empty profiles only) |
 | Extraction pipeline (jobs, hybrid policy, commit guards) | Implemented (backend; Flyway V10) |
-| Backend test suite | 79 passing tests (16 memory-governance, injection, and extraction tests included) |
-| Candidate confirmation (accept/reject) | Not started |
+| Candidate review (list/accept/reject) | Implemented (backend) |
+| Backend test suite | 83 passing tests (20 memory-governance, injection, extraction, and candidate tests included) |
 | Android memory UI | Not started |
 | Concurrency race suites | Not started |
 | Phase 1 open follow-ups | See section 3.1 |
@@ -170,8 +172,9 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Discard ephemeral task instructions.
 - [x] Let explicit user corrections overwrite prior memory immediately.
 - [x] Decide and implement where staged candidates live (`user_memory_candidate`, Flyway `V10`).
-- [ ] Expose candidate review (accept/reject) over HTTP and from the Android client.
-- [ ] Decide the evidence threshold or confirmation policy that promotes a staged candidate.
+- [x] Expose candidate review (accept/reject) over HTTP with ownership and generation checks.
+- [ ] Add the Android candidate-review UI.
+- [ ] Decide whether an evidence threshold should auto-promote candidates (currently manual confirmation only).
 - [ ] Tests: `MemoryConflictResolutionTest` for the full hybrid matrix.
 
 ### 4.4 Concurrency & Tombstone Safety
@@ -204,6 +207,8 @@ These are tracked here because Phase 1 closed with them still open:
 - [ ] Allow manual editing with OCC `expectedVersion`; surface `409 version_conflict` and refresh.
 - [ ] Allow toggling memory on/off.
 - [ ] Allow purging with a confirmation dialog.
+- [ ] List pending inferred candidates with evidence and evidence count.
+- [ ] Accept/reject candidates and handle `404`/`400` outcomes.
 - [ ] Never claim personalization is active while memory is disabled.
 - [ ] Unit tests for the memory repository/error mapping; smoke test for the flow.
 
@@ -220,7 +225,7 @@ These are tracked here because Phase 1 closed with them still open:
 
 | Area | Required Verification | Status |
 | :--- | :--- | :--- |
-| Governance API | Read/replace/toggle/purge happy paths, validation, OCC conflict, auth isolation | Implemented (core paths + OCC; memory-endpoint isolation tests pending) |
+| Governance API | Read/replace/toggle/purge/candidate-review happy paths, validation, OCC conflict, auth isolation | Implemented (backend; candidate ownership test included) |
 | Eligibility gate | `COMPLETED` only; no jobs for `PENDING`/`FAILED`/`UNKNOWN` or disabled memory | Implemented (backend tests) |
 | Extraction & hybrid policy | JSON extraction, allow-list re-validation, explicit merge, inferred staging, ephemeral discard | Implemented (explicit/inferred/malformed tests) |
 | Concurrency | Generation mismatch skips, disabled commit skips, OCC collision, deletion race | Partial (sequential guards implemented; race suite pending) |
@@ -239,7 +244,7 @@ All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQ
 | :--- | :--- |
 | **FR-006** Persistent Style Profile Retrieval | Governance API, profile read, and advisory injection *(implemented)* |
 | **FR-007** Candidate Extraction & Eligibility Gate | Extraction pipeline gated on `COMPLETED` *(implemented)* |
-| **FR-008** Hybrid Persistence & Conflict Resolution | Policy classifier, staging, OCC merge *(implemented)*; candidate confirmation pending |
+| **FR-008** Hybrid Persistence & Conflict Resolution | Policy classifier, staging, OCC merge, candidate confirmation *(implemented)* |
 | **FR-009** User Memory Governance | Read, replace, toggle, purge *(implemented)*; Android UI pending |
 | **NFR-002** Privacy & Data Minimization | Extraction prompt guardrails *(implemented)* and privacy audit tests |
 | **NFR-005** Maintainability | Memory module isolation behind service boundaries |
@@ -250,7 +255,7 @@ All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQ
 ## 7. Risks & Open Decisions
 
 1. **Extraction provider cost and latency:** Extraction adds a second model call per completed response. Batch or debounce if cost becomes material.
-2. **Candidate confirmation policy:** Staged inferred preferences currently accumulate evidence but have no accept/reject API or evidence threshold. Decide the promotion rule and expose it before claiming the hybrid policy is complete end-to-end.
+2. **Candidate promotion policy:** Pending inferred candidates accumulate evidence and can be manually accepted or rejected. Decide whether repeated evidence should auto-promote a candidate or whether confirmation remains strictly manual.
 3. **Background execution model:** Extraction uses an in-process fixed-delay poller that reclaims `PENDING` jobs. It is safe for a single instance because commit is guarded by generation/version checks, but horizontal scaling needs a distributed claim or leader election; failed jobs are terminal and are not retried.
 4. **Immediate vs eventual injection:** A newly extracted preference may not affect the very next response because extraction is asynchronous. Document this so the UI does not overpromise.
 5. **Richer profile schema:** Do not expand the allow-list without a migration and validation update.
@@ -269,10 +274,10 @@ Phase 2 is complete only when every item is verified:
 - [x] Purge increments `generation` and clears the profile atomically.
 - [x] Extraction runs only for `COMPLETED` responses and never blocks chat latency.
 - [x] Explicit durable preferences merge; inferred preferences are staged; ephemeral instructions are discarded.
-- [ ] Candidate confirmation (accept/reject) is exposed over HTTP and in the Android client.
+- [x] Candidate confirmation (accept/reject) is exposed over HTTP with ownership and generation checks.
 - [x] Prompt assembly injects the profile only when enabled and omits it when disabled, empty, or all-unspecified.
 - [ ] `MEM-TEST-01`..`MEM-TEST-07` pass against Testcontainers PostgreSQL.
 - [ ] Privacy audit proves no biographical extraction and no sensitive logging.
-- [ ] Android memory UI supports inspect, edit, toggle, and purge with conflict handling.
+- [ ] Android memory UI supports inspect, edit, toggle, purge, and candidate review with conflict handling.
 - [ ] `mvnw clean verify` and `gradlew assembleDebug` pass in CI.
-- [x] API contract, domain model, memory spec, and test inventory match delivered behavior (reconciled through the extraction pipeline and Flyway V10; will be re-checked as confirmation lands).
+- [x] API contract, domain model, memory spec, and test inventory match delivered behavior (reconciled through candidate review and Flyway V10; will be re-checked as the Android UI lands).

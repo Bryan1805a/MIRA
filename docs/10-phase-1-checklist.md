@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.7.0 |
+| **Version** | 1.8.0 |
 | **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 1 — End-to-End Text Chat |
@@ -24,6 +24,7 @@
 | 1.5.0 | 2026-10-26 | Bryan | Closed Phase 1: exit gate verified (68 backend tests), merged to `main` via PR #5, and listed the remaining follow-ups carried into Phase 2. |
 | 1.6.0 | 2026-10-27 | Bryan | Recorded the current suite at 72 tests after Phase 2 injection coverage; Phase 1 closed with 68. |
 | 1.7.0 | 2026-10-27 | Bryan | Recorded the current suite at 79 tests after Phase 2 extraction coverage; Phase 1 closed with 68. |
+| 1.8.0 | 2026-10-27 | Bryan | Recorded the current suite at 83 tests after Phase 2 candidate-review coverage; Phase 1 closed with 68. |
 
 ---
 
@@ -67,7 +68,7 @@ Phase 1 objectives:
 6. Establish CI for both projects.
 
 > [!IMPORTANT]
-> **Memory is intentionally out of scope for Phase 1.** Phase 1 prompt assembly uses conversation history only. Phase 2 delivered the backend governance surface, advisory prompt injection, and the asynchronous extraction pipeline, and remains responsible for candidate confirmation and the Android memory UI, as specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+> **Memory is intentionally out of scope for Phase 1.** Phase 1 prompt assembly uses conversation history only. Phase 2 delivered the backend governance surface, advisory prompt injection, the asynchronous extraction pipeline, and candidate review, and remains responsible for the Android memory UI, as specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
 ---
 
@@ -117,7 +118,7 @@ Phase 1 objectives:
 | Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min per user) |
 | Request-ID propagation and enriched error envelope | Implemented (Backend & Android) |
 | Schema `V1`–`V9` at closure (V10 added in Phase 2) | Implemented |
-| Backend test suite | 79 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
+| Backend test suite | 83 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
 | Android application | Full UI delivered (Login, Register, session gate, encrypted token store, auto-refresh authenticator, Conversations list, Chat with retry; compiles via `assembleDebug`, passes `testDebugUnitTest`, lint-clean) |
 | CI workflows | Configured (GitHub Actions for backend verification and Android build/test/lint) |
 | Android debug APK verification | Verified (build passes cleanly) |

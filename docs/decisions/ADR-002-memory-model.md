@@ -79,4 +79,4 @@ We need to decide:
 
 ### Delivery Status (2026-10-27)
 
-The schema and backend implementation are in place. `user_style_profile.profile`, `version`, and `enabled` are defined in `V5`; `user_memory_control.generation` is defined in `V6`; extraction jobs and staged candidates are defined in `V10`. The governance endpoints, advisory prompt injection, the hybrid extraction pipeline, and generation/version commit guards are implemented. Candidate confirmation, the Android memory UI, and the full concurrency suite remain tracked in [11-phase-2-checklist.md](../11-phase-2-checklist.md).
+The schema and backend implementation are in place. `user_style_profile.profile`, `version`, and `enabled` are defined in `V5`; `user_memory_control.generation` is defined in `V6`; extraction jobs and staged candidates are defined in `V10`. The governance endpoints, advisory prompt injection, the hybrid extraction pipeline, generation/version commit guards, and candidate list/accept/reject are implemented. The Android memory UI and the full concurrency suite remain tracked in [11-phase-2-checklist.md](../11-phase-2-checklist.md).

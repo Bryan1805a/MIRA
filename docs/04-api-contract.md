@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.7.0 |
+| **Version** | 1.8.0 |
 | **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
@@ -26,6 +26,7 @@
 | 1.5.0 | 2026-10-26 | Bryan | Corrected stale Android status (conversation and chat screens delivered), marked style-memory governance endpoints and `version_conflict` as Implemented (Backend), and clarified that provider failures are represented by response status rather than 502/504 responses. |
 | 1.6.0 | 2026-10-27 | Bryan | Noted implemented advisory style-profile injection during message send: enabled profiles add a system message, while disabled, empty, or all-unspecified profiles add none. No endpoint shape changes. |
 | 1.7.0 | 2026-10-27 | Bryan | Recorded the internal asynchronous extraction pipeline. No new public endpoints; staged inferred candidates are not yet exposed for confirmation. |
+| 1.8.0 | 2026-10-27 | Bryan | Added the candidate-review endpoints: list pending inferred candidates, accept with OCC, and reject. No schema changes. |
 
 ---
 
@@ -55,9 +56,9 @@
 | Standard error envelope | **Implemented (Backend & Android)** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler`/`RequestIdFilter` and mapped via `ApiError` in Android. |
 | Conversation endpoints | **Implemented (Backend & Android)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation; Android `ConversationsActivity` delivered. |
 | Message send/list and retry | **Implemented (Backend & Android)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, bounded retries, and Android `ChatActivity` delivered. |
-| Style-memory governance (read/replace/toggle/purge) | **Implemented (Backend)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, and the internal extraction pipeline are live and covered by tests. Candidate confirmation and the Android memory UI remain Phase 2. |
+| Style-memory governance and candidate review | **Implemented (Backend)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, the internal extraction pipeline, and candidate list/accept/reject are live and covered by tests. The Android memory UI remains Phase 2. |
 
-Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; the remaining Phase 2 work is candidate confirmation (accept/reject), the Android memory UI, and the concurrency/privacy suites.
+Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; the remaining Phase 2 work is the Android memory UI and the concurrency/privacy suites.
 
 ---
 
@@ -373,7 +374,7 @@ If an upstream AI provider times out after the user message has been safely pers
 
 ## 5. Communication-Style Memory Endpoints
 
-> **Delivery status:** Backend governance, advisory injection, and the internal extraction pipeline are implemented. `GET`, `PUT`, `PATCH /settings`, and `DELETE /api/v1/memory/style` are live, including first-read provisioning, allow-list validation, OCC version checks, and generation-guarded purge. During message send, an enabled profile is serialized into an advisory system message; disabled, empty, or all-unspecified profiles add none. After a `COMPLETED` response, an asynchronous job extracts candidates and applies the hybrid policy. Staged inferred candidates are not yet exposed through an HTTP endpoint; the candidate-confirmation API and Android memory UI remain Phase 2 work.
+> **Delivery status:** Backend governance, advisory injection, the internal extraction pipeline, and candidate review are implemented. `GET`, `PUT`, `PATCH /settings`, and `DELETE /api/v1/memory/style` are live, including first-read provisioning, allow-list validation, OCC version checks, and generation-guarded purge. During message send, an enabled profile is serialized into an advisory system message; disabled, empty, or all-unspecified profiles add none. After a `COMPLETED` response, an asynchronous job extracts candidates and applies the hybrid policy. Pending inferred candidates can be listed, accepted, or rejected. The Android memory UI remains Phase 2 work.
 
 ### 5.1 Read Style Profile
 * **Endpoint:** `GET /api/v1/memory/style`
@@ -463,7 +464,68 @@ If an upstream AI provider times out after the user message has been safely pers
 * **Endpoint:** `DELETE /api/v1/memory/style`
 * **Authentication:** Required
 * **Status Code:** `204 No Content`
-* **Behavior:** Clears the stored JSONB profile and increments the `generation` counter. Any running background extraction jobs carrying older generation numbers are automatically aborted to prevent resurrecting deleted preferences.
+* **Behavior:** Clears the stored JSONB profile, increments the `generation` counter, and deletes `PENDING` staged candidates in the same transaction. Any running background extraction jobs carrying older generation numbers are automatically aborted to prevent resurrecting deleted preferences.
+
+---
+
+### 5.5 List Pending Candidates
+* **Endpoint:** `GET /api/v1/memory/candidates`
+* **Authentication:** Required
+* **Status Code:** `200 OK`
+
+#### Response Body (`200 OK`)
+```json
+{
+  "items": [
+    {
+      "id": "0f6a6a5e-5c65-4f4a-9f2b-4c3e2b1a9d77",
+      "field": "tone",
+      "value": "academic",
+      "evidence": "I usually prefer academic explanations.",
+      "evidenceCount": 2,
+      "createdAt": "2026-10-27T08:15:00Z"
+    }
+  ]
+}
+```
+* Only `PENDING` candidates for the authenticated user are returned, newest first.
+* Candidates originate from `INFERRED` extraction results. Explicit durable/correction values are merged directly into the profile and are never staged.
+
+---
+
+### 5.6 Accept Candidate
+* **Endpoint:** `POST /api/v1/memory/candidates/{candidateId}/accept`
+* **Authentication:** Required
+* **Request Body:** None
+* **Status Code:** `200 OK`
+
+#### Response Body (`200 OK`)
+```json
+{
+  "enabled": true,
+  "version": 3,
+  "profile": {
+    "tone": "academic"
+  },
+  "updatedAt": "2026-10-27T08:20:00Z"
+}
+```
+* **Rules:**
+  * The candidate must belong to the caller and still be `PENDING`.
+  * The candidate's captured `generation` must match the current memory generation; otherwise the request is rejected with `400 invalid_request` ("Memory candidate is no longer valid.").
+  * The value is re-validated against the allow-list before being applied.
+  * The profile `version` increments only when accepting actually changes the stored value.
+  * On success the candidate becomes `ACCEPTED`.
+  * Unknown, foreign, or already-decided candidates return `404 resource_not_found`.
+
+---
+
+### 5.7 Reject Candidate
+* **Endpoint:** `POST /api/v1/memory/candidates/{candidateId}/reject`
+* **Authentication:** Required
+* **Request Body:** None
+* **Status Code:** `204 No Content`
+* **Behavior:** Marks a pending candidate `REJECTED` without changing the profile. Unknown, foreign, or already-decided candidates return `404 resource_not_found`.
 
 ---
 

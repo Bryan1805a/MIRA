@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.7.0 |
+| **Version** | 1.8.0 |
 | **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
@@ -25,6 +25,7 @@
 | 1.5.0 | 2026-10-26 | Bryan | Marked Phase 1 complete and merged to `main` (PR #5). Opened Phase 2 with the backend style-memory governance endpoints (`GET/PUT/PATCH/DELETE /api/v1/memory/style`), allow-list validation, OCC versioning, and generation-guarded purge implemented and covered by tests (68 passing backend tests). |
 | 1.6.0 | 2026-10-27 | Bryan | Recorded backend prompt injection: enabled style profiles are serialized into an advisory system message during chat context assembly, disabled/empty profiles are omitted, and injection failures never block chat. Test suite now 72 passing tests. |
 | 1.7.0 | 2026-10-27 | Bryan | Recorded the asynchronous memory extraction pipeline (Flyway V10): jobs scheduled only for `COMPLETED` responses, explicit durable corrections merged, inferred candidates staged, ephemeral candidates discarded, and generation/version guards enforced at commit. Test suite now 79 passing tests. |
+| 1.8.0 | 2026-10-27 | Bryan | Recorded backend candidate review: pending inferred candidates can be listed, accepted with OCC, or rejected; purge clears pending candidates. Test suite now 83 passing tests. |
 
 ---
 
@@ -132,10 +133,10 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 | :--- | :--- | :--- |
 | **Phase 0** | Complete (Android APK install verification carried into Phase 1) | Repository, toolchain, backend/Android skeletons, Flyway baseline |
 | **Phase 1** | **Complete** (merged to `main`) | Conversation API, message orchestration, AI provider abstraction, Android auth/chat client, hardening, CI |
-| **Phase 2** | **Active** | Communication-style memory governance, prompt injection, extraction, OCC/generation concurrency, memory UI |
+| **Phase 2** | **Active** | Communication-style memory governance, prompt injection, extraction, candidate review, OCC/generation concurrency, memory UI |
 | **Phase 3** | Planned | Production hardening, deployment, release signing, operational readiness |
 
-Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 is the active milestone: the backend style-memory governance surface (read, replace with OCC, toggle, purge with generation increment), **advisory prompt injection**, and the **asynchronous extraction pipeline** (eligibility gate, hybrid persistence, generation/version commit guards) are implemented. The candidate-confirmation surface, Android memory UI, and the concurrency/privacy test suites remain scheduled in [11-phase-2-checklist.md](./11-phase-2-checklist.md) and specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 is the active milestone: backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline, and **candidate review (list, accept, reject)** are implemented. The Android memory UI and the concurrency/privacy test suites remain scheduled in [11-phase-2-checklist.md](./11-phase-2-checklist.md) and specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
 ---
 

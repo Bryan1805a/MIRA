@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-MEM-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.5.0 |
+| **Version** | 1.6.0 |
 | **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Personalization & Memory Team |
 | **Scope** | Persistent Communication-Style Preferences |
@@ -23,6 +23,7 @@
 | 1.3.0 | 2026-10-26 | Bryan | Reconciled Phase 2 backend delivery: governance endpoints, allow-list validation, OCC conflict handling, and generation-guarded purge are implemented. Extraction, hybrid policy staging, prompt injection, Android UI, and MEM-TEST-01..07 remain pending. |
 | 1.4.0 | 2026-10-27 | Bryan | Reconciled advisory prompt injection: enabled profiles are appended as a system message, unspecified fields are skipped, and disabled/empty profiles are omitted. Extraction, hybrid policy, Android UI, and MEM-TEST-01..07 remain pending. |
 | 1.5.0 | 2026-10-27 | Bryan | Reconciled the asynchronous extraction pipeline (Flyway V10): `COMPLETED`-only scheduling, hybrid persistence, candidate staging, and generation/version commit guards are implemented. Candidate confirmation, Android UI, and race suites remain pending. |
+| 1.6.0 | 2026-10-27 | Bryan | Reconciled backend candidate review: pending inferred candidates can be listed, accepted with generation/allow-list validation and OCC, or rejected; purge deletes pending candidates. Android UI and race suites remain pending. |
 
 ---
 
@@ -50,9 +51,14 @@ The durable schema, governance surface, advisory injection, and asynchronous ext
   - `MemoryExtractionWorker` verifies the turn is `COMPLETED`, calls the provider in JSON mode, validates the allow-list and classifications, and records terminal job outcomes (`COMPLETED`, `SKIPPED`, `FAILED`).
   - `MemoryExtractionCommitService` locks the control row, profile row, and job; rejects stale generation, disabled memory, or version drift with `SKIPPED`; merges explicit durable/correction updates; stages inferred candidates; and discards ephemeral candidates.
   - Repeated evidence for the same pending inferred candidate increments `evidence_count`.
-- Integration tests cover provisioning, OCC conflict, allow-list rejection, toggling, purge/generation behavior, injection, extraction scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, and malformed output.
+- Candidate review is implemented:
+  - `GET /api/v1/memory/candidates` lists pending inferred candidates for the authenticated user, newest first.
+  - `POST /api/v1/memory/candidates/{id}/accept` locks the control/profile/candidate rows, validates `generation` and the allow-list, applies the value (incrementing `version` only when it changes), and marks the candidate `ACCEPTED`.
+  - `POST /api/v1/memory/candidates/{id}/reject` marks the candidate `REJECTED` without changing the profile.
+  - Purge deletes `PENDING` candidates in the same transaction.
+- Integration tests cover provisioning, OCC conflict, allow-list rejection, toggling, purge/generation behavior, injection, extraction scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, malformed output, and candidate list/accept/reject/ownership.
 
-Not yet implemented: accepting/rejecting staged candidates over HTTP, the Android memory UI, job retry/backoff beyond the terminal `FAILED` state, and the `MEM-TEST-01`..`MEM-TEST-07` concurrent race suite. The active plan is [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+Not yet implemented: the Android memory UI, job retry/backoff beyond the terminal `FAILED` state, an automatic evidence threshold for promoting staged candidates, and the `MEM-TEST-01`..`MEM-TEST-07` concurrent race suite. The active plan is [11-phase-2-checklist.md](./11-phase-2-checklist.md).
 
 ---
 
@@ -107,7 +113,7 @@ flowchart TD
 ```
 
 > [!NOTE]
-> Implemented in `MemoryExtractionWorker` / `MemoryExtractionCommitService`. The gate, schema validation, and commit guards are live. Staged inferred candidates are persisted for evidence accumulation; an HTTP/UI confirmation surface is still pending.
+> Implemented in `MemoryExtractionWorker` / `MemoryExtractionCommitService`. The gate, schema validation, and commit guards are live. Staged inferred candidates are persisted for evidence accumulation and exposed through the candidate-review endpoints; the Android review UI is still pending.
 
 ---
 
@@ -169,7 +175,7 @@ stateDiagram-v2
    * *Action:* High-priority update. Overwrites historical preferences immediately.
 
 > [!NOTE]
-> The backend implements all four paths: explicit durable values merge automatically, explicit corrections override same-field values, inferred candidates are staged in `user_memory_candidate` with an incremented `evidence_count`, and ephemeral candidates are discarded. Surfacing staged candidates for user acceptance is pending.
+> The backend implements all four paths: explicit durable values merge automatically, explicit corrections override same-field values, inferred candidates are staged in `user_memory_candidate` with an incremented `evidence_count`, and ephemeral candidates are discarded. Pending inferred candidates are surfaced to the user for acceptance through the candidate-review endpoints.
 
 ---
 
@@ -263,6 +269,7 @@ flowchart LR
         Edit["PUT /memory/style\n(Manual override with OCC)"]
         Toggle["PATCH /memory/style/settings\n(Enable/Disable toggle)"]
         Purge["DELETE /memory/style\n(Atomic generation bump & purge)"]
+        Review["GET /memory/candidates\naccept / reject pending candidates"]
     end
 
     subgraph ProfileState ["Persistent Profile State"]
@@ -273,6 +280,8 @@ flowchart LR
 
     View --> EnabledState
     Edit --> EnabledState
+    Review -->|accept| EnabledState
+    Review -->|reject| EnabledState
     Toggle -->|enabled: false| DisabledState
     Toggle -->|enabled: true| EnabledState
     Purge --> PurgedState
@@ -297,7 +306,19 @@ The message lists the specified fields in a fixed order (`explanation_depth`, `t
 A profile lookup or formatting failure is treated as non-fatal: the chat request proceeds without memory. This preserves the "memory informs, never blocks" invariant.
 
 > [!NOTE]
-> Injection covers retrieval and prompt assembly only. Extracting new preferences from conversation remains the Phase 2 pipeline described in sections 2–5.
+> Injection covers retrieval and prompt assembly only. Extraction of new preferences is implemented as described in sections 2–5 and runs asynchronously.
+
+### 6.3 Candidate Review (Implemented)
+
+Pending inferred candidates are exposed only to their owner:
+
+| Operation | Endpoint | Behavior |
+| :--- | :--- | :--- |
+| List | `GET /api/v1/memory/candidates` | Returns `PENDING` candidates newest-first with field, value, evidence, evidence count, and creation time. |
+| Accept | `POST /api/v1/memory/candidates/{id}/accept` | Locks control/profile/candidate, validates generation and allow-list, applies the value under OCC (version increments only on change), marks `ACCEPTED`, returns the updated profile. |
+| Reject | `POST /api/v1/memory/candidates/{id}/reject` | Marks the candidate `REJECTED` and returns `204`; the profile is untouched. |
+
+Unknown, foreign, or already-decided candidates return `404 resource_not_found`. A generation mismatch returns `400 invalid_request`. Purging memory deletes pending candidates so no stale suggestions survive.
 
 ---
 
@@ -316,4 +337,4 @@ The memory subsystem must pass deterministic automated tests covering race condi
 | **MEM-TEST-07** | Worker & Service Restart | Background extraction job persists across server restart. | Stale job still carries its immutable `expected_generation` and is rejected if memory was purged during downtime. |
 
 > [!NOTE]
-> Implemented today: governance tests for first-read provisioning, OCC conflict, allow-list rejection, settings toggle, and purge/generation increment; injection tests for enabled, disabled, empty, and all-unspecified profiles; and extraction tests for `COMPLETED`-only scheduling, disabled-memory suppression, explicit merge, inferred staging, stale-generation skip, and malformed output. The concurrent race suites `MEM-TEST-01`..`MEM-TEST-07` remain open in [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+> Implemented today: governance tests for first-read provisioning, OCC conflict, allow-list rejection, settings toggle, and purge/generation increment; injection tests for enabled, disabled, empty, and all-unspecified profiles; extraction tests for `COMPLETED`-only scheduling, disabled-memory suppression, explicit merge, inferred staging, stale-generation skip, and malformed output; and candidate tests for list/accept/reject, ownership isolation, and purge cleanup. The concurrent race suites `MEM-TEST-01`..`MEM-TEST-07` remain open in [11-phase-2-checklist.md](./11-phase-2-checklist.md).

@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-DAT-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.5.0 |
+| **Version** | 1.6.0 |
 | **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Data Engineering Team |
 | **Database Engine** | PostgreSQL 15+ (Neon Managed Database; PostgreSQL 18 in Testcontainers) |
@@ -24,6 +24,7 @@
 | 1.3.0 | 2026-10-26 | Bryan | Recorded Phase 2 usage of the existing `user_style_profile` and `user_memory_control` tables by the implemented governance service. No schema changes; migrations remain V1–V9. |
 | 1.4.0 | 2026-10-27 | Bryan | Recorded that chat context assembly reads the enabled style profile for advisory injection. No schema changes; migrations remain V1–V9. |
 | 1.5.0 | 2026-10-27 | Bryan | Reconciled Flyway V10: added `memory_extraction_job` and `user_memory_candidate`, their lifecycle constraints, indices, and asynchronous extraction flow. |
+| 1.6.0 | 2026-10-27 | Bryan | Recorded candidate review transitions (accept/reject) and pending-candidate cleanup on purge. No schema changes; migrations remain V1–V10. |
 
 ---
 
@@ -455,7 +456,7 @@ CREATE TABLE user_memory_control (
   * Purging memory increments `generation` under `SELECT ... FOR UPDATE` and deletes the profile row in the same transaction.
   * Background extraction jobs capture an immutable `expected_generation`; a commit is rejected if the current generation differs.
   * A control row is preserved even when the profile is deleted, so a delayed worker cannot resurrect purged preferences.
-  * **Implementation status (Phase 2):** The purge endpoint locks the control row with `SELECT ... FOR UPDATE`, increments `generation`, and clears the profile in the same transaction. Background extraction jobs capture `expected_generation` at scheduling time and abort with `SKIPPED` if it no longer matches at commit. See section 3.8 and [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+  * **Implementation status (Phase 2):** The purge endpoint locks the control row with `SELECT ... FOR UPDATE`, increments `generation`, clears the profile, and deletes `PENDING` staged candidates in the same transaction. Background extraction jobs capture `expected_generation` at scheduling time and abort with `SKIPPED` if it no longer matches at commit. See sections 3.8, 3.9, and [11-phase-2-checklist.md](./11-phase-2-checklist.md).
 
 ---
 
@@ -545,7 +546,7 @@ CREATE INDEX idx_memory_candidate_user_status
   * Only `INFERRED` preferences are staged. `EXPLICIT_DURABLE` and `EXPLICIT_CORRECTION` candidates are merged directly into the profile; `EPHEMERAL` candidates are discarded.
   * Repeated evidence for the same pending `(user_id, field, value)` increments `evidence_count` and refreshes `evidence` instead of creating duplicates.
   * `generation` records the generation observed at staging time; a later purge invalidates the staged evidence.
-  * The accept/reject transitions exist in the entity model, but no HTTP endpoint or Android UI exposes them yet.
+  * **Implementation status (Phase 2):** The transitions are exposed by `MemoryCandidateController`: `GET /api/v1/memory/candidates` lists `PENDING` candidates newest-first; `POST /api/v1/memory/candidates/{id}/accept` applies the value under the same control/profile locks used by governance, increments `version` only when the value changes, and marks the candidate `ACCEPTED`; `POST .../reject` marks it `REJECTED` and returns `204`. Unknown, foreign, or already-decided candidates return `404 resource_not_found`. Purge deletes `PENDING` candidates. The Android UI is not implemented yet.
 
 ---
 

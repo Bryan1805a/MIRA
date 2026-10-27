@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-SEC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.7.0 |
+| **Version** | 1.8.0 |
 | **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Security & Privacy Lead |
 | **Compliance Baseline** | OWASP Mobile & API Top 10, Data Minimization Standards |
@@ -25,6 +25,7 @@
 | 1.5.0 | 2026-10-26 | Bryan | Corrected the Android client status (Keystore/EncryptedSharedPreferences implemented), and reconciled Phase 2 memory controls: allow-list validation and generation-guarded purge implemented; extraction privacy audit pending. |
 | 1.6.0 | 2026-10-27 | Bryan | Documented advisory prompt injection: only allow-listed enum values are serialized, no free-form memory text is injected, and lookup failures never block chat. |
 | 1.7.0 | 2026-10-27 | Bryan | Documented extraction privacy guardrails: style-only prompt, untrusted-turn framing, allow-list/classification validation, evidence truncation, and enum-only staging. Audit test remains pending. |
+| 1.8.0 | 2026-10-27 | Bryan | Documented candidate-review privacy: evidence is a short owner-scoped quote, accept/reject is owner-scoped, and purge deletes pending candidates. |
 
 ---
 
@@ -183,7 +184,11 @@ flowchart LR
    * A profile with no specified values, a disabled profile, or a missing profile injects nothing.
    * Injection is advisory and explicitly subordinate to current user instructions.
    * A profile lookup failure never blocks the chat request.
-4. **Log Sanitization:**
+4. **Candidate Evidence:**
+   * Staged candidates store at most a 500-character user quote or paraphrase as evidence; raw prompts and full transcripts are not retained for this purpose.
+   * Candidate list/accept/reject is scoped to the authenticated owner; foreign or already-decided identifiers return a generic `404`.
+   * Purging memory deletes pending candidates, and accepted values become ordinary allow-listed profile entries.
+5. **Log Sanitization:**
    * Log formatters automatically mask Authorization headers, passwords, and prompt message bodies.
    * Internal diagnostics utilize unique request tracking UUIDs (`requestId`) via `RequestIdFilter` and MDC logging to trace errors across log streams without exposing user data. The `requestId` is returned in headers and in standard error responses.
 
@@ -206,4 +211,5 @@ flowchart LR
 | Memory allow-list validation and generation-guarded purge | Implemented (Backend) |
 | Advisory style-profile injection (allow-listed values only) | Implemented (Backend) |
 | Extraction privacy guardrails (style-only prompt, allow-list re-validation, evidence cap) | Implemented (Backend) |
+| Candidate review (owner-scoped list/accept/reject; purge cleanup) | Implemented (Backend) |
 | Memory extraction privacy audit tests | Phase 2 |

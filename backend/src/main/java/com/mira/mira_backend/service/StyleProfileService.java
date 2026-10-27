@@ -4,8 +4,11 @@ import com.mira.mira_backend.dto.MemorySettingsResponse;
 import com.mira.mira_backend.dto.StyleProfileResponse;
 import com.mira.mira_backend.entity.UserMemoryControl;
 import com.mira.mira_backend.entity.UserStyleProfile;
+import com.mira.mira_backend.entity.MemoryCandidateStatus;
+
 import com.mira.mira_backend.repository.UserMemoryControlRepository;
 import com.mira.mira_backend.repository.UserStyleProfileRepository;
+import com.mira.mira_backend.repository.UserMemoryCandidateRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,67 +22,61 @@ import java.util.Optional;
 
 @Service
 public class StyleProfileService {
+    private static final Map<String, Set<String>> ALLOWED_VALUES = Map.of(
+            "explanation_depth",
+            Set.of("concise", "balanced", "detailed"),
 
-    private static final Map<String, Set<String>> ALLOWED_VALUES =
-            Map.of(
-                    "explanation_depth",
-                    Set.of("concise", "balanced", "detailed"),
+            "tone",
+            Set.of(
+                    "conversational",
+                    "formal",
+                    "academic"),
 
-                    "tone",
-                    Set.of(
-                            "conversational",
-                            "formal",
-                            "academic"
-                    ),
+            "examples",
+            Set.of(
+                    "prefer_concrete_examples",
+                    "theory_first",
+                    "no_strong_preference"),
 
-                    "examples",
-                    Set.of(
-                            "prefer_concrete_examples",
-                            "theory_first",
-                            "no_strong_preference"
-                    ),
+            "formatting",
+            Set.of(
+                    "structured",
+                    "prose",
+                    "bulleted_lists",
+                    "no_strong_preference"),
 
-                    "formatting",
-                    Set.of(
-                            "structured",
-                            "prose",
-                            "bulleted_lists",
-                            "no_strong_preference"
-                    ),
-
-                    "teaching_sequence",
-                    Set.of(
-                            "principles_first",
-                            "code_first",
-                            "analogy_first",
-                            "no_strong_preference"
-                    )
-            );
+            "teaching_sequence",
+            Set.of(
+                    "principles_first",
+                    "code_first",
+                    "analogy_first",
+                    "no_strong_preference"));
 
     private final UserMemoryControlRepository controlRepository;
     private final UserStyleProfileRepository profileRepository;
+    private final UserMemoryCandidateRepository candidateRepository;
 
-   private static final List<String> PROFILE_FIELD_ORDER = List.of(
+    private static final List<String> PROFILE_FIELD_ORDER = List.of(
             "explanation_depth",
             "tone",
             "examples",
             "formatting",
-            "teaching_sequence"
-    );
+            "teaching_sequence");
 
-    private static final String STYLE_PROMPT_HEADER =
-            "User communication-style preferences. "
-                    + "These are advisory only. "
-                    + "Current explicit user instructions always take "
-                    + "precedence. Apply these preferences only when they "
-                    + "do not conflict with the current request:\n";
+    private static final String STYLE_PROMPT_HEADER = "User communication-style preferences. "
+            + "These are advisory only. "
+            + "Current explicit user instructions always take "
+            + "precedence. Apply these preferences only when they "
+            + "do not conflict with the current request:\n";
 
+    // Construction
     public StyleProfileService(
             UserMemoryControlRepository controlRepository,
-            UserStyleProfileRepository profileRepository
-    ) {
+            UserStyleProfileRepository profileRepository,
+            UserMemoryCandidateRepository candidateRepository) {
         this.controlRepository = controlRepository;
         this.profileRepository = profileRepository;
+        this.candidateRepository = candidateRepository;
     }
 
     @Transactional
@@ -98,25 +95,25 @@ public class StyleProfileService {
     }
 
     private String formatStylePrompt(Map<String, String> profile) {
-    StringBuilder builder = new StringBuilder();
+        StringBuilder builder = new StringBuilder();
 
         for (String field : PROFILE_FIELD_ORDER) {
-                String value = profile.get(field);
+            String value = profile.get(field);
 
-                if (value == null
-                        || "no_strong_preference".equals(value)) {
+            if (value == null
+                    || "no_strong_preference".equals(value)) {
                 continue;
-                }
+            }
 
-                if (builder.length() == 0) {
+            if (builder.length() == 0) {
                 builder.append(STYLE_PROMPT_HEADER);
-                }
+            }
 
-                builder.append("- ")
-                        .append(field)
-                        .append(": ")
-                        .append(value)
-                        .append('\n');
+            builder.append("- ")
+                    .append(field)
+                    .append(": ")
+                    .append(value)
+                    .append('\n');
         }
 
         return builder.toString().trim();
@@ -126,8 +123,7 @@ public class StyleProfileService {
     public StyleProfileResponse replace(
             UUID userId,
             int expectedVersion,
-            Map<String, String> profile
-    ) {
+            Map<String, String> profile) {
         Map<String, String> validated = validate(profile);
 
         LockedProfile locked = provisionAndLock(userId);
@@ -146,8 +142,7 @@ public class StyleProfileService {
     @Transactional
     public MemorySettingsResponse updateSettings(
             UUID userId,
-            boolean enabled
-    ) {
+            boolean enabled) {
         LockedProfile locked = provisionAndLock(userId);
         UserStyleProfile entity = locked.profile();
 
@@ -157,8 +152,7 @@ public class StyleProfileService {
         return new MemorySettingsResponse(
                 entity.isEnabled(),
                 entity.getVersion(),
-                entity.getUpdatedAt()
-        );
+                entity.getUpdatedAt());
     }
 
     @Transactional
@@ -172,6 +166,11 @@ public class StyleProfileService {
         UserStyleProfile profile = locked.profile();
         profile.purge();
         profileRepository.saveAndFlush(profile);
+
+        candidateRepository.deleteByUserIdAndStatus(
+                userId,
+                MemoryCandidateStatus.PENDING
+        );
     }
 
     private LockedProfile provisionAndLock(UUID userId) {
@@ -181,25 +180,21 @@ public class StyleProfileService {
         UserMemoryControl control = controlRepository
                 .findByIdForUpdate(userId)
                 .orElseThrow(() -> new IllegalStateException(
-                        "Memory control row was not created."
-                ));
+                        "Memory control row was not created."));
 
         UserStyleProfile profile = profileRepository
                 .findByIdForUpdate(userId)
                 .orElseThrow(() -> new IllegalStateException(
-                        "Style profile row was not created."
-                ));
+                        "Style profile row was not created."));
 
         return new LockedProfile(control, profile);
     }
 
     private Map<String, String> validate(
-            Map<String, String> input
-    ) {
+            Map<String, String> input) {
         if (input == null) {
             throw new InvalidRequestException(
-                    "profile must not be null."
-            );
+                    "profile must not be null.");
         }
 
         Map<String, String> validated = new LinkedHashMap<>();
@@ -212,14 +207,12 @@ public class StyleProfileService {
 
             if (allowed == null) {
                 throw new InvalidRequestException(
-                        "Unsupported profile field: " + field
-                );
+                        "Unsupported profile field: " + field);
             }
 
             if (value == null || !allowed.contains(value)) {
                 throw new InvalidRequestException(
-                        "Invalid value for profile field: " + field
-                );
+                        "Invalid value for profile field: " + field);
             }
 
             validated.put(field, value);
@@ -229,9 +222,8 @@ public class StyleProfileService {
     }
 
     public static boolean isAllowedProfileValue(
-        String field,
-        String value
-    ) {
+            String field,
+            String value) {
         if (field == null || value == null) {
             return false;
         }
@@ -246,13 +238,11 @@ public class StyleProfileService {
                 profile.isEnabled(),
                 profile.getVersion(),
                 profile.getProfile(),
-                profile.getUpdatedAt()
-        );
+                profile.getUpdatedAt());
     }
 
     private record LockedProfile(
             UserMemoryControl control,
-            UserStyleProfile profile
-    ) {
+            UserStyleProfile profile) {
     }
 }

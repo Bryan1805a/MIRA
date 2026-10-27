@@ -11,6 +11,7 @@ import com.mira.mira_backend.service.InvalidRequestException;
 import com.mira.mira_backend.service.IdempotencyConflictException;
 import com.mira.mira_backend.service.RateLimitExceededException;
 import com.mira.mira_backend.service.VersionConflictException;
+import com.mira.mira_backend.service.MemoryCandidateNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -252,6 +253,19 @@ public class ApiExceptionHandler {
                                         + exception.currentVersion()
                         )
                 )
+        );
+    }
+
+    @ExceptionHandler(MemoryCandidateNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleCandidateNotFound(
+            MemoryCandidateNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                request,
+                HttpStatus.NOT_FOUND,
+                "resource_not_found",
+                "The requested resource was not found."
         );
     }
 

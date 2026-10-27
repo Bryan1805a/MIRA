@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.5.0 |
-| **Last Updated** | 2026-10-26 |
+| **Version** | 1.7.0 |
+| **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
 | **Data Format** | JSON (UTF-8 Encoded) |
@@ -24,6 +24,8 @@
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled Android client authentication implementation (screens, TokenStore, auto-refresh authenticator) and DeepSeekAIProvider backend implementation. |
 | 1.4.0 | 2026-10-25 | Bryan | Reconciled Android client conversation & chat endpoint integration, and marked `rate_limited` error code as Implemented (sliding window limit on message send/retry). |
 | 1.5.0 | 2026-10-26 | Bryan | Corrected stale Android status (conversation and chat screens delivered), marked style-memory governance endpoints and `version_conflict` as Implemented (Backend), and clarified that provider failures are represented by response status rather than 502/504 responses. |
+| 1.6.0 | 2026-10-27 | Bryan | Noted implemented advisory style-profile injection during message send: enabled profiles add a system message, while disabled, empty, or all-unspecified profiles add none. No endpoint shape changes. |
+| 1.7.0 | 2026-10-27 | Bryan | Recorded the internal asynchronous extraction pipeline. No new public endpoints; staged inferred candidates are not yet exposed for confirmation. |
 
 ---
 
@@ -53,9 +55,9 @@
 | Standard error envelope | **Implemented (Backend & Android)** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler`/`RequestIdFilter` and mapped via `ApiError` in Android. |
 | Conversation endpoints | **Implemented (Backend & Android)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation; Android `ConversationsActivity` delivered. |
 | Message send/list and retry | **Implemented (Backend & Android)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, bounded retries, and Android `ChatActivity` delivered. |
-| Style-memory governance (read/replace/toggle/purge) | **Implemented (Backend)** | Allow-list validation, OCC `version`, and generation-guarded purge are live and covered by tests. Extraction and Android memory UI remain Phase 2. |
+| Style-memory governance (read/replace/toggle/purge) | **Implemented (Backend)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, and the internal extraction pipeline are live and covered by tests. Candidate confirmation and the Android memory UI remain Phase 2. |
 
-Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; the remaining Phase 2 work is the extraction pipeline, prompt injection, and the Android memory UI.
+Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; the remaining Phase 2 work is candidate confirmation (accept/reject), the Android memory UI, and the concurrency/privacy suites.
 
 ---
 
@@ -318,6 +320,7 @@ Endpoints marked Implemented are live and covered by automated test suites. Phas
 }
 ```
 * `assistantResponse.id` is the logical `ai_response` UUID used by the retry endpoint. Its `content` is read from the linked assistant `message` row; `ai_response` itself stores no content.
+* When memory is enabled and the stored profile contains at least one specified preference, the provider context includes an advisory system message derived from the profile. The request and response payloads are unchanged, and current user instructions take precedence.
 
 #### Error & Timeout Response (`200 OK` with `UNKNOWN`)
 If an upstream AI provider times out after the user message has been safely persisted:
@@ -370,7 +373,7 @@ If an upstream AI provider times out after the user message has been safely pers
 
 ## 5. Communication-Style Memory Endpoints
 
-> **Delivery status:** Backend governance is implemented. `GET`, `PUT`, `PATCH /settings`, and `DELETE /api/v1/memory/style` are live, including first-read provisioning, allow-list validation, OCC version checks, and generation-guarded purge. The extraction pipeline (eligibility gate, hybrid persistence, background workers), prompt injection, and the Android memory UI remain Phase 2 work.
+> **Delivery status:** Backend governance, advisory injection, and the internal extraction pipeline are implemented. `GET`, `PUT`, `PATCH /settings`, and `DELETE /api/v1/memory/style` are live, including first-read provisioning, allow-list validation, OCC version checks, and generation-guarded purge. During message send, an enabled profile is serialized into an advisory system message; disabled, empty, or all-unspecified profiles add none. After a `COMPLETED` response, an asynchronous job extracts candidates and applies the hybrid policy. Staged inferred candidates are not yet exposed through an HTTP endpoint; the candidate-confirmation API and Android memory UI remain Phase 2 work.
 
 ### 5.1 Read Style Profile
 * **Endpoint:** `GET /api/v1/memory/style`

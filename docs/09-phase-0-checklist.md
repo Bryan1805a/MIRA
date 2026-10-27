@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-10-26 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 0 — Reproducible Project Foundation (complete; Android APK verification carried into Phase 1) |
 
@@ -20,6 +20,7 @@
 | 1.0.0 | 2026-10-11 | Bryan | Enterprise standardization: integrated visual Mermaid execution roadmap, concrete skeleton milestones, Flyway setup, and exit gating criteria. |
 | 1.1.0 | 2026-10-21 | Bryan | Marked Phase 0 complete, reconciled the actual stack (Java 21, Spring Boot 4.1.x), package layout, dependency list, migration range, and verified exit criteria. |
 | 1.2.0 | 2026-10-26 | Bryan | Corrected the migration baseline references from V1–V8 to V1–V9 and noted Phase 1 closure. |
+| 1.3.0 | 2026-10-27 | Bryan | Updated the baseline to V1–V10 after the Phase 2 extraction migration. |
 
 ---
 
@@ -92,7 +93,7 @@ mira/
 │   │   │   │   └── service/
 │   │   │   └── resources/
 │   │   │       ├── application.properties
-│   │   │       └── db/migration/   # Flyway SQL migrations (V1–V9)
+│   │   │       └── db/migration/   # Flyway SQL migrations (V1–V10)
 │   │   └── test/
 │   ├── pom.xml
 │   ├── mvnw
@@ -190,7 +191,7 @@ Before executing build commands, ensure the following local prerequisites are co
 - [x] Backend compiles and runs unit + Testcontainers integration tests. The latest local reports show 27 tests passing (21 integration, 5 token-service unit, 1 JWT configuration).
 - [x] Backend exposes `/actuator/health` and permits it without authentication.
 - [x] Android application compiles and builds a debug APK via `.\gradlew.bat assembleDebug`. **Carry-over to Phase 1:** no debug APK artifact is present in the repository evidence, so the build must be re-run and verified.
-- [x] PostgreSQL connectivity and Flyway migration execution are verified by the Testcontainers suite applying `V1`–`V9` from a clean database.
+- [x] PostgreSQL connectivity and Flyway migration execution are verified by the Testcontainers suite applying `V1`–`V10` from a clean database.
 - [x] All architectural decision records (`ADR-001`, `ADR-002`, `ADR-003`) are authored and approved.
 - [x] Root `README.md` documents prerequisites, environment variables, build, test, and run commands for both applications.
 

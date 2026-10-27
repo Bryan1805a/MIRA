@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.6.0 |
-| **Last Updated** | 2026-10-26 |
+| **Version** | 1.8.0 |
+| **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
 
@@ -24,6 +24,8 @@
 | 1.4.0 | 2026-10-25 | Bryan | Reconciled test inventory to 63 passing tests (adding MessageRateLimiterTests and rate-limiting integration test) and verified Android conversation and chat unit tests. |
 | 1.5.0 | 2026-10-25 | Bryan | Documented GitHub Actions CI pipelines (`backend.yml` and `android.yml`) and Android lint verification (`lintDebug`). |
 | 1.6.0 | 2026-10-26 | Bryan | Reconciled Phase 1 closure and Phase 2 backend delivery: 68 passing tests including style-memory provisioning, OCC conflict, allow-list rejection, toggle, and purge/generation coverage. |
+| 1.7.0 | 2026-10-27 | Bryan | Reconciled advisory prompt injection: added four context-assembly tests (enabled, disabled, empty, all-unspecified) and updated the inventory to 72 passing tests. |
+| 1.8.0 | 2026-10-27 | Bryan | Reconciled the extraction pipeline: seven new tests for scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, and malformed output; inventory now 79 tests. |
 
 ---
 
@@ -71,7 +73,7 @@ flowchart TD
 ### 3.2 Database Integration Testing (Testcontainers)
 * **Framework:** Spring Boot Test (`@DataJpaTest`), Testcontainers PostgreSQL.
 * **Verification Scope:**
-  * **Flyway Migrations:** Verify that all versioned migrations (`V1` through `V9`) execute successfully from a clean database. The current suite uses `postgres:18-alpine` through Testcontainers.
+  * **Flyway Migrations:** Verify that all versioned migrations (`V1` through `V10`) execute successfully from a clean database. The current suite uses `postgres:18-alpine` through Testcontainers.
   * **Relational Constraints:** Verify that deleting a `user_account` cascades to `conversation` and `message` records, but leaves unrelated data intact.
   * **Optimistic Concurrency Control (OCC):** Verify that concurrent `UPDATE user_style_profile` operations with identical `expectedVersion` integers permit only one update and trigger a version conflict on the second.
   * **Idempotency Uniqueness:** Verify that inserting duplicate `(conversation_id, idempotency_key)` tuples violates database unique constraints.
@@ -107,18 +109,18 @@ flowchart LR
 
 The `MockAIProvider` enables deterministic simulation of complex edge cases without spending API credits or encountering live network flakiness.
 
-### 3.5 Current Test Inventory (2026-10-26)
+### 3.5 Current Test Inventory (2026-10-27)
 
 | Suite | Type | Tests | Scope |
 | :--- | :--- | :--- | :--- |
-| `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 47 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, per-account rate limiting (`429 rate_limited`), cross-account isolation, and style-memory governance (first-read provisioning, OCC conflict, allow-list rejection, settings toggle, purge/generation increment). |
+| `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 58 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, per-account rate limiting (`429 rate_limited`), cross-account isolation, style-memory governance (first-read provisioning, OCC conflict, allow-list rejection, settings toggle, purge/generation increment), prompt injection (enabled, disabled, empty, all-unspecified), and extraction (scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, malformed output). |
 | `MessageRateLimiterTests` | Unit | 4 | In-memory sliding-window rate limiter accounting, quota enforcement (10 req/min), multi-user isolation, and window expiration. |
 | `DeepSeekAIProviderTests` | Unit + MockRestServiceServer | 6 | OpenAI-compatible request serialization, Bearer authorization, response parsing, and HTTP status/error mapping (timeout, 429 rate limit, 5xx unavailable, 4xx provider error, invalid/blank output). |
 | `MockAIProviderTests` | Unit | 5 | Deterministic simulation of instant success, timeout, HTTP 429 rate limiting, HTTP 5xx error, and malformed response scenarios. |
 | `TokenServiceTests` | Unit | 5 | JWT claims and expiry, refresh-token uniqueness/URL safety, deterministic SHA-256 hashing. |
 | `JwtConfigurationTests` | Unit | 1 | Secret validation and decoder configuration. |
 
-The suite (68 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V9`. No test contacts DeepSeek. The classes should be split by domain as the Phase 2 surface grows; the current consolidated class is a baseline, not the target structure.
+The suite (79 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler is disabled in the test profile and the worker is invoked directly with a scripted mock response. The classes should be split by domain as the Phase 2 surface grows; the current consolidated class is a baseline, not the target structure.
 
 ---
 
@@ -136,6 +138,17 @@ The suite (68 tests total) runs against a real PostgreSQL container (`postgres:1
 | **Memory Governance** | OCC conflict | Second `PUT` reusing an already-consumed `expectedVersion`. | `409 version_conflict` with `details` naming `expectedVersion`. | Implemented (Backend) |
 | **Memory Governance** | Toggle settings | `PATCH /memory/style/settings` with `enabled=false` then `true`. | Flag flips and `version` increments on each mutation. | Implemented (Backend) |
 | **Memory Governance** | Purge & generation | `DELETE /memory/style` after establishing a profile. | Profile becomes empty, `generation` increments by one, `version` increments. | Implemented (Backend) |
+| **Memory Injection** | Enabled profile injected | Established, enabled profile with specified fields; send a message. | Provider request includes an advisory system message containing the specified fields; the user message remains the last message. | Implemented (Backend) |
+| **Memory Injection** | Disabled profile omitted | Toggle `enabled=false`; send a message. | Provider request contains no communication-style system message. | Implemented (Backend) |
+| **Memory Injection** | Empty / unspecified profile omitted | No stored profile, or only `no_strong_preference` values. | Provider request contains no communication-style system message. | Implemented (Backend) |
+| **Memory Injection** | Lookup failure is non-fatal | Simulate a profile lookup failure during assembly. | Chat proceeds without memory. | Unit coverage pending |
+| **Memory Extraction** | Schedule on completed response | Send a message that completes successfully. | One `PENDING` job with the current `expected_generation`/`expected_version`; attempts `0`. | Implemented (Backend) |
+| **Memory Extraction** | No job for timeout or disabled memory | Provider timeout, or `enabled=false` before send. | No extraction job row is created. | Implemented (Backend) |
+| **Memory Extraction** | Explicit durable merge | Worker returns `EXPLICIT_DURABLE` for `tone=formal`. | Job `COMPLETED`; profile `tone=formal`; version increments. | Implemented (Backend) |
+| **Memory Extraction** | Inferred staging | Worker returns `INFERRED`. | Job `COMPLETED`; profile unchanged; `user_memory_candidate` is `PENDING` with `evidence_count=1`. | Implemented (Backend) |
+| **Memory Extraction** | Stale generation skip | Purge memory after scheduling, then run the worker. | Job `SKIPPED`; purged profile remains empty. | Implemented (Backend) |
+| **Memory Extraction** | Malformed provider output | Provider returns non-JSON. | Job `FAILED` with `INVALID_OUTPUT`; profile unchanged. | Implemented (Backend) |
+| **Memory Extraction** | Concurrent claim / OCC race | Multiple workers or generations race to commit. | Exactly one commit wins; stale jobs skip. | Phase 2 (MEM-TEST suite) |
 | **Memory Gating** | Extraction from Incomplete Response | Response is `PENDING`, `FAILED`, or `UNKNOWN`. | Extraction service strictly skips task; zero memory updates committed. | Phase 2 |
 | **Memory Concurrency** | OCC Version Collision (concurrent) | Two threads attempt update with `expectedVersion: 4`. | Thread 1 succeeds (version becomes 5); Thread 2 receives `409 Conflict` (`version_conflict`). | Phase 2 (API-level conflict implemented; two-thread race suite pending) |
 | **Memory Deletion Race**| Background Extraction vs User Purge | Extraction task starts; User executes `DELETE /memory/style`; Extraction finishes. | Extraction task detects incremented `generation` counter and aborts; profile remains completely purged. | Phase 2 |

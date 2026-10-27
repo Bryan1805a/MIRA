@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DAT-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-26 |
+| **Version** | 1.5.0 |
+| **Last Updated** | 2026-10-27 |
 | **Author / Lead** | Bryan / MIRA Data Engineering Team |
 | **Database Engine** | PostgreSQL 15+ (Neon Managed Database; PostgreSQL 18 in Testcontainers) |
 | **Migration Tool** | Flyway |
@@ -22,6 +22,8 @@
 | 1.1.0 | 2026-10-21 | Bryan | Reconciled the documented schema with Flyway migrations V1–V8: refresh-token history, final `ai_response` shape, composite ownership FKs, and the separation of generation control from the style profile. |
 | 1.2.0 | 2026-10-23 | Bryan | Reconciled migration baseline with Flyway V1–V9, adding `idempotency_key` and unique partial index `uq_ai_attempt_idempotency` to `ai_processing_attempt`. |
 | 1.3.0 | 2026-10-26 | Bryan | Recorded Phase 2 usage of the existing `user_style_profile` and `user_memory_control` tables by the implemented governance service. No schema changes; migrations remain V1–V9. |
+| 1.4.0 | 2026-10-27 | Bryan | Recorded that chat context assembly reads the enabled style profile for advisory injection. No schema changes; migrations remain V1–V9. |
+| 1.5.0 | 2026-10-27 | Bryan | Reconciled Flyway V10: added `memory_extraction_job` and `user_memory_candidate`, their lifecycle constraints, indices, and asynchronous extraction flow. |
 
 ---
 
@@ -33,7 +35,7 @@
 4. **Decoupled Memory Life Cycle:** Deleting a conversation cascades to its messages and AI response records, but **never** deletes the user's communication-style profile. Memory profile deletion must execute via an explicit, dedicated user action.
 5. **Concurrency-Safe Mutations:** Concurrent style-memory extractions and client edits are governed by Optimistic Concurrency Control (OCC) using an incremental `version`, while a durable `generation` counter in `user_memory_control` prevents deleted profiles from being resurrected.
 6. **Token Auditability:** Only SHA-256 hashes of refresh tokens are stored. The session row holds the current hash; `refresh_token_history` preserves every issued hash and its consumption time for replay detection.
-7. **Migrations Are Authoritative:** The DDL below reflects the consolidated state after Flyway migrations `V1`–`V9`. If this document and a migration disagree, the migration is the source of truth and this document must be corrected.
+7. **Migrations Are Authoritative:** The DDL below reflects the consolidated state after Flyway migrations `V1`–`V10`. If this document and a migration disagree, the migration is the source of truth and this document must be corrected.
 
 ---
 
@@ -49,6 +51,9 @@ erDiagram
     CONVERSATION ||--o{ MESSAGE : "contains"
     CONVERSATION ||--o{ AI_RESPONSE : "coordinates"
     AI_RESPONSE ||--o{ AI_PROCESSING_ATTEMPT : "tracks"
+    AI_RESPONSE ||--o| MEMORY_EXTRACTION_JOB : "triggers"
+    USER_ACCOUNT ||--o{ MEMORY_EXTRACTION_JOB : "schedules"
+    USER_ACCOUNT ||--o{ USER_MEMORY_CANDIDATE : "stages"
 
     USER_ACCOUNT {
         uuid id PK
@@ -128,6 +133,35 @@ erDiagram
     USER_MEMORY_CONTROL {
         uuid user_id PK, FK
         integer generation "Tombstone protection counter"
+        timestamptz updated_at
+    }
+
+    MEMORY_EXTRACTION_JOB {
+        uuid id PK
+        uuid user_id FK
+        uuid conversation_id FK
+        uuid response_id FK, UK "One job per completed response"
+        integer expected_generation "Immutable generation snapshot"
+        integer expected_version "Immutable profile version snapshot"
+        varchar status "PENDING, PROCESSING, COMPLETED, SKIPPED, FAILED"
+        integer attempts
+        varchar error_category "Nullable"
+        timestamptz created_at
+        timestamptz started_at "Nullable"
+        timestamptz finished_at "Nullable"
+    }
+
+    USER_MEMORY_CANDIDATE {
+        uuid id PK
+        uuid user_id FK
+        varchar field "Allow-listed style field"
+        varchar value "Allow-listed enum value"
+        varchar classification "INFERRED, EXPLICIT_DURABLE, EXPLICIT_CORRECTION, EPHEMERAL"
+        text evidence "Short user quote/paraphrase"
+        integer evidence_count
+        varchar status "PENDING, ACCEPTED, REJECTED"
+        integer generation "Generation at staging time"
+        timestamptz created_at
         timestamptz updated_at
     }
 ```
@@ -398,7 +432,7 @@ CREATE TABLE user_style_profile (
   * OCC updates use `WHERE user_id = :userId AND version = :expectedVersion`; on match, `version` is incremented by 1.
   * The `profile` document must be a JSON object. Application-level validation restricts keys and enum values to the allow-list in [05-memory-lifecycle.md](./05-memory-lifecycle.md#31-allowed-fields--enum-values).
   * The profile table deliberately has **no** `generation` column. Generation state lives in `USER_MEMORY_CONTROL` so that it survives physical deletion of the profile row.
-  * **Implementation status (Phase 2):** `StyleProfileService` provisions a profile row on first access (`version = 1`, `enabled = true`, empty JSONB object), validates replacement payloads against the allow-list, and applies OCC updates via the version precondition. Reads and mutations are exposed through `/api/v1/memory/style`.
+  * **Implementation status (Phase 2):** `StyleProfileService` provisions a profile row on first access (`version = 1`, `enabled = true`, empty JSONB object), validates replacement payloads against the allow-list, and applies OCC updates via the version precondition. Reads and mutations are exposed through `/api/v1/memory/style`. Chat context assembly reads the enabled profile (without provisioning) and injects its allow-listed values as an advisory system message.
 
 ---
 
@@ -421,7 +455,97 @@ CREATE TABLE user_memory_control (
   * Purging memory increments `generation` under `SELECT ... FOR UPDATE` and deletes the profile row in the same transaction.
   * Background extraction jobs capture an immutable `expected_generation`; a commit is rejected if the current generation differs.
   * A control row is preserved even when the profile is deleted, so a delayed worker cannot resurrect purged preferences.
-  * **Implementation status (Phase 2):** The purge endpoint locks the control row with `SELECT ... FOR UPDATE`, increments `generation`, and clears the profile in the same transaction. Background extraction workers that capture `expected_generation` are not implemented yet; see [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+  * **Implementation status (Phase 2):** The purge endpoint locks the control row with `SELECT ... FOR UPDATE`, increments `generation`, and clears the profile in the same transaction. Background extraction jobs capture `expected_generation` at scheduling time and abort with `SKIPPED` if it no longer matches at commit. See section 3.8 and [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+
+---
+
+### 3.8 `MEMORY_EXTRACTION_JOB`
+Tracks one asynchronous extraction attempt per completed assistant response.
+
+```sql
+CREATE TABLE memory_extraction_job (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL
+        REFERENCES user_account(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL
+        REFERENCES conversation(id) ON DELETE CASCADE,
+    response_id UUID NOT NULL UNIQUE
+        REFERENCES ai_response(id) ON DELETE CASCADE,
+    expected_generation INTEGER NOT NULL,
+    expected_version INTEGER NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    error_category VARCHAR(50),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMPTZ,
+    finished_at TIMESTAMPTZ,
+
+    CONSTRAINT ck_memory_job_generation
+        CHECK (expected_generation >= 1),
+    CONSTRAINT ck_memory_job_version
+        CHECK (expected_version >= 1),
+    CONSTRAINT ck_memory_job_attempts
+        CHECK (attempts >= 0),
+    CONSTRAINT ck_memory_job_status
+        CHECK (status IN (
+            'PENDING', 'PROCESSING', 'COMPLETED', 'SKIPPED', 'FAILED'
+        ))
+);
+
+CREATE INDEX idx_memory_job_status_created
+    ON memory_extraction_job (status, created_at ASC);
+```
+* **Integrity Rules:**
+  * A job exists at most once per `ai_response` (`response_id` is unique), making scheduling idempotent.
+  * Jobs are created only after the response reaches `COMPLETED`; `PENDING`, `FAILED`, and `UNKNOWN` responses produce no job.
+  * `expected_generation` and `expected_version` are immutable snapshots captured at scheduling time.
+  * The worker claims `PENDING` jobs, moves them to `PROCESSING`, and finishes them as `COMPLETED`, `SKIPPED`, or `FAILED`.
+  * A generation mismatch, disabled memory, or version mismatch at commit moves the job to `SKIPPED` without touching the profile.
+
+---
+
+### 3.9 `USER_MEMORY_CANDIDATE`
+Stages inferred preferences for review and records accepted/rejected outcomes.
+
+```sql
+CREATE TABLE user_memory_candidate (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL
+        REFERENCES user_account(id) ON DELETE CASCADE,
+    field VARCHAR(50) NOT NULL,
+    value VARCHAR(50) NOT NULL,
+    classification VARCHAR(30) NOT NULL,
+    evidence TEXT,
+    evidence_count INTEGER NOT NULL DEFAULT 1,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    generation INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT ck_memory_candidate_classification
+        CHECK (classification IN (
+            'INFERRED', 'EXPLICIT_DURABLE', 'EXPLICIT_CORRECTION', 'EPHEMERAL'
+        )),
+    CONSTRAINT ck_memory_candidate_status
+        CHECK (status IN ('PENDING', 'ACCEPTED', 'REJECTED')),
+    CONSTRAINT ck_memory_candidate_evidence_count
+        CHECK (evidence_count >= 1),
+    CONSTRAINT ck_memory_candidate_generation
+        CHECK (generation >= 1)
+);
+
+CREATE UNIQUE INDEX uq_memory_candidate_pending
+    ON user_memory_candidate (user_id, field, value)
+    WHERE status = 'PENDING';
+
+CREATE INDEX idx_memory_candidate_user_status
+    ON user_memory_candidate (user_id, status, created_at DESC);
+```
+* **Integrity Rules:**
+  * Only `INFERRED` preferences are staged. `EXPLICIT_DURABLE` and `EXPLICIT_CORRECTION` candidates are merged directly into the profile; `EPHEMERAL` candidates are discarded.
+  * Repeated evidence for the same pending `(user_id, field, value)` increments `evidence_count` and refreshes `evidence` instead of creating duplicates.
+  * `generation` records the generation observed at staging time; a later purge invalidates the staged evidence.
+  * The accept/reject transitions exist in the entity model, but no HTTP endpoint or Android UI exposes them yet.
 
 ---
 
@@ -440,6 +564,7 @@ All physical schema definitions are maintained using **Flyway** under `backend/s
 | `V7__tighten_uniqueness_constraints.sql` | Make refresh-token hashes unique, make assistant-message links unique, and drop a duplicate attempt index. |
 | `V8__add_refresh_token_history.sql` | Create `refresh_token_history` and backfill existing session token hashes. |
 | `V9__add_attempt_idempotency.sql` | Add nullable `idempotency_key` column and partial unique index `uq_ai_attempt_idempotency` on `(response_id, idempotency_key)` to `ai_processing_attempt`. |
+| `V10__init_memory_extraction.sql` | Create `memory_extraction_job` (one row per completed response, status/attempt tracking) and `user_memory_candidate` (staged inferred preferences with evidence counts). |
 
 > [!NOTE]
 > Database migrations must be forward-compatible. Destructive migrations (e.g., dropping columns) must follow a multi-step expand-and-contract deployment pattern. The redundant `idx_user_session_token_hash` index from V2 is retained for now; dropping it is a non-destructive cleanup candidate for a future migration.

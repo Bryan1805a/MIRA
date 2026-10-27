@@ -15,11 +15,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import  java.util.UUID;
+import java.util.UUID;
 
 @Service
 public class AuthenticationService {
-
     private static final long REFRESH_TOKEN_DAYS = 30;
 
     private final UserAccountRepository userAccountRepository;
@@ -33,8 +32,7 @@ public class AuthenticationService {
             UserSessionRepository userSessionRepository,
             RefreshTokenHistoryRepository refreshTokenHistoryRepository,
             PasswordEncoder passwordEncoder,
-            TokenService tokenService
-    ) {
+            TokenService tokenService) {
         this.userAccountRepository = userAccountRepository;
         this.userSessionRepository = userSessionRepository;
         this.refreshTokenHistoryRepository = refreshTokenHistoryRepository;
@@ -61,8 +59,7 @@ public class AuthenticationService {
         // Check if password is invalid
         if (!passwordEncoder.matches(
                 rawPassword,
-                account.getPasswordHash()
-        )) {
+                account.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
 
@@ -80,16 +77,14 @@ public class AuthenticationService {
         UserSession session = new UserSession(
                 account,
                 refreshTokenHash,
-                refreshTokenExpiresAt
-        );
+                refreshTokenExpiresAt);
 
         UserSession savedSession = userSessionRepository.saveAndFlush(session);
 
         RefreshTokenHistory initialHistory = new RefreshTokenHistory(
                 savedSession,
                 refreshTokenHash,
-                Instant.now()
-        );
+                Instant.now());
 
         refreshTokenHistoryRepository.saveAndFlush(initialHistory);
 
@@ -100,8 +95,7 @@ public class AuthenticationService {
                 accessToken.value(),
                 accessToken.expiresAt(),
                 refreshToken,
-                refreshTokenExpiresAt
-        );
+                refreshTokenExpiresAt);
     }
 
     @Transactional
@@ -110,23 +104,22 @@ public class AuthenticationService {
         Objects.requireNonNull(userId, "userId must not be null");
         Objects.requireNonNull(
                 rawRefreshToken,
-                "rawRefreshToken must not be null"
-        );
-    
+                "rawRefreshToken must not be null");
+
         String refreshTokenHash = tokenService.hashRefreshToken(rawRefreshToken);
-    
+
         Optional<UserSession> lockedSession = userSessionRepository.findByRefreshTokenHashForUpdate(refreshTokenHash);
         // Check if lockedSession is empty
         if (lockedSession.isEmpty()) {
             return;
         }
-        
+
         // Get session from lockedSession
         UserSession session = lockedSession.get();
         if (!session.getUser().getId().equals(userId)) {
             return;
         }
-        
+
         // Revoke session and logout
         session.revoke(Instant.now());
     }
@@ -138,8 +131,7 @@ public class AuthenticationService {
             String accessToken,
             Instant accessTokenExpiresAt,
             String refreshToken,
-            Instant refreshTokenExpiresAt
-    ) {
+            Instant refreshTokenExpiresAt) {
         public LoginResult {
             Objects.requireNonNull(userId);
             Objects.requireNonNull(email);

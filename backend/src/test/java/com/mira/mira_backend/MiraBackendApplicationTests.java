@@ -29,6 +29,8 @@ import com.mira.mira_backend.service.DuplicateEmailException;
 import com.mira.mira_backend.service.InvalidRegistrationException;
 import com.mira.mira_backend.service.UserAccountService;
 import com.mira.mira_backend.service.MemoryExtractionWorker;
+import com.mira.mira_backend.service.MemoryExtractionService;
+import com.mira.mira_backend.service.StyleProfileService;
 
 import com.mira.mira_backend.ai.MockAIProvider;
 import com.mira.mira_backend.ai.AIMessage;
@@ -49,6 +51,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -57,9 +60,18 @@ import org.testcontainers.utility.DockerImageName;
 
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Instant;
+
 import java.util.UUID;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import java.time.Instant;
+
+import java.sql.Timestamp;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -138,6 +150,15 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private UserMemoryCandidateRepository userMemoryCandidateRepository;
+
+    @Autowired
+    private MemoryExtractionService memoryExtractionService;
+
+    @Autowired
+    private StyleProfileService styleProfileService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void resetMockProvider() {
@@ -2138,7 +2159,7 @@ class MiraBackendApplicationTests {
     }
 
     @Test
-    void malformedExtractionOutputFailsTheJob() throws Exception {
+    void malformedExtractionOutputRetriesAndThenFails() throws Exception {
         String email = "extract-invalid-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
@@ -2148,7 +2169,8 @@ class MiraBackendApplicationTests {
 
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Invalid extraction");
+                "Invalid extraction"
+        );
 
         mockAIProvider.setContent("Assistant reply");
 
@@ -2156,7 +2178,8 @@ class MiraBackendApplicationTests {
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                "extract-invalid-" + UUID.randomUUID());
+                "extract-invalid-" + UUID.randomUUID()
+        );
 
         UUID responseId = responseIdFrom(sendResult);
 
@@ -2168,12 +2191,32 @@ class MiraBackendApplicationTests {
 
         memoryExtractionWorker.processJob(job.getId());
 
-        MemoryExtractionJob failed = memoryExtractionJobRepository
+        MemoryExtractionJob firstAttempt = memoryExtractionJobRepository
                 .findById(job.getId())
                 .orElseThrow();
 
-        assertEquals(MemoryJobStatus.FAILED, failed.getStatus());
-        assertEquals("INVALID_OUTPUT", failed.getErrorCategory());
+        assertEquals(MemoryJobStatus.PENDING, firstAttempt.getStatus());
+        assertEquals(1, firstAttempt.getAttempts());
+        assertEquals("INVALID_OUTPUT", firstAttempt.getErrorCategory());
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        MemoryExtractionJob secondAttempt = memoryExtractionJobRepository
+                .findById(job.getId())
+                .orElseThrow();
+
+        assertEquals(MemoryJobStatus.PENDING, secondAttempt.getStatus());
+        assertEquals(2, secondAttempt.getAttempts());
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        MemoryExtractionJob thirdAttempt = memoryExtractionJobRepository
+                .findById(job.getId())
+                .orElseThrow();
+
+        assertEquals(MemoryJobStatus.FAILED, thirdAttempt.getStatus());
+        assertEquals(3, thirdAttempt.getAttempts());
+        assertEquals("INVALID_OUTPUT", thirdAttempt.getErrorCategory());
     }
 
     @Test
@@ -2430,6 +2473,406 @@ class MiraBackendApplicationTests {
                         .value("resource_not_found"));
     }
 
+    @Test
+    void queuedJobsAreSkippedAfterPurge() throws Exception {
+        String email = "mem-test-02-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Queued jobs"
+        );
+
+        mockAIProvider.setContent("Reply one");
+        MemoryExtractionJob first = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-02-a-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("Reply two");
+        MemoryExtractionJob second = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-02-b-" + UUID.randomUUID()
+        );
+
+        mockMvc.perform(delete("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(first.getId());
+        memoryExtractionWorker.processJob(second.getId());
+
+        assertEquals(MemoryJobStatus.SKIPPED, jobStatus(first.getId()));
+        assertEquals(MemoryJobStatus.SKIPPED, jobStatus(second.getId()));
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+
+    @Test
+    void extractionCommitIsSkippedWhenMemoryIsDisabled()
+            throws Exception {
+        String email = "mem-test-04-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Disabled commit"
+        );
+
+        mockAIProvider.setContent("Reply");
+        MemoryExtractionJob job = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-04-" + UUID.randomUUID()
+        );
+
+        mockMvc.perform(patch("/api/v1/memory/style/settings")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk());
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        assertEquals(MemoryJobStatus.SKIPPED, jobStatus(job.getId()));
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+
+    @Test
+    void newProfileCanBeBuiltAfterPurge() throws Exception {
+        String email = "mem-test-05-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Post-deletion profile"
+        );
+
+        mockAIProvider.setContent("Reply one");
+        MemoryExtractionJob staleJob = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-05-a-" + UUID.randomUUID()
+        );
+
+        mockMvc.perform(delete("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+
+        mockAIProvider.setContent("Reply two");
+        MemoryExtractionJob freshJob = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-05-b-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(freshJob.getId());
+        memoryExtractionWorker.processJob(staleJob.getId());
+
+        assertEquals(
+                MemoryJobStatus.COMPLETED,
+                jobStatus(freshJob.getId())
+        );
+        assertEquals(
+                MemoryJobStatus.SKIPPED,
+                jobStatus(staleJob.getId())
+        );
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(3))
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    }
+
+    @Test
+    void twoJobsWithTheSameVersionAllowOnlyOneCommit()
+            throws Exception {
+        String email = "mem-test-06-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "OCC collision"
+        );
+
+        mockAIProvider.setContent("Reply one");
+        MemoryExtractionJob first = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-06-a-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("Reply two");
+        MemoryExtractionJob second = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-06-b-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(first.getId());
+        memoryExtractionWorker.processJob(second.getId());
+
+        assertEquals(MemoryJobStatus.COMPLETED, jobStatus(first.getId()));
+        assertEquals(MemoryJobStatus.SKIPPED, jobStatus(second.getId()));
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    }
+
+    @Test
+    void staleProcessingJobIsRequeuedAfterRestart() throws Exception {
+        String email = "mem-test-07-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Restart recovery"
+        );
+
+        mockAIProvider.setContent("Reply");
+        MemoryExtractionJob job = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-07-" + UUID.randomUUID()
+        );
+
+        memoryExtractionService.claimJob(job.getId());
+
+        jdbcTemplate.update(
+                """
+                UPDATE memory_extraction_job
+                SET started_at = ?
+                WHERE id = ?
+                """,
+                Timestamp.from(Instant.now().minusSeconds(600)),
+                job.getId()
+        );
+
+        int requeued = memoryExtractionService.requeueStaleProcessing(
+                Instant.now().minusSeconds(300),
+                3
+        );
+
+        assertEquals(1, requeued);
+        assertEquals(MemoryJobStatus.PENDING, jobStatus(job.getId()));
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        assertEquals(MemoryJobStatus.COMPLETED, jobStatus(job.getId()));
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    }
+
+    @Test
+    void concurrentPurgeAndExtractionNeverResurrectsProfile()
+            throws Exception {
+        String email = "mem-test-03-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Concurrent purge"
+        );
+
+        mockAIProvider.setContent("Reply");
+        MemoryExtractionJob job = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-03-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        UUID userId = userIdFor(email);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        Future<?> purgeFuture = executor.submit(() -> {
+            start.await();
+            styleProfileService.purge(userId);
+            return null;
+        });
+
+        Future<?> extractionFuture = executor.submit(() -> {
+            start.await();
+            memoryExtractionWorker.processJob(job.getId());
+            return null;
+        });
+
+        start.countDown();
+
+        purgeFuture.get(20, TimeUnit.SECONDS);
+        extractionFuture.get(20, TimeUnit.SECONDS);
+
+        executor.shutdownNow();
+
+        MemoryJobStatus finalStatus = jobStatus(job.getId());
+
+        assertTrue(
+                finalStatus == MemoryJobStatus.COMPLETED
+                        || finalStatus == MemoryJobStatus.SKIPPED
+        );
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+
     private record LoginTokens(
             String accessToken,
             String refreshToken,
@@ -2517,5 +2960,39 @@ class MiraBackendApplicationTests {
         }
 
         return false;
+    }
+
+    private MemoryExtractionJob sendAndGetJob(
+            LoginTokens tokens,
+            UUID conversationId,
+            String content,
+            String idempotencyKey
+    ) throws Exception {
+        MvcResult result = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                content,
+                idempotencyKey
+        );
+
+        UUID responseId = responseIdFrom(result);
+
+        return memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+    }
+
+    private MemoryJobStatus jobStatus(UUID jobId) {
+        return memoryExtractionJobRepository
+                .findById(jobId)
+                .orElseThrow()
+                .getStatus();
+    }
+
+    private UUID userIdFor(String email) {
+        return userAccountRepository
+                .findByNormalizedEmail(email)
+                .orElseThrow()
+                .getId();
     }
 }

@@ -38,6 +38,7 @@ public class AuthController {
                 this.refreshTokenService = refreshTokenService;
     }
 
+    // Register endpoint
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> register(
             @Valid @RequestBody RegisterRequest request

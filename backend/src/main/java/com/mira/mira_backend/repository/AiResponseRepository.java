@@ -42,4 +42,15 @@ public interface AiResponseRepository
             @Param("userId") UUID userId,
             @Param("conversationId") UUID conversationId
     );
+
+    @Query("""
+        SELECT r
+        FROM AiResponse r
+        JOIN FETCH r.userMessage
+        JOIN FETCH r.assistantMessage
+        WHERE r.id = :responseId
+        """)
+    Optional<AiResponse> findWithMessages(
+            @Param("responseId") UUID responseId
+    );
 }

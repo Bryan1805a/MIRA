@@ -9,6 +9,11 @@ import com.mira.mira_backend.entity.AiResponseStatus;
 import com.mira.mira_backend.entity.AttemptOutcome;
 import com.mira.mira_backend.entity.Message;
 import com.mira.mira_backend.entity.MessageRole;
+import com.mira.mira_backend.entity.MemoryExtractionJob;
+import com.mira.mira_backend.entity.MemoryJobStatus;
+import com.mira.mira_backend.entity.MemoryCandidateStatus;
+import com.mira.mira_backend.entity.UserMemoryCandidate;
+import com.mira.mira_backend.entity.MemoryCandidateClassification;
 
 import com.mira.mira_backend.repository.AiProcessingAttemptRepository;
 import com.mira.mira_backend.repository.AiResponseRepository;
@@ -17,13 +22,20 @@ import com.mira.mira_backend.repository.ConversationRepository;
 import com.mira.mira_backend.repository.UserAccountRepository;
 import com.mira.mira_backend.repository.UserMemoryControlRepository;
 import com.mira.mira_backend.repository.UserSessionRepository;
+import com.mira.mira_backend.repository.MemoryExtractionJobRepository;
+import com.mira.mira_backend.repository.UserMemoryCandidateRepository;
 
 import com.mira.mira_backend.service.DuplicateEmailException;
 import com.mira.mira_backend.service.InvalidRegistrationException;
 import com.mira.mira_backend.service.UserAccountService;
+import com.mira.mira_backend.service.MemoryExtractionWorker;
+import com.mira.mira_backend.service.MemoryExtractionService;
+import com.mira.mira_backend.service.StyleProfileService;
 
 import com.mira.mira_backend.ai.MockAIProvider;
-
+import com.mira.mira_backend.ai.AIMessage;
+import com.mira.mira_backend.ai.AIRequest;
+import com.mira.mira_backend.ai.AIRole;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +51,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -47,9 +60,18 @@ import org.testcontainers.utility.DockerImageName;
 
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Instant;
+
 import java.util.UUID;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import java.time.Instant;
+
+import java.sql.Timestamp;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -69,12 +91,11 @@ class MiraBackendApplicationTests {
 
     @SuppressWarnings("resource")
     @Container
-    static final PostgreSQLContainer postgres =
-            new PostgreSQLContainer(
-                    DockerImageName.parse("postgres:18-alpine"))
-                    .withDatabaseName("mira_test")
-                    .withUsername("mira_test")
-                    .withPassword("mira_test");
+    static final PostgreSQLContainer postgres = new PostgreSQLContainer(
+            DockerImageName.parse("postgres:18-alpine"))
+            .withDatabaseName("mira_test")
+            .withUsername("mira_test")
+            .withPassword("mira_test");
 
     @DynamicPropertySource
     static void configureDatasource(DynamicPropertyRegistry registry) {
@@ -99,7 +120,7 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private MockMvc mockMvc;
-    
+
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -108,10 +129,10 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private MessageRepository messageRepository;
-    
+
     @Autowired
     private AiResponseRepository aiResponseRepository;
-    
+
     @Autowired
     private AiProcessingAttemptRepository aiProcessingAttemptRepository;
 
@@ -120,6 +141,24 @@ class MiraBackendApplicationTests {
 
     @Autowired
     private UserMemoryControlRepository memoryControlRepository;
+
+    @Autowired
+    private MemoryExtractionJobRepository memoryExtractionJobRepository;
+
+    @Autowired
+    private MemoryExtractionWorker memoryExtractionWorker;
+
+    @Autowired
+    private UserMemoryCandidateRepository userMemoryCandidateRepository;
+
+    @Autowired
+    private MemoryExtractionService memoryExtractionService;
+
+    @Autowired
+    private StyleProfileService styleProfileService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void resetMockProvider() {
@@ -139,12 +178,10 @@ class MiraBackendApplicationTests {
         String email = "Bryan" + suffix + "@example.com";
 
         UserAccount account = userAccountRepository.saveAndFlush(
-                new UserAccount(email, "test-password-hash")
-        );
+                new UserAccount(email, "test-password-hash"));
 
         var found = userAccountRepository.findByNormalizedEmail(
-                "  " + email.toUpperCase() + "  "
-        );
+                "  " + email.toUpperCase() + "  ");
 
         assertTrue(found.isPresent());
         assertEquals(account.getId(), found.get().getId());
@@ -156,22 +193,17 @@ class MiraBackendApplicationTests {
                 .replace("-", "");
 
         String email = "Bryan" + suffix + "@example.com";
-        String duplicateEmail =
-                "  BRYAN" + suffix.toUpperCase() + "@EXAMPLE.COM  ";
+        String duplicateEmail = "  BRYAN" + suffix.toUpperCase() + "@EXAMPLE.COM  ";
 
         userAccountRepository.saveAndFlush(
-                new UserAccount(email, "test-password-hash")
-        );
+                new UserAccount(email, "test-password-hash"));
 
         assertThrows(
                 DataIntegrityViolationException.class,
                 () -> userAccountRepository.saveAndFlush(
                         new UserAccount(
                                 duplicateEmail,
-                                "another-test-password-hash"
-                        )
-                )
-        );
+                                "another-test-password-hash")));
     }
 
     @Test
@@ -179,9 +211,7 @@ class MiraBackendApplicationTests {
         UserAccount account = userAccountRepository.saveAndFlush(
                 new UserAccount(
                         "session-" + UUID.randomUUID() + "@example.com",
-                        "test-password-hash"
-                )
-        );
+                        "test-password-hash"));
 
         String tokenHash = newTokenHash();
 
@@ -189,13 +219,10 @@ class MiraBackendApplicationTests {
                 new UserSession(
                         account,
                         tokenHash,
-                        Instant.now().plusSeconds(3600)
-                )
-        );
+                        Instant.now().plusSeconds(3600)));
 
         var found = userSessionRepository.findByRefreshTokenHash(
-                tokenHash
-        );
+                tokenHash);
 
         assertTrue(found.isPresent());
         assertEquals(session.getId(), found.get().getId());
@@ -207,23 +234,18 @@ class MiraBackendApplicationTests {
         UserAccount firstAccount = userAccountRepository.saveAndFlush(
                 new UserAccount(
                         "first-" + UUID.randomUUID() + "@example.com",
-                        "test-password-hash"
-                )
-        );
+                        "test-password-hash"));
 
         UserAccount secondAccount = userAccountRepository.saveAndFlush(
                 new UserAccount(
                         "second-" + UUID.randomUUID() + "@example.com",
-                        "test-password-hash"
-                )
-        );
+                        "test-password-hash"));
 
         String tokenHash = newTokenHash();
         Instant expiry = Instant.now().plusSeconds(3600);
 
         userSessionRepository.saveAndFlush(
-                new UserSession(firstAccount, tokenHash, expiry)
-        );
+                new UserSession(firstAccount, tokenHash, expiry));
 
         assertThrows(
                 DataIntegrityViolationException.class,
@@ -231,10 +253,7 @@ class MiraBackendApplicationTests {
                         new UserSession(
                                 secondAccount,
                                 tokenHash,
-                                expiry
-                        )
-                )
-        );
+                                expiry)));
     }
 
     @Test
@@ -242,123 +261,107 @@ class MiraBackendApplicationTests {
         String email = "  Bryan-" + UUID.randomUUID()
                 + "@Example.com  ";
         String password = "Correct-Horse-123!";
-    
-        UserAccount account =
-                userAccountService.register(email, password);
-    
+
+        UserAccount account = userAccountService.register(email, password);
+
         assertEquals(
                 email.trim().toLowerCase(java.util.Locale.ROOT),
-                account.getEmail()
-        );
-    
+                account.getEmail());
+
         assertNotEquals(password, account.getPasswordHash());
         assertTrue(passwordEncoder.matches(
                 password,
-                account.getPasswordHash()
-        ));
+                account.getPasswordHash()));
     }
-    
+
     @Test
     void registrationRejectsDuplicateNormalizedEmail() {
         String email = "Bryan-" + UUID.randomUUID() + "@example.com";
-    
+
         userAccountService.register(email, "Correct-Horse-123!");
-    
+
         assertThrows(
                 DuplicateEmailException.class,
                 () -> userAccountService.register(
                         "  " + email.toUpperCase() + "  ",
-                        "Another-Password-456!"
-                )
-        );
+                        "Another-Password-456!"));
     }
-    
+
     @Test
     void registrationRejectsInvalidEmailAndWeakPassword() {
         assertThrows(
                 InvalidRegistrationException.class,
                 () -> userAccountService.register(
                         "not-an-email",
-                        "Correct-Horse-123!"
-                )
-        );
-    
+                        "Correct-Horse-123!"));
+
         assertThrows(
                 InvalidRegistrationException.class,
                 () -> userAccountService.register(
                         "valid-" + UUID.randomUUID() + "@example.com",
-                        "short"
-                )
-        );
+                        "short"));
     }
-
 
     @Test
     void registrationEndpointReturnsCreatedAndDoesNotExposePasswordHash()
             throws Exception {
-            
+
         var request = new com.mira.mira_backend.dto.RegisterRequest(
                 "  Api-" + UUID.randomUUID() + "@Example.com  ",
-                "Correct-Horse-123!"
-        );
-    
+                "Correct-Horse-123!");
+
         mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNotEmpty())
                 .andExpect(jsonPath("$.email").value(
                         request.email().trim().toLowerCase(
-                                java.util.Locale.ROOT
-                        )
-                ))
+                                java.util.Locale.ROOT)))
                 .andExpect(jsonPath("$.createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist());
     }
-    
+
     @Test
     void registrationEndpointReturnsConflictForDuplicateEmail()
             throws Exception {
-            
+
         String email = "api-duplicate-" + UUID.randomUUID()
                 + "@example.com";
-    
+
         var firstRequest = new com.mira.mira_backend.dto.RegisterRequest(
                 email,
-                "Correct-Horse-123!"
-        );
-    
+                "Correct-Horse-123!");
+
         var duplicateRequest = new com.mira.mira_backend.dto.RegisterRequest(
                 "  " + email.toUpperCase() + "  ",
-                "Another-Password-456!"
-        );
-    
+                "Another-Password-456!");
+
         mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(firstRequest)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(firstRequest)))
                 .andExpect(status().isCreated());
-    
+
         mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(duplicateRequest)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(duplicateRequest)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error")
                         .value("email_already_registered"));
     }
-    
+
     @Test
     void registrationEndpointRejectsInvalidRequest()
             throws Exception {
-            
+
         var request = new com.mira.mira_backend.dto.RegisterRequest(
                 "not-an-email",
-                "short"
-        );
-    
+                "short");
+
         mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -374,62 +377,53 @@ class MiraBackendApplicationTests {
     void logoutRevokesOnlyThePresentedSession() throws Exception {
         String email = "logout-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens first = login(email, password);
         LoginTokens second = login(email, password);
-    
+
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .header(
-                                "Authorization",
-                                "Bearer " + first.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.LogoutRequest(
-                                        first.refreshToken()
-                                )
-                        )))
+                .header(
+                        "Authorization",
+                        "Bearer " + first.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.LogoutRequest(
+                                first.refreshToken()))))
                 .andExpect(status().isNoContent());
-    
+
         assertNotNull(
                 userSessionRepository.findById(first.sessionId())
                         .orElseThrow()
-                        .getRevokedAt()
-        );
-    
+                        .getRevokedAt());
+
         assertNull(
                 userSessionRepository.findById(second.sessionId())
                         .orElseThrow()
-                        .getRevokedAt()
-        );
-    
+                        .getRevokedAt());
+
         // The logged-out session's refresh token must no longer work.
         mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.RefreshRequest(
-                                        first.refreshToken()
-                                )
-                        )))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.RefreshRequest(
+                                first.refreshToken()))))
                 .andExpect(status().isUnauthorized());
-    
+
         // The other session must still work.
         mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.RefreshRequest(
-                                        second.refreshToken()
-                                )
-                        )))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.RefreshRequest(
+                                second.refreshToken()))))
                 .andExpect(status().isOk());
     }
 
     @Test
     void logoutRequiresAuthentication() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"refreshToken\":\"anything\"}"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"anything\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error")
                         .value("authentication_required"));
@@ -440,39 +434,33 @@ class MiraBackendApplicationTests {
         String password = "Correct-Horse-123!";
         String emailA = "logout-a-" + UUID.randomUUID() + "@example.com";
         String emailB = "logout-b-" + UUID.randomUUID() + "@example.com";
-    
+
         register(emailA, password);
         register(emailB, password);
-    
+
         LoginTokens a = login(emailA, password);
         LoginTokens b = login(emailB, password);
-    
+
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .header(
-                                "Authorization",
-                                "Bearer " + a.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.LogoutRequest(
-                                        b.refreshToken()
-                                )
-                        )))
+                .header(
+                        "Authorization",
+                        "Bearer " + a.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.LogoutRequest(
+                                b.refreshToken()))))
                 .andExpect(status().isNoContent());
-    
+
         assertNull(
                 userSessionRepository.findById(b.sessionId())
                         .orElseThrow()
-                        .getRevokedAt()
-        );
-    
+                        .getRevokedAt());
+
         mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.RefreshRequest(
-                                        b.refreshToken()
-                                )
-                        )))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.RefreshRequest(
+                                b.refreshToken()))))
                 .andExpect(status().isOk());
     }
 
@@ -480,17 +468,16 @@ class MiraBackendApplicationTests {
     void logoutRejectsBlankRefreshToken() throws Exception {
         String email = "logout-blank-"
                 + UUID.randomUUID() + "@example.com";
-    
+
         register(email, "Correct-Horse-123!");
         LoginTokens tokens = login(email, "Correct-Horse-123!");
-    
+
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"refreshToken\":\"\"}"))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -498,22 +485,19 @@ class MiraBackendApplicationTests {
     void logoutIsIdempotent() throws Exception {
         String email = "logout-idem-"
                 + UUID.randomUUID() + "@example.com";
-    
+
         register(email, "Correct-Horse-123!");
         LoginTokens tokens = login(email, "Correct-Horse-123!");
-    
+
         for (int i = 0; i < 2; i++) {
             mockMvc.perform(post("/api/v1/auth/logout")
-                            .header(
-                                    "Authorization",
-                                    "Bearer " + tokens.accessToken()
-                            )
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(
-                                    new com.mira.mira_backend.dto.LogoutRequest(
-                                            tokens.refreshToken()
-                                    )
-                            )))
+                    .header(
+                            "Authorization",
+                            "Bearer " + tokens.accessToken())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(
+                            new com.mira.mira_backend.dto.LogoutRequest(
+                                    tokens.refreshToken()))))
                     .andExpect(status().isNoContent());
         }
     }
@@ -522,15 +506,14 @@ class MiraBackendApplicationTests {
     void meReturnsAuthenticatedUsersProfile() throws Exception {
         String email = "me-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         mockMvc.perform(get("/api/v1/me")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").isNotEmpty())
                 .andExpect(jsonPath("$.email").value(email))
@@ -549,38 +532,29 @@ class MiraBackendApplicationTests {
     @Test
     void conversationCanBeFoundOnlyByItsOwner() {
         String suffix = UUID.randomUUID().toString();
-    
+
         UserAccount owner = userAccountRepository.saveAndFlush(
                 new UserAccount(
                         "conversation-owner-" + suffix + "@example.com",
-                        "test-password-hash"
-                )
-        );
-    
+                        "test-password-hash"));
+
         UserAccount otherUser = userAccountRepository.saveAndFlush(
                 new UserAccount(
                         "conversation-other-" + suffix + "@example.com",
-                        "test-password-hash"
-                )
-        );
-    
+                        "test-password-hash"));
+
         Conversation conversation = conversationRepository.saveAndFlush(
-                new Conversation(owner, "First conversation")
-        );
-    
+                new Conversation(owner, "First conversation"));
+
         assertTrue(
                 conversationRepository.findOwnedById(
                         conversation.getId(),
-                        owner.getId()
-                ).isPresent()
-        );
-    
+                        owner.getId()).isPresent());
+
         assertFalse(
                 conversationRepository.findOwnedById(
                         conversation.getId(),
-                        otherUser.getId()
-                ).isPresent()
-        );
+                        otherUser.getId()).isPresent());
     }
 
     @Test
@@ -590,49 +564,38 @@ class MiraBackendApplicationTests {
                 new UserAccount(
                         "conversation-page-" + UUID.randomUUID()
                                 + "@example.com",
-                        "test-password-hash"
-                )
-        );
-    
+                        "test-password-hash"));
+
         Conversation first = conversationRepository.saveAndFlush(
-                new Conversation(owner, "First")
-        );
-    
+                new Conversation(owner, "First"));
+
         Thread.sleep(5);
-    
+
         Conversation second = conversationRepository.saveAndFlush(
-                new Conversation(owner, "Second")
-        );
-    
+                new Conversation(owner, "Second"));
+
         Thread.sleep(5);
-    
+
         Conversation third = conversationRepository.saveAndFlush(
-                new Conversation(owner, "Third")
-        );
-    
-        List<Conversation> firstPage =
-                conversationRepository.findFirstPage(
-                        owner.getId(),
-                        PageRequest.of(0, 2)
-                );
-    
+                new Conversation(owner, "Third"));
+
+        List<Conversation> firstPage = conversationRepository.findFirstPage(
+                owner.getId(),
+                PageRequest.of(0, 2));
+
         assertEquals(
                 List.of(third.getId(), second.getId()),
-                firstPage.stream().map(Conversation::getId).toList()
-        );
-    
-        List<Conversation> secondPage =
-                conversationRepository.findPageAfter(
-                        owner.getId(),
-                        second.getUpdatedAt(),
-                        second.getId(),
-                        PageRequest.of(0, 2)
-                );
-    
+                firstPage.stream().map(Conversation::getId).toList());
+
+        List<Conversation> secondPage = conversationRepository.findPageAfter(
+                owner.getId(),
+                second.getUpdatedAt(),
+                second.getId(),
+                PageRequest.of(0, 2));
+
         assertEquals(
                 List.of(first.getId()),
-                secondPage.stream().map(Conversation::getId).toList()
-        );
+                secondPage.stream().map(Conversation::getId).toList());
     }
 
     @Test
@@ -644,28 +607,27 @@ class MiraBackendApplicationTests {
                         .value("authentication_required"))
                 .andExpect(jsonPath("$.requestId").isNotEmpty());
     }
-    
+
     @Test
     void suppliedRequestIdIsEchoed() throws Exception {
         String requestId = "test-request-123";
-    
+
         mockMvc.perform(get("/api/v1/me")
-                        .header("X-Request-Id", requestId))
+                .header("X-Request-Id", requestId))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("X-Request-Id", requestId))
                 .andExpect(jsonPath("$.requestId").value(requestId));
     }
-    
+
     @Test
     void validationErrorsIncludeFieldDetails() throws Exception {
         var request = new com.mira.mira_backend.dto.RegisterRequest(
                 "valid-" + UUID.randomUUID() + "@example.com",
-                "short"
-        );
-    
+                "short");
+
         mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"))
                 .andExpect(jsonPath("$.details[0].field").value("password"))
@@ -677,111 +639,99 @@ class MiraBackendApplicationTests {
         String email = "conversation-api-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "  Phase 1 conversation  "
-        );
-    
+                "  Phase 1 conversation  ");
+
         mockMvc.perform(get("/api/v1/conversations")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].id")
                         .value(conversationId.toString()))
                 .andExpect(jsonPath("$.items[0].title")
                         .value("Phase 1 conversation"));
-    
+
         mockMvc.perform(delete(
-                                "/api/v1/conversations/{id}",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                "/api/v1/conversations/{id}",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isNoContent());
-    
+
         mockMvc.perform(get("/api/v1/conversations")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isEmpty());
     }
-    
+
     @Test
     void conversationListPaginatesWithAnOpaqueCursor() throws Exception {
         String email = "conversation-page-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         UUID first = createConversation(tokens.accessToken(), "First");
         Thread.sleep(5);
         UUID second = createConversation(tokens.accessToken(), "Second");
         Thread.sleep(5);
         UUID third = createConversation(tokens.accessToken(), "Third");
-    
+
         MvcResult firstPageResult = mockMvc.perform(
-                        get("/api/v1/conversations")
-                                .param("limit", "2")
-                                .header(
-                                        "Authorization",
-                                        "Bearer " + tokens.accessToken()
-                                ))
+                get("/api/v1/conversations")
+                        .param("limit", "2")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2))
                 .andExpect(jsonPath("$.nextCursor").isNotEmpty())
                 .andReturn();
-    
+
         var firstPage = objectMapper.readTree(
-                firstPageResult.getResponse().getContentAsString()
-        );
-    
+                firstPageResult.getResponse().getContentAsString());
+
         String cursor = firstPage.get("nextCursor").stringValue();
-    
+
         MvcResult secondPageResult = mockMvc.perform(
-                        get("/api/v1/conversations")
-                                .param("limit", "2")
-                                .param("cursor", cursor)
-                                .header(
-                                        "Authorization",
-                                        "Bearer " + tokens.accessToken()
-                                ))
+                get("/api/v1/conversations")
+                        .param("limit", "2")
+                        .param("cursor", cursor)
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andReturn();
-    
+
         var secondPage = objectMapper.readTree(
-                secondPageResult.getResponse().getContentAsString()
-        );
-    
+                secondPageResult.getResponse().getContentAsString());
+
         var ids = new java.util.HashSet<String>();
-    
+
         firstPage.get("items").forEach(
-                item -> ids.add(item.get("id").stringValue())
-        );
+                item -> ids.add(item.get("id").stringValue()));
         secondPage.get("items").forEach(
-                item -> ids.add(item.get("id").stringValue())
-        );
-    
+                item -> ids.add(item.get("id").stringValue()));
+
         assertEquals(3, ids.size());
         assertTrue(ids.containsAll(java.util.List.of(
                 first.toString(),
                 second.toString(),
-                third.toString()
-        )));
+                third.toString())));
     }
-    
+
     @Test
     void userCannotDeleteAnotherUsersConversation() throws Exception {
         String password = "Correct-Horse-123!";
@@ -789,72 +739,65 @@ class MiraBackendApplicationTests {
                 + "@example.com";
         String emailB = "conversation-other-" + UUID.randomUUID()
                 + "@example.com";
-    
+
         register(emailA, password);
         register(emailB, password);
-    
+
         LoginTokens owner = login(emailA, password);
         LoginTokens other = login(emailB, password);
-    
+
         UUID conversationId = createConversation(
                 owner.accessToken(),
-                "Owner only"
-        );
-    
+                "Owner only");
+
         mockMvc.perform(delete(
-                                "/api/v1/conversations/{id}",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + other.accessToken()
-                        ))
+                "/api/v1/conversations/{id}",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + other.accessToken()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error")
                         .value("resource_not_found"));
-    
+
         mockMvc.perform(get("/api/v1/conversations")
-                        .header(
-                                "Authorization",
-                                "Bearer " + owner.accessToken()
-                        ))
+                .header(
+                        "Authorization",
+                        "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].id")
                         .value(conversationId.toString()));
     }
-    
+
     @Test
     void conversationListRejectsInvalidPaginationInput() throws Exception {
         String email = "conversation-invalid-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         mockMvc.perform(get("/api/v1/conversations")
-                        .param("limit", "51")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                .param("limit", "51")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
-    
+
         mockMvc.perform(get("/api/v1/conversations")
-                        .param("cursor", "not-a-cursor")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                .param("cursor", "not-a-cursor")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
-    
+
         mockMvc.perform(delete("/api/v1/conversations/not-a-uuid")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
     }
@@ -864,22 +807,17 @@ class MiraBackendApplicationTests {
         UserAccount user = userAccountRepository.saveAndFlush(
                 new UserAccount(
                         "message-" + UUID.randomUUID() + "@example.com",
-                        "test-password-hash"
-                )
-        );
-    
+                        "test-password-hash"));
+
         Conversation conversation = conversationRepository.saveAndFlush(
-                new Conversation(user, "Messaging")
-        );
-    
+                new Conversation(user, "Messaging"));
+
         Message userMessage = messageRepository.saveAndFlush(
                 new Message(
                         conversation,
                         MessageRole.USER,
-                        "Hello"
-                )
-        );
-    
+                        "Hello"));
+
         AiResponse response = aiResponseRepository.saveAndFlush(
                 new AiResponse(
                         user,
@@ -887,66 +825,54 @@ class MiraBackendApplicationTests {
                         userMessage,
                         "MESSAGE_SEND",
                         "idem-" + UUID.randomUUID(),
-                        "a".repeat(64)
-                )
-        );
-    
+                        "a".repeat(64)));
+
         assertEquals(AiResponseStatus.PENDING, response.getStatus());
-    
-        AiProcessingAttempt attempt =
-                aiProcessingAttemptRepository.saveAndFlush(
-                        new AiProcessingAttempt(response, 1)
-                );
-    
+
+        AiProcessingAttempt attempt = aiProcessingAttemptRepository.saveAndFlush(
+                new AiProcessingAttempt(response, 1));
+
         assertEquals(AttemptOutcome.IN_PROGRESS, attempt.getOutcome());
         assertNull(attempt.getFinishedAt());
-    
+
         Message assistantMessage = messageRepository.saveAndFlush(
                 new Message(
                         conversation,
                         MessageRole.ASSISTANT,
-                        "Hi there"
-                )
-        );
-    
+                        "Hi there"));
+
         response.markCompleted(assistantMessage);
         attempt.succeed();
-    
+
         aiResponseRepository.saveAndFlush(response);
         aiProcessingAttemptRepository.saveAndFlush(attempt);
-    
+
         assertEquals(AiResponseStatus.COMPLETED, response.getStatus());
         assertEquals(
                 assistantMessage.getId(),
-                response.getAssistantMessage().getId()
-        );
+                response.getAssistantMessage().getId());
         assertEquals(AttemptOutcome.SUCCESS, attempt.getOutcome());
         assertNotNull(attempt.getFinishedAt());
     }
-    
+
     @Test
     void aiResponseIdempotencyKeyIsUniquePerUserAndOperation() {
         UserAccount user = userAccountRepository.saveAndFlush(
                 new UserAccount(
                         "idempotency-" + UUID.randomUUID() + "@example.com",
-                        "test-password-hash"
-                )
-        );
-    
+                        "test-password-hash"));
+
         Conversation conversation = conversationRepository.saveAndFlush(
-                new Conversation(user, "Idempotency")
-        );
-    
+                new Conversation(user, "Idempotency"));
+
         Message firstMessage = messageRepository.saveAndFlush(
-                new Message(conversation, MessageRole.USER, "First")
-        );
-    
+                new Message(conversation, MessageRole.USER, "First"));
+
         Message secondMessage = messageRepository.saveAndFlush(
-                new Message(conversation, MessageRole.USER, "Second")
-        );
-    
+                new Message(conversation, MessageRole.USER, "Second"));
+
         String key = "idem-" + UUID.randomUUID();
-    
+
         aiResponseRepository.saveAndFlush(
                 new AiResponse(
                         user,
@@ -954,10 +880,8 @@ class MiraBackendApplicationTests {
                         firstMessage,
                         "MESSAGE_SEND",
                         key,
-                        "a".repeat(64)
-                )
-        );
-    
+                        "a".repeat(64)));
+
         assertThrows(
                 DataIntegrityViolationException.class,
                 () -> aiResponseRepository.saveAndFlush(
@@ -967,66 +891,55 @@ class MiraBackendApplicationTests {
                                 secondMessage,
                                 "MESSAGE_SEND",
                                 key,
-                                "b".repeat(64)
-                        )
-                )
-        );
+                                "b".repeat(64))));
     }
 
     @Test
     void sendMessagePersistsAndCompletesResponse() throws Exception {
         String email = "send-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Send test"
-        );
-    
+                "Send test");
+
         mockAIProvider.setContent("Hello from MIRA");
-    
+
         MvcResult result = sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                "send-" + UUID.randomUUID()
-        );
-    
+                "send-" + UUID.randomUUID());
+
         assertEquals(201, result.getResponse().getStatus());
-    
+
         var body = objectMapper.readTree(
-                result.getResponse().getContentAsString()
-        );
-    
+                result.getResponse().getContentAsString());
+
         assertEquals(
                 "COMPLETED",
                 body.get("assistantResponse")
                         .get("status")
-                        .stringValue()
-        );
+                        .stringValue());
         assertEquals(
                 "Hello from MIRA",
                 body.get("assistantResponse")
                         .get("content")
-                        .stringValue()
-        );
-    
+                        .stringValue());
+
         UUID responseId = UUID.fromString(
                 body.get("assistantResponse")
                         .get("id")
-                        .stringValue()
-        );
-    
+                        .stringValue());
+
         mockMvc.perform(get(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                "/api/v1/conversations/{id}/messages",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2))
                 .andExpect(jsonPath("$.items[0].role").value("USER"))
@@ -1039,209 +952,181 @@ class MiraBackendApplicationTests {
                 .andExpect(jsonPath("$.items[1].content")
                         .value("Hello from MIRA"));
     }
-    
+
     @Test
     void sendMessageIsIdempotentForTheSameKeyAndPayload() throws Exception {
         String email = "send-idem-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Idempotent send"
-        );
-    
+                "Idempotent send");
+
         String key = "send-" + UUID.randomUUID();
-    
+
         MvcResult first = sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                key
-        );
-    
+                key);
+
         MvcResult second = sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                key
-        );
-    
+                key);
+
         assertEquals(201, first.getResponse().getStatus());
         assertEquals(201, second.getResponse().getStatus());
-    
+
         var firstBody = objectMapper.readTree(
-                first.getResponse().getContentAsString()
-        );
+                first.getResponse().getContentAsString());
         var secondBody = objectMapper.readTree(
-                second.getResponse().getContentAsString()
-        );
-    
+                second.getResponse().getContentAsString());
+
         assertEquals(
                 firstBody.get("userMessage").get("id").stringValue(),
-                secondBody.get("userMessage").get("id").stringValue()
-        );
+                secondBody.get("userMessage").get("id").stringValue());
         assertEquals(
                 firstBody.get("assistantResponse").get("id").stringValue(),
-                secondBody.get("assistantResponse").get("id").stringValue()
-        );
-    
+                secondBody.get("assistantResponse").get("id").stringValue());
+
         mockMvc.perform(get(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                "/api/v1/conversations/{id}/messages",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2));
     }
-    
+
     @Test
     void sendMessageRejectsAReusedKeyWithDifferentContent() throws Exception {
         String email = "send-conflict-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Conflict test"
-        );
-    
+                "Conflict test");
+
         String key = "send-" + UUID.randomUUID();
-    
+
         sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "First content",
-                key
-        );
-    
+                key);
+
         mockMvc.perform(post(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .header("Idempotency-Key", key)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.SendMessageRequest(
-                                        "Different content"
-                                )
-                        )))
+                "/api/v1/conversations/{id}/messages",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.SendMessageRequest(
+                                "Different content"))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error")
                         .value("idempotency_conflict"));
     }
-    
+
     @Test
     void providerTimeoutIsPersistedAsUnknown() throws Exception {
         String email = "send-timeout-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Timeout test"
-        );
-    
+                "Timeout test");
+
         mockAIProvider.setScenario(MockAIProvider.Scenario.TIMEOUT);
-    
+
         MvcResult result = sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                "timeout-" + UUID.randomUUID()
-        );
-    
+                "timeout-" + UUID.randomUUID());
+
         assertEquals(200, result.getResponse().getStatus());
-    
+
         var body = objectMapper.readTree(
-                result.getResponse().getContentAsString()
-        );
-    
+                result.getResponse().getContentAsString());
+
         assertEquals(
                 "UNKNOWN",
                 body.get("assistantResponse")
                         .get("status")
-                        .stringValue()
-        );
-    
+                        .stringValue());
+
         mockMvc.perform(get(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                "/api/v1/conversations/{id}/messages",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].role").value("USER"))
                 .andExpect(jsonPath("$.items[0].response.status")
                         .value("UNKNOWN"));
     }
-    
+
     @Test
     void userCannotSendToAnotherUsersConversation() throws Exception {
         String password = "Correct-Horse-123!";
         String emailA = "send-owner-" + UUID.randomUUID() + "@example.com";
         String emailB = "send-other-" + UUID.randomUUID() + "@example.com";
-    
+
         register(emailA, password);
         register(emailB, password);
-    
+
         LoginTokens owner = login(emailA, password);
         LoginTokens other = login(emailB, password);
-    
+
         UUID conversationId = createConversation(
                 owner.accessToken(),
-                "Owner only"
-        );
-    
+                "Owner only");
+
         MvcResult result = sendMessage(
                 other.accessToken(),
                 conversationId,
                 "Intrusion attempt",
-                "send-" + UUID.randomUUID()
-        );
-    
+                "send-" + UUID.randomUUID());
+
         assertEquals(404, result.getResponse().getStatus());
     }
-    
+
     @Test
     void sendMessageRequiresAnIdempotencyKey() throws Exception {
         String email = "send-no-key-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "No key"
-        );
-    
+                "No key");
+
         mockMvc.perform(post(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.SendMessageRequest(
-                                        "Hello"
-                                )
-                        )))
+                "/api/v1/conversations/{id}/messages",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.SendMessageRequest(
+                                "Hello"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
     }
@@ -1250,70 +1135,61 @@ class MiraBackendApplicationTests {
     void retryCompletesAnUnknownResponse() throws Exception {
         String email = "retry-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Retry test"
-        );
-    
+                "Retry test");
+
         mockAIProvider.setScenario(MockAIProvider.Scenario.TIMEOUT);
-    
+
         MvcResult sendResult = sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                "send-" + UUID.randomUUID()
-        );
-    
+                "send-" + UUID.randomUUID());
+
         assertEquals(200, sendResult.getResponse().getStatus());
-    
+
         UUID responseId = responseIdFrom(sendResult);
-    
+
         mockAIProvider.setScenario(MockAIProvider.Scenario.SUCCESS);
         mockAIProvider.setContent("Recovered response");
-    
+
         MvcResult retryResult = retryResponse(
                 tokens.accessToken(),
                 conversationId,
                 responseId,
-                "retry-" + UUID.randomUUID()
-        );
-    
+                "retry-" + UUID.randomUUID());
+
         assertEquals(200, retryResult.getResponse().getStatus());
-    
+
         var body = objectMapper.readTree(
-                retryResult.getResponse().getContentAsString()
-        );
-    
+                retryResult.getResponse().getContentAsString());
+
         assertEquals(
                 responseId.toString(),
                 body.get("assistantResponse")
                         .get("id")
-                        .stringValue()
-        );
+                        .stringValue());
         assertEquals(
                 "COMPLETED",
                 body.get("assistantResponse")
                         .get("status")
-                        .stringValue()
-        );
+                        .stringValue());
         assertEquals(
                 "Recovered response",
                 body.get("assistantResponse")
                         .get("content")
-                        .stringValue()
-        );
-    
+                        .stringValue());
+
         mockMvc.perform(get(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                "/api/v1/conversations/{id}/messages",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2))
                 .andExpect(jsonPath("$.items[0].role").value("USER"))
@@ -1324,99 +1200,88 @@ class MiraBackendApplicationTests {
                 .andExpect(jsonPath("$.items[1].content")
                         .value("Recovered response"));
     }
-    
+
     @Test
     void retryWithTheSameKeyIsIdempotent() throws Exception {
         String email = "retry-idem-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Retry idempotency"
-        );
-    
+                "Retry idempotency");
+
         mockAIProvider.setScenario(MockAIProvider.Scenario.TIMEOUT);
-    
+
         MvcResult sendResult = sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                "send-" + UUID.randomUUID()
-        );
-    
+                "send-" + UUID.randomUUID());
+
         UUID responseId = responseIdFrom(sendResult);
-    
+
         mockAIProvider.setScenario(MockAIProvider.Scenario.SUCCESS);
         mockAIProvider.setContent("Only once");
-    
+
         String retryKey = "retry-" + UUID.randomUUID();
-    
+
         MvcResult first = retryResponse(
                 tokens.accessToken(),
                 conversationId,
                 responseId,
-                retryKey
-        );
-    
+                retryKey);
+
         MvcResult second = retryResponse(
                 tokens.accessToken(),
                 conversationId,
                 responseId,
-                retryKey
-        );
-    
+                retryKey);
+
         assertEquals(200, first.getResponse().getStatus());
         assertEquals(200, second.getResponse().getStatus());
-    
+
         var firstBody = objectMapper.readTree(
-                first.getResponse().getContentAsString()
-        );
+                first.getResponse().getContentAsString());
         var secondBody = objectMapper.readTree(
-                second.getResponse().getContentAsString()
-        );
-    
+                second.getResponse().getContentAsString());
+
         assertEquals(
                 firstBody.get("assistantResponse").get("id").stringValue(),
-                secondBody.get("assistantResponse").get("id").stringValue()
-        );
-    
+                secondBody.get("assistantResponse").get("id").stringValue());
+
         mockMvc.perform(get(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                "/api/v1/conversations/{id}/messages",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2));
     }
-    
+
     @Test
     void retryLimitIsEnforced() throws Exception {
         String email = "retry-limit-" + UUID.randomUUID() + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Retry limit"
-        );
-    
+                "Retry limit");
+
         mockAIProvider.setScenario(MockAIProvider.Scenario.TIMEOUT);
-    
+
         MvcResult sendResult = sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                "send-" + UUID.randomUUID()
-        );
-    
+                "send-" + UUID.randomUUID());
+
         UUID responseId = responseIdFrom(sendResult);
-    
+
         // Attempt 2
         assertEquals(
                 200,
@@ -1424,10 +1289,8 @@ class MiraBackendApplicationTests {
                         tokens.accessToken(),
                         conversationId,
                         responseId,
-                        "retry-2-" + UUID.randomUUID()
-                ).getResponse().getStatus()
-        );
-    
+                        "retry-2-" + UUID.randomUUID()).getResponse().getStatus());
+
         // Attempt 3
         assertEquals(
                 200,
@@ -1435,70 +1298,60 @@ class MiraBackendApplicationTests {
                         tokens.accessToken(),
                         conversationId,
                         responseId,
-                        "retry-3-" + UUID.randomUUID()
-                ).getResponse().getStatus()
-        );
-    
+                        "retry-3-" + UUID.randomUUID()).getResponse().getStatus());
+
         // Attempt 4 must be rejected
         mockMvc.perform(post(
-                                "/api/v1/conversations/{cid}/responses/{rid}/retry",
-                                conversationId,
-                                responseId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .header(
-                                "Idempotency-Key",
-                                "retry-4-" + UUID.randomUUID()
-                        ))
+                "/api/v1/conversations/{cid}/responses/{rid}/retry",
+                conversationId,
+                responseId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .header(
+                        "Idempotency-Key",
+                        "retry-4-" + UUID.randomUUID()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
     }
-    
+
     @Test
     void retryRejectsACompletedResponse() throws Exception {
         String email = "retry-completed-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Completed retry"
-        );
-    
+                "Completed retry");
+
         mockAIProvider.setScenario(MockAIProvider.Scenario.SUCCESS);
         mockAIProvider.setContent("Done");
-    
+
         MvcResult sendResult = sendMessage(
                 tokens.accessToken(),
                 conversationId,
                 "Hello",
-                "send-" + UUID.randomUUID()
-        );
-    
+                "send-" + UUID.randomUUID());
+
         UUID responseId = responseIdFrom(sendResult);
-    
+
         mockMvc.perform(post(
-                                "/api/v1/conversations/{cid}/responses/{rid}/retry",
-                                conversationId,
-                                responseId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .header(
-                                "Idempotency-Key",
-                                "retry-" + UUID.randomUUID()
-                        ))
+                "/api/v1/conversations/{cid}/responses/{rid}/retry",
+                conversationId,
+                responseId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .header(
+                        "Idempotency-Key",
+                        "retry-" + UUID.randomUUID()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
     }
-    
+
     @Test
     void userCannotRetryAnotherUsersResponse() throws Exception {
         String password = "Correct-Horse-123!";
@@ -1506,42 +1359,37 @@ class MiraBackendApplicationTests {
                 + "@example.com";
         String emailB = "retry-other-" + UUID.randomUUID()
                 + "@example.com";
-    
+
         register(emailA, password);
         register(emailB, password);
-    
+
         LoginTokens owner = login(emailA, password);
         LoginTokens other = login(emailB, password);
-    
+
         UUID conversationId = createConversation(
                 owner.accessToken(),
-                "Retry owner"
-        );
-    
+                "Retry owner");
+
         mockAIProvider.setScenario(MockAIProvider.Scenario.TIMEOUT);
-    
+
         MvcResult sendResult = sendMessage(
                 owner.accessToken(),
                 conversationId,
                 "Hello",
-                "send-" + UUID.randomUUID()
-        );
-    
+                "send-" + UUID.randomUUID());
+
         UUID responseId = responseIdFrom(sendResult);
-    
+
         mockMvc.perform(post(
-                                "/api/v1/conversations/{cid}/responses/{rid}/retry",
-                                conversationId,
-                                responseId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + other.accessToken()
-                        )
-                        .header(
-                                "Idempotency-Key",
-                                "retry-" + UUID.randomUUID()
-                        ))
+                "/api/v1/conversations/{cid}/responses/{rid}/retry",
+                conversationId,
+                responseId)
+                .header(
+                        "Authorization",
+                        "Bearer " + other.accessToken())
+                .header(
+                        "Idempotency-Key",
+                        "retry-" + UUID.randomUUID()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error")
                         .value("resource_not_found"));
@@ -1553,39 +1401,33 @@ class MiraBackendApplicationTests {
     }
 
     private void register(String email, String password) throws Exception {
-    mockMvc.perform(post("/api/v1/auth/register")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(
-                            new com.mira.mira_backend.dto.RegisterRequest(
-                                    email,
-                                    password
-                            )
-                    )))
-            .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.RegisterRequest(
+                                email,
+                                password))))
+                .andExpect(status().isCreated());
     }
-    
+
     private LoginTokens login(String email, String password)
             throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.LoginRequest(
-                                        email,
-                                        password
-                                )
-                        )))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.LoginRequest(
+                                email,
+                                password))))
                 .andExpect(status().isOk())
                 .andReturn();
-    
+
         var body = objectMapper.readTree(
-                result.getResponse().getContentAsString()
-        );
-    
+                result.getResponse().getContentAsString());
+
         return new LoginTokens(
                 body.get("accessToken").stringValue(),
                 body.get("refreshToken").stringValue(),
-                UUID.fromString(body.get("sessionId").stringValue())
-        );
+                UUID.fromString(body.get("sessionId").stringValue()));
     }
 
     @Test
@@ -1593,44 +1435,37 @@ class MiraBackendApplicationTests {
         String email = "rate-limit-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         UUID conversationId = createConversation(
                 tokens.accessToken(),
-                "Rate limit test"
-        );
-    
+                "Rate limit test");
+
         for (int index = 0; index < 10; index++) {
             MvcResult result = sendMessage(
                     tokens.accessToken(),
                     conversationId,
                     "Message " + index,
-                    "rate-" + index + "-" + UUID.randomUUID()
-            );
-    
+                    "rate-" + index + "-" + UUID.randomUUID());
+
             assertEquals(201, result.getResponse().getStatus());
         }
-    
+
         mockMvc.perform(post(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .header(
-                                "Idempotency-Key",
-                                "rate-final-" + UUID.randomUUID()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new com.mira.mira_backend.dto.SendMessageRequest(
-                                        "One too many"
-                                )
-                        )))
+                "/api/v1/conversations/{id}/messages",
+                conversationId)
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .header(
+                        "Idempotency-Key",
+                        "rate-final-" + UUID.randomUUID())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new com.mira.mira_backend.dto.SendMessageRequest(
+                                "One too many"))))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error").value("rate_limited"));
     }
@@ -1640,15 +1475,14 @@ class MiraBackendApplicationTests {
         String email = "memory-first-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         mockMvc.perform(get("/api/v1/memory/style")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.version").value(1))
@@ -1656,17 +1490,17 @@ class MiraBackendApplicationTests {
                 .andExpect(jsonPath("$.profile").isEmpty())
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty());
     }
-    
+
     @Test
     void styleProfileReplacementUsesOptimisticConcurrency()
             throws Exception {
         String email = "memory-occ-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         String update = """
                 {
                   "expectedVersion": 1,
@@ -1679,42 +1513,40 @@ class MiraBackendApplicationTests {
                   }
                 }
                 """;
-    
+
         mockMvc.perform(put("/api/v1/memory/style")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(update))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(update))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(2))
                 .andExpect(jsonPath("$.profile.explanation_depth")
                         .value("detailed"))
                 .andExpect(jsonPath("$.profile.tone").value("formal"));
-    
+
         mockMvc.perform(put("/api/v1/memory/style")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(update))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(update))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("version_conflict"))
                 .andExpect(jsonPath("$.details[0].field")
                         .value("expectedVersion"));
     }
-    
+
     @Test
     void invalidStyleProfileIsRejected() throws Exception {
         String email = "memory-invalid-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         String unknownField = """
                 {
                   "expectedVersion": 1,
@@ -1723,17 +1555,16 @@ class MiraBackendApplicationTests {
                   }
                 }
                 """;
-    
+
         mockMvc.perform(put("/api/v1/memory/style")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(unknownField))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(unknownField))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
-    
+
         String invalidValue = """
                 {
                   "expectedVersion": 1,
@@ -1742,59 +1573,56 @@ class MiraBackendApplicationTests {
                   }
                 }
                 """;
-    
+
         mockMvc.perform(put("/api/v1/memory/style")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(invalidValue))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(invalidValue))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_request"));
     }
-    
+
     @Test
     void memorySettingsCanBeToggled() throws Exception {
         String email = "memory-toggle-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         mockMvc.perform(patch("/api/v1/memory/style/settings")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"enabled\":false}"))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(false))
                 .andExpect(jsonPath("$.version").value(2));
-    
+
         mockMvc.perform(patch("/api/v1/memory/style/settings")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"enabled\":true}"))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.version").value(3));
     }
-    
+
     @Test
     void purgeClearsProfileAndIncrementsGeneration() throws Exception {
         String email = "memory-purge-" + UUID.randomUUID()
                 + "@example.com";
         String password = "Correct-Horse-123!";
-    
+
         register(email, password);
         LoginTokens tokens = login(email, password);
-    
+
         String update = """
                 {
                   "expectedVersion": 1,
@@ -1804,38 +1632,601 @@ class MiraBackendApplicationTests {
                   }
                 }
                 """;
-    
+
         mockMvc.perform(put("/api/v1/memory/style")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(update))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(update))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(2));
-    
+
         UUID userId = userAccountRepository
                 .findByNormalizedEmail(email)
                 .orElseThrow()
                 .getId();
-    
+
         int before = memoryControlRepository.findById(userId)
                 .orElseThrow()
                 .getGeneration();
-    
+
         mockMvc.perform(delete("/api/v1/memory/style")
-                        .header(
-                                "Authorization",
-                                "Bearer " + tokens.accessToken()
-                        ))
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
                 .andExpect(status().isNoContent());
-    
+
         int after = memoryControlRepository.findById(userId)
                 .orElseThrow()
                 .getGeneration();
-    
+
         assertEquals(before + 1, after);
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").isEmpty())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.version").value(3));
+    }
+
+    @Test
+    void enabledStyleProfileIsInjectedIntoChatContext() throws Exception {
+        String email = "memory-inject-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Memory injection");
+
+        mockMvc.perform(put("/api/v1/memory/style")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "expectedVersion": 1,
+                          "profile": {
+                            "explanation_depth": "detailed",
+                            "tone": "formal"
+                          }
+                        }
+                        """))
+                .andExpect(status().isOk());
+
+        mockAIProvider.setContent("Styled reply");
+
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "memory-send-" + UUID.randomUUID());
+
+        assertEquals(201, sendResult.getResponse().getStatus());
+
+        AIRequest request = mockAIProvider.lastRequest();
+
+        assertNotNull(request);
+        assertTrue(requestHasSystemContent(
+                request,
+                "communication-style preferences"));
+        assertTrue(requestHasSystemContent(
+                request,
+                "explanation_depth: detailed"));
+        assertTrue(requestHasSystemContent(
+                request,
+                "tone: formal"));
+
+        AIMessage lastMessage = request.messages()
+                .get(request.messages().size() - 1);
+
+        assertEquals(AIRole.USER, lastMessage.role());
+        assertEquals("Hello", lastMessage.content());
+    }
+
+    @Test
+    void disabledStyleProfileIsOmittedFromChatContext() throws Exception {
+        String email = "memory-disabled-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Memory disabled");
+
+        mockMvc.perform(put("/api/v1/memory/style")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "expectedVersion": 1,
+                          "profile": {
+                            "tone": "formal"
+                          }
+                        }
+                        """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/memory/style/settings")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false}"))
+                .andExpect(status().isOk());
+
+        mockAIProvider.setContent("Plain reply");
+
+        sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "memory-disabled-send-" + UUID.randomUUID());
+
+        AIRequest request = mockAIProvider.lastRequest();
+
+        assertNotNull(request);
+        assertFalse(requestHasSystemContent(
+                request,
+                "communication-style preferences"));
+    }
+
+    @Test
+    void emptyStyleProfileDoesNotInjectMemory() throws Exception {
+        String email = "memory-empty-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Memory empty");
+
+        mockAIProvider.setContent("Plain reply");
+
+        sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "memory-empty-send-" + UUID.randomUUID());
+
+        AIRequest request = mockAIProvider.lastRequest();
+
+        assertNotNull(request);
+        assertFalse(requestHasSystemContent(
+                request,
+                "communication-style preferences"));
+    }
+
+    @Test
+    void noStrongPreferenceOnlyProfileIsOmittedFromChatContext()
+            throws Exception {
+        String email = "memory-weak-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Memory weak");
+
+        mockMvc.perform(put("/api/v1/memory/style")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "expectedVersion": 1,
+                          "profile": {
+                            "examples": "no_strong_preference",
+                            "formatting": "no_strong_preference",
+                            "teaching_sequence": "no_strong_preference"
+                          }
+                        }
+                        """))
+                .andExpect(status().isOk());
+
+        mockAIProvider.setContent("Plain reply");
+
+        sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "memory-weak-send-" + UUID.randomUUID());
+
+        AIRequest request = mockAIProvider.lastRequest();
+
+        assertNotNull(request);
+        assertFalse(requestHasSystemContent(
+                request,
+                "communication-style preferences"));
+    }
+
+    @Test
+    void completedResponseSchedulesMemoryExtraction() throws Exception {
+        String email = "extraction-job-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Extraction job");
+
+        mockAIProvider.setContent("Completed reply");
+
+        MvcResult result = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "extraction-" + UUID.randomUUID());
+
+        assertEquals(201, result.getResponse().getStatus());
+
+        UUID responseId = responseIdFrom(result);
+
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+
+        assertEquals(MemoryJobStatus.PENDING, job.getStatus());
+        assertEquals(1, job.getExpectedGeneration());
+        assertEquals(1, job.getExpectedVersion());
+        assertEquals(0, job.getAttempts());
+    }
+
+    @Test
+    void timeoutResponseDoesNotScheduleMemoryExtraction()
+            throws Exception {
+        String email = "extraction-timeout-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "No extraction on timeout");
+
+        mockAIProvider.setScenario(MockAIProvider.Scenario.TIMEOUT);
+
+        MvcResult result = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "extraction-timeout-" + UUID.randomUUID());
+
+        assertEquals(200, result.getResponse().getStatus());
+
+        UUID responseId = responseIdFrom(result);
+
+        assertTrue(
+                memoryExtractionJobRepository
+                        .findByResponseId(responseId)
+                        .isEmpty());
+    }
+
+    @Test
+    void disabledMemoryDoesNotScheduleExtraction() throws Exception {
+        String email = "extraction-disabled-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Disabled extraction");
+
+        mockMvc.perform(patch("/api/v1/memory/style/settings")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false}"))
+                .andExpect(status().isOk());
+
+        mockAIProvider.setContent("Completed reply");
+
+        MvcResult result = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "extraction-disabled-" + UUID.randomUUID());
+
+        UUID responseId = responseIdFrom(result);
+
+        assertTrue(
+                memoryExtractionJobRepository
+                        .findByResponseId(responseId)
+                        .isEmpty());
+    }
+
+    @Test
+    void explicitDurableCandidateIsMergedIntoProfile() throws Exception {
+        String email = "extract-explicit-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Explicit extraction");
+
+        mockAIProvider.setContent("Assistant reply");
+
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Always use a formal tone.",
+                "extract-explicit-" + UUID.randomUUID());
+
+        UUID responseId = responseIdFrom(sendResult);
+
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+
+        mockAIProvider.setContent("""
+                {
+                  "candidates": [
+                    {
+                      "field": "tone",
+                      "value": "formal",
+                      "classification": "EXPLICIT_DURABLE",
+                      "evidence": "Always use a formal tone."
+                    }
+                  ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        MemoryExtractionJob completed = memoryExtractionJobRepository
+                .findById(job.getId())
+                .orElseThrow();
+
+        assertEquals(MemoryJobStatus.COMPLETED, completed.getStatus());
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    }
+
+    @Test
+    void inferredCandidateIsStagedWithoutChangingProfile()
+            throws Exception {
+        String email = "extract-inferred-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Inferred extraction");
+
+        mockAIProvider.setContent("Assistant reply");
+
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "I usually prefer academic explanations.",
+                "extract-inferred-" + UUID.randomUUID());
+
+        UUID responseId = responseIdFrom(sendResult);
+
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+
+        mockAIProvider.setContent("""
+                {
+                  "candidates": [
+                    {
+                      "field": "tone",
+                      "value": "academic",
+                      "classification": "INFERRED",
+                      "evidence": "I usually prefer academic explanations."
+                    }
+                  ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        assertEquals(
+                MemoryJobStatus.COMPLETED,
+                memoryExtractionJobRepository
+                        .findById(job.getId())
+                        .orElseThrow()
+                        .getStatus());
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.profile").isEmpty());
+
+        UUID userId = userAccountRepository
+                .findByNormalizedEmail(email)
+                .orElseThrow()
+                .getId();
+
+        UserMemoryCandidate candidate = userMemoryCandidateRepository
+                .findByUserIdAndFieldAndValueAndStatus(
+                        userId,
+                        "tone",
+                        "academic",
+                        MemoryCandidateStatus.PENDING)
+                .orElseThrow();
+
+        assertEquals(1, candidate.getEvidenceCount());
+    }
+
+    @Test
+    void staleGenerationSkipsExtraction() throws Exception {
+        String email = "extract-stale-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Stale extraction");
+
+        mockAIProvider.setContent("Assistant reply");
+
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Always use a formal tone.",
+                "extract-stale-" + UUID.randomUUID());
+
+        UUID responseId = responseIdFrom(sendResult);
+
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+
+        mockMvc.perform(delete("/api/v1/memory/style")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
+                .andExpect(status().isNoContent());
+
+        mockAIProvider.setContent("""
+                {
+                  "candidates": [
+                    {
+                      "field": "tone",
+                      "value": "formal",
+                      "classification": "EXPLICIT_DURABLE",
+                      "evidence": "Always use a formal tone."
+                    }
+                  ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        assertEquals(
+                MemoryJobStatus.SKIPPED,
+                memoryExtractionJobRepository
+                        .findById(job.getId())
+                        .orElseThrow()
+                        .getStatus());
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                .header(
+                        "Authorization",
+                        "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+
+    @Test
+    void malformedExtractionOutputRetriesAndThenFails() throws Exception {
+        String email = "extract-invalid-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Invalid extraction"
+        );
+
+        mockAIProvider.setContent("Assistant reply");
+
+        MvcResult sendResult = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                "Hello",
+                "extract-invalid-" + UUID.randomUUID()
+        );
+
+        UUID responseId = responseIdFrom(sendResult);
+
+        MemoryExtractionJob job = memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+
+        mockAIProvider.setContent("This is not JSON.");
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        MemoryExtractionJob firstAttempt = memoryExtractionJobRepository
+                .findById(job.getId())
+                .orElseThrow();
+
+        assertEquals(MemoryJobStatus.PENDING, firstAttempt.getStatus());
+        assertEquals(1, firstAttempt.getAttempts());
+        assertEquals("INVALID_OUTPUT", firstAttempt.getErrorCategory());
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        MemoryExtractionJob secondAttempt = memoryExtractionJobRepository
+                .findById(job.getId())
+                .orElseThrow();
+
+        assertEquals(MemoryJobStatus.PENDING, secondAttempt.getStatus());
+        assertEquals(2, secondAttempt.getAttempts());
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        MemoryExtractionJob thirdAttempt = memoryExtractionJobRepository
+                .findById(job.getId())
+                .orElseThrow();
+
+        assertEquals(MemoryJobStatus.FAILED, thirdAttempt.getStatus());
+        assertEquals(3, thirdAttempt.getAttempts());
+        assertEquals("INVALID_OUTPUT", thirdAttempt.getErrorCategory());
+    }
+
+    @Test
+    void pendingCandidateCanBeListedAndAccepted() throws Exception {
+        String email = "candidate-accept-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
     
         mockMvc.perform(get("/api/v1/memory/style")
                         .header(
@@ -1843,102 +2234,765 @@ class MiraBackendApplicationTests {
                                 "Bearer " + tokens.accessToken()
                         ))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.profile").isEmpty())
-                .andExpect(jsonPath("$.enabled").value(true))
-                .andExpect(jsonPath("$.version").value(3));
+                .andExpect(jsonPath("$.version").value(1));
+                    
+        UUID userId = userAccountRepository
+                .findByNormalizedEmail(email)
+                .orElseThrow()
+                .getId();
+                    
+        int generation = memoryControlRepository
+                .findById(userId)
+                .orElseThrow()
+                .getGeneration();
+                    
+        UserMemoryCandidate candidate =
+                userMemoryCandidateRepository.saveAndFlush(
+                        new UserMemoryCandidate(
+                                userId,
+                                "tone",
+                                "formal",
+                                MemoryCandidateClassification.INFERRED,
+                                "The user seems to prefer a formal tone.",
+                                generation
+                        )
+                );
+            
+        mockMvc.perform(get("/api/v1/memory/candidates")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id")
+                        .value(candidate.getId().toString()))
+                .andExpect(jsonPath("$.items[0].field").value("tone"))
+                .andExpect(jsonPath("$.items[0].value").value("formal"));
+                    
+        mockMvc.perform(post(
+                                "/api/v1/memory/candidates/{id}/accept",
+                                candidate.getId()
+                        )
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+                    
+        assertEquals(
+                MemoryCandidateStatus.ACCEPTED,
+                userMemoryCandidateRepository
+                        .findById(candidate.getId())
+                        .orElseThrow()
+                        .getStatus()
+        );
+    
+        mockMvc.perform(get("/api/v1/memory/candidates")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty());
     }
     
+    @Test
+    void candidateCanBeRejectedWithoutChangingProfile() throws Exception {
+        String email = "candidate-reject-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk());
+                    
+        UUID userId = userAccountRepository
+                .findByNormalizedEmail(email)
+                .orElseThrow()
+                .getId();
+                    
+        int generation = memoryControlRepository
+                .findById(userId)
+                .orElseThrow()
+                .getGeneration();
+                    
+        UserMemoryCandidate candidate =
+                userMemoryCandidateRepository.saveAndFlush(
+                        new UserMemoryCandidate(
+                                userId,
+                                "tone",
+                                "academic",
+                                MemoryCandidateClassification.INFERRED,
+                                "Possible academic preference.",
+                                generation
+                        )
+                );
+            
+        mockMvc.perform(post(
+                                "/api/v1/memory/candidates/{id}/reject",
+                                candidate.getId()
+                        )
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+                    
+        assertEquals(
+                MemoryCandidateStatus.REJECTED,
+                userMemoryCandidateRepository
+                        .findById(candidate.getId())
+                        .orElseThrow()
+                        .getStatus()
+        );
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+    
+    @Test
+    void purgeDeletesPendingCandidates() throws Exception {
+        String email = "candidate-purge-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+    
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk());
+                    
+        UUID userId = userAccountRepository
+                .findByNormalizedEmail(email)
+                .orElseThrow()
+                .getId();
+                    
+        int generation = memoryControlRepository
+                .findById(userId)
+                .orElseThrow()
+                .getGeneration();
+                    
+        UserMemoryCandidate candidate =
+                userMemoryCandidateRepository.saveAndFlush(
+                        new UserMemoryCandidate(
+                                userId,
+                                "formatting",
+                                "prose",
+                                MemoryCandidateClassification.INFERRED,
+                                "Possible prose preference.",
+                                generation
+                        )
+                );
+            
+        mockMvc.perform(delete("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+                    
+        assertFalse(
+                userMemoryCandidateRepository.existsById(
+                        candidate.getId()
+                )
+        );
+    }
+    
+    @Test
+    void userCannotAcceptAnotherUsersCandidate() throws Exception {
+        String password = "Correct-Horse-123!";
+        String emailA = "candidate-owner-" + UUID.randomUUID()
+                + "@example.com";
+        String emailB = "candidate-other-" + UUID.randomUUID()
+                + "@example.com";
+    
+        register(emailA, password);
+        register(emailB, password);
+    
+        LoginTokens owner = login(emailA, password);
+        LoginTokens other = login(emailB, password);
+    
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + owner.accessToken()
+                        ))
+                .andExpect(status().isOk());
+                    
+        UUID ownerId = userAccountRepository
+                .findByNormalizedEmail(emailA)
+                .orElseThrow()
+                .getId();
+                    
+        int generation = memoryControlRepository
+                .findById(ownerId)
+                .orElseThrow()
+                .getGeneration();
+                    
+        UserMemoryCandidate candidate =
+                userMemoryCandidateRepository.saveAndFlush(
+                        new UserMemoryCandidate(
+                                ownerId,
+                                "tone",
+                                "formal",
+                                MemoryCandidateClassification.INFERRED,
+                                "Owner evidence.",
+                                generation
+                        )
+                );
+            
+        mockMvc.perform(post(
+                                "/api/v1/memory/candidates/{id}/accept",
+                                candidate.getId()
+                        )
+                        .header(
+                                "Authorization",
+                                "Bearer " + other.accessToken()
+                        ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error")
+                        .value("resource_not_found"));
+    }
+
+    @Test
+    void queuedJobsAreSkippedAfterPurge() throws Exception {
+        String email = "mem-test-02-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Queued jobs"
+        );
+
+        mockAIProvider.setContent("Reply one");
+        MemoryExtractionJob first = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-02-a-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("Reply two");
+        MemoryExtractionJob second = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-02-b-" + UUID.randomUUID()
+        );
+
+        mockMvc.perform(delete("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(first.getId());
+        memoryExtractionWorker.processJob(second.getId());
+
+        assertEquals(MemoryJobStatus.SKIPPED, jobStatus(first.getId()));
+        assertEquals(MemoryJobStatus.SKIPPED, jobStatus(second.getId()));
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+
+    @Test
+    void extractionCommitIsSkippedWhenMemoryIsDisabled()
+            throws Exception {
+        String email = "mem-test-04-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Disabled commit"
+        );
+
+        mockAIProvider.setContent("Reply");
+        MemoryExtractionJob job = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-04-" + UUID.randomUUID()
+        );
+
+        mockMvc.perform(patch("/api/v1/memory/style/settings")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk());
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        assertEquals(MemoryJobStatus.SKIPPED, jobStatus(job.getId()));
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+
+    @Test
+    void newProfileCanBeBuiltAfterPurge() throws Exception {
+        String email = "mem-test-05-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Post-deletion profile"
+        );
+
+        mockAIProvider.setContent("Reply one");
+        MemoryExtractionJob staleJob = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-05-a-" + UUID.randomUUID()
+        );
+
+        mockMvc.perform(delete("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isNoContent());
+
+        mockAIProvider.setContent("Reply two");
+        MemoryExtractionJob freshJob = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-05-b-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(freshJob.getId());
+        memoryExtractionWorker.processJob(staleJob.getId());
+
+        assertEquals(
+                MemoryJobStatus.COMPLETED,
+                jobStatus(freshJob.getId())
+        );
+        assertEquals(
+                MemoryJobStatus.SKIPPED,
+                jobStatus(staleJob.getId())
+        );
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(3))
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    }
+
+    @Test
+    void twoJobsWithTheSameVersionAllowOnlyOneCommit()
+            throws Exception {
+        String email = "mem-test-06-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "OCC collision"
+        );
+
+        mockAIProvider.setContent("Reply one");
+        MemoryExtractionJob first = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-06-a-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("Reply two");
+        MemoryExtractionJob second = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-06-b-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(first.getId());
+        memoryExtractionWorker.processJob(second.getId());
+
+        assertEquals(MemoryJobStatus.COMPLETED, jobStatus(first.getId()));
+        assertEquals(MemoryJobStatus.SKIPPED, jobStatus(second.getId()));
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    }
+
+    @Test
+    void staleProcessingJobIsRequeuedAfterRestart() throws Exception {
+        String email = "mem-test-07-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Restart recovery"
+        );
+
+        mockAIProvider.setContent("Reply");
+        MemoryExtractionJob job = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-07-" + UUID.randomUUID()
+        );
+
+        memoryExtractionService.claimJob(job.getId());
+
+        jdbcTemplate.update(
+                """
+                UPDATE memory_extraction_job
+                SET started_at = ?
+                WHERE id = ?
+                """,
+                Timestamp.from(Instant.now().minusSeconds(600)),
+                job.getId()
+        );
+
+        int requeued = memoryExtractionService.requeueStaleProcessing(
+                Instant.now().minusSeconds(300),
+                3
+        );
+
+        assertEquals(1, requeued);
+        assertEquals(MemoryJobStatus.PENDING, jobStatus(job.getId()));
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        memoryExtractionWorker.processJob(job.getId());
+
+        assertEquals(MemoryJobStatus.COMPLETED, jobStatus(job.getId()));
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile.tone").value("formal"));
+    }
+
+    @Test
+    void concurrentPurgeAndExtractionNeverResurrectsProfile()
+            throws Exception {
+        String email = "mem-test-03-" + UUID.randomUUID()
+                + "@example.com";
+        String password = "Correct-Horse-123!";
+
+        register(email, password);
+        LoginTokens tokens = login(email, password);
+
+        UUID conversationId = createConversation(
+                tokens.accessToken(),
+                "Concurrent purge"
+        );
+
+        mockAIProvider.setContent("Reply");
+        MemoryExtractionJob job = sendAndGetJob(
+                tokens,
+                conversationId,
+                "Always use a formal tone.",
+                "mem-03-" + UUID.randomUUID()
+        );
+
+        mockAIProvider.setContent("""
+                {
+                "candidates": [
+                    {
+                    "field": "tone",
+                    "value": "formal",
+                    "classification": "EXPLICIT_DURABLE",
+                    "evidence": "Always use a formal tone."
+                    }
+                ]
+                }
+                """);
+
+        UUID userId = userIdFor(email);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        Future<?> purgeFuture = executor.submit(() -> {
+            start.await();
+            styleProfileService.purge(userId);
+            return null;
+        });
+
+        Future<?> extractionFuture = executor.submit(() -> {
+            start.await();
+            memoryExtractionWorker.processJob(job.getId());
+            return null;
+        });
+
+        start.countDown();
+
+        purgeFuture.get(20, TimeUnit.SECONDS);
+        extractionFuture.get(20, TimeUnit.SECONDS);
+
+        executor.shutdownNow();
+
+        MemoryJobStatus finalStatus = jobStatus(job.getId());
+
+        assertTrue(
+                finalStatus == MemoryJobStatus.COMPLETED
+                        || finalStatus == MemoryJobStatus.SKIPPED
+        );
+
+        mockMvc.perform(get("/api/v1/memory/style")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokens.accessToken()
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").isEmpty());
+    }
+
     private record LoginTokens(
             String accessToken,
             String refreshToken,
-            UUID sessionId
-    ) {
+            UUID sessionId) {
     }
 
     private UUID createConversation(
             String accessToken,
-            String title
-    ) throws Exception {
+            String title) throws Exception {
         MvcResult result = mockMvc.perform(
-                        post("/api/v1/conversations")
-                                .header(
-                                        "Authorization",
-                                        "Bearer " + accessToken
-                                )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(
-                                        new com.mira.mira_backend.dto.CreateConversationRequest(
-                                                title
-                                        )
-                                )))
+                post("/api/v1/conversations")
+                        .header(
+                                "Authorization",
+                                "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.CreateConversationRequest(
+                                        title))))
                 .andExpect(status().isCreated())
                 .andReturn();
-    
+
         return UUID.fromString(
                 objectMapper.readTree(
-                                result.getResponse().getContentAsString()
-                        )
+                        result.getResponse().getContentAsString())
                         .get("id")
-                        .stringValue()
-        );
+                        .stringValue());
     }
 
     private MvcResult sendMessage(
-        String accessToken,
-        UUID conversationId,
-        String content,
-        String idempotencyKey
-    ) throws Exception {
+            String accessToken,
+            UUID conversationId,
+            String content,
+            String idempotencyKey) throws Exception {
         return mockMvc.perform(
-                        post(
-                                "/api/v1/conversations/{id}/messages",
-                                conversationId
-                        )
-                                .header(
-                                        "Authorization",
-                                        "Bearer " + accessToken
-                                )
-                                .header("Idempotency-Key", idempotencyKey)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(
-                                        new com.mira.mira_backend.dto.SendMessageRequest(
-                                                content
-                                        )
-                                )))
+                post(
+                        "/api/v1/conversations/{id}/messages",
+                        conversationId)
+                        .header(
+                                "Authorization",
+                                "Bearer " + accessToken)
+                        .header("Idempotency-Key", idempotencyKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.mira.mira_backend.dto.SendMessageRequest(
+                                        content))))
                 .andReturn();
     }
 
     private UUID responseIdFrom(MvcResult result) throws Exception {
-    return UUID.fromString(
-            objectMapper.readTree(
-                            result.getResponse().getContentAsString()
-                    )
-                    .get("assistantResponse")
-                    .get("id")
-                    .stringValue()
-        );
+        return UUID.fromString(
+                objectMapper.readTree(
+                        result.getResponse().getContentAsString())
+                        .get("assistantResponse")
+                        .get("id")
+                        .stringValue());
     }
 
     private MvcResult retryResponse(
             String accessToken,
             UUID conversationId,
             UUID responseId,
+            String idempotencyKey) throws Exception {
+        return mockMvc.perform(
+                post(
+                        "/api/v1/conversations/{cid}/responses/{rid}/retry",
+                        conversationId,
+                        responseId)
+                        .header(
+                                "Authorization",
+                                "Bearer " + accessToken)
+                        .header(
+                                "Idempotency-Key",
+                                idempotencyKey))
+                .andReturn();
+    }
+
+    private boolean requestHasSystemContent(
+            AIRequest request,
+            String text) {
+        for (AIMessage message : request.messages()) {
+            if (message.role() == AIRole.SYSTEM
+                    && message.content().contains(text)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private MemoryExtractionJob sendAndGetJob(
+            LoginTokens tokens,
+            UUID conversationId,
+            String content,
             String idempotencyKey
     ) throws Exception {
-        return mockMvc.perform(
-                        post(
-                                "/api/v1/conversations/{cid}/responses/{rid}/retry",
-                                conversationId,
-                                responseId
-                        )
-                                .header(
-                                        "Authorization",
-                                        "Bearer " + accessToken
-                                )
-                                .header(
-                                        "Idempotency-Key",
-                                        idempotencyKey
-                                ))
-                .andReturn();
+        MvcResult result = sendMessage(
+                tokens.accessToken(),
+                conversationId,
+                content,
+                idempotencyKey
+        );
+
+        UUID responseId = responseIdFrom(result);
+
+        return memoryExtractionJobRepository
+                .findByResponseId(responseId)
+                .orElseThrow();
+    }
+
+    private MemoryJobStatus jobStatus(UUID jobId) {
+        return memoryExtractionJobRepository
+                .findById(jobId)
+                .orElseThrow()
+                .getStatus();
+    }
+
+    private UUID userIdFor(String email) {
+        return userAccountRepository
+                .findByNormalizedEmail(email)
+                .orElseThrow()
+                .getId();
     }
 }

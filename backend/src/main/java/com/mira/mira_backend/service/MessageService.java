@@ -51,6 +51,8 @@ public class MessageService {
     private final AiProcessingAttemptRepository attemptRepository;
     private final ConversationRepository conversationRepository;
     private final AIProvider aiProvider;
+    private final StyleProfileService styleProfileService;
+    private final MemoryExtractionService memoryExtractionService;
 
     public MessageService(
             MessageTransactionService transactionService,
@@ -58,7 +60,9 @@ public class MessageService {
             AiResponseRepository aiResponseRepository,
             AiProcessingAttemptRepository attemptRepository,
             ConversationRepository conversationRepository,
-            AIProvider aiProvider
+            AIProvider aiProvider,
+            StyleProfileService styleProfileService,
+            MemoryExtractionService memoryExtractionService
     ) {
         this.transactionService = transactionService;
         this.messageRepository = messageRepository;
@@ -66,6 +70,8 @@ public class MessageService {
         this.attemptRepository = attemptRepository;
         this.conversationRepository = conversationRepository;
         this.aiProvider = aiProvider;
+        this.styleProfileService = styleProfileService;
+        this.memoryExtractionService = memoryExtractionService;
     }
 
     public SendMessageResponse send(
@@ -318,12 +324,27 @@ public class MessageService {
             );
         }
 
-        return transactionService.complete(
-                pending,
-                userId,
-                conversationId,
-                completion.content()
+        SendMessageResponse response = transactionService.complete(
+            pending,
+            userId,
+            conversationId,
+            completion.content()
         );
+
+        try {
+            memoryExtractionService.scheduleAfterCompletion(
+                    userId,
+                    conversationId,
+                    response.assistantResponse().id()
+            );
+        } catch (RuntimeException exception) {
+            /*
+             * Memory extraction is advisory. Scheduling failure must not
+             * turn a successful chat response into an error.
+             */
+        }
+
+        return response;
     }
 
     private AIRequest buildRequest(
@@ -340,10 +361,22 @@ public class MessageService {
         Collections.reverse(chronological);
 
         List<AIMessage> messages = new ArrayList<>(
-                chronological.size() + 1
+                chronological.size() + 2
         );
 
         messages.add(new AIMessage(AIRole.SYSTEM, SYSTEM_PROMPT));
+
+        try {
+            styleProfileService.activeStylePrompt(userId)
+                    .ifPresent(stylePrompt -> messages.add(
+                            new AIMessage(AIRole.SYSTEM, stylePrompt)
+                    ));
+        } catch (RuntimeException exception) {
+            /*
+             * Memory is advisory. A profile lookup failure must never
+             * block the user's chat request.
+             */
+        }
 
         for (Message message : chronological) {
             AIRole role = message.getRole() == MessageRole.USER

@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.5.0 |
-| **Last Updated** | 2026-10-26 |
+| **Version** | 1.9.0 |
+| **Last Updated** | 2026-10-29 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
 
@@ -23,6 +23,10 @@
 | 1.3.0 | 2026-10-24 | Bryan | Reconciled delivered Android authentication client (LoginActivity, RegisterActivity, MainActivity session gate & logout, TokenStore EncryptedSharedPreferences, auto-refresh TokenAuthenticator). |
 | 1.4.0 | 2026-10-25 | Bryan | Reconciled full Android conversation & chat delivery (ConversationsActivity, ChatActivity, adapters, repositories), backend message rate limiting (MessageRateLimiter), and Docker Compose local database environment. |
 | 1.5.0 | 2026-10-26 | Bryan | Closed Phase 1 (merged to `main`) and documented Phase 2 backend delivery: `MemoryController`, `StyleProfileService`, allow-list validation, OCC conflict mapping, and generation-guarded purge. Extraction, hybrid policy, and prompt injection remain Phase 2. |
+| 1.6.0 | 2026-10-27 | Bryan | Documented implemented advisory prompt injection: `StyleProfileService.activeStylePrompt` adds a second system message for enabled profiles and is omitted when disabled, empty, or all-unspecified. |
+| 1.7.0 | 2026-10-27 | Bryan | Documented the asynchronous extraction pipeline: `memory_extraction_job` / `user_memory_candidate` (Flyway V10), polling scheduler, JSON extraction mode, hybrid policy, and generation/version commit guards. |
+| 1.8.0 | 2026-10-27 | Bryan | Documented backend candidate review: `MemoryCandidateController` lists pending inferred candidates and accepts/rejects them with generation and allow-list validation. |
+| 1.9.0 | 2026-10-29 | Bryan | Documented extraction reliability: bounded retries, `FOR UPDATE SKIP LOCKED` claiming, and startup/interval recovery of stale `PROCESSING` jobs. MEM-TEST race scenarios are covered. |
 
 ---
 
@@ -100,13 +104,14 @@ flowchart TD
   * Enforce server-side ownership: verify that the authenticated caller owns the target conversation before any read or write.
   * Intercept requests with `Idempotency-Key` headers to prevent duplicate message dispatch or duplicate AI invocations.
   * Persist incoming user messages immediately to ensure conversation state is never lost even if subsequent network calls fail.
-  * Query the `Memory Module` for active style preferences and serialize them into advisory system context.
+  * Query the `Memory Module` for active style preferences and serialize them into advisory system context. Implemented via `StyleProfileService.activeStylePrompt`: enabled, non-empty profiles are appended as a second system message after the base instruction.
   * Retrieve the latest conversation history within bounded context limits (e.g., last 10 messages).
   * Record and track the logical assistant response and its individual processing attempts.
+  * Schedule asynchronous memory extraction after a response reaches `COMPLETED`; scheduling failures never fail the chat request.
 
 ### 2.3 Memory Subsystem Module (`memory` domain)
 * **Primary Scope:** Style memory extraction, validation, conflict resolution, versioning, and user governance.
-* **Current Delivery Status:** The governance surface and concurrency primitives are implemented in the backend: profile provisioning on first read, allow-list validation, OCC version checks with `409 version_conflict`, the enabled/disabled toggle, and atomic purge with a generation increment. Extraction, hybrid-persistence staging, prompt injection, and the Android memory UI remain Phase 2 work.
+* **Current Delivery Status:** The governance surface, concurrency primitives, advisory prompt injection, asynchronous extraction pipeline, and candidate review are implemented in the backend: profile provisioning on first read, allow-list validation, OCC version checks with `409 version_conflict`, the enabled/disabled toggle, atomic purge with a generation increment, enum-only advisory injection during chat context assembly, `COMPLETED`-only extraction job scheduling, JSON extraction, hybrid candidate handling (explicit merge, inferred staging, ephemeral discard), generation/version commit guards, pending-candidate list/accept/reject, bounded retries, `SKIP LOCKED` claiming, and stale-processing recovery. The Android memory UI and privacy audit remain Phase 2 work.
 * **Core Responsibilities:**
   * Manage persistent `USER_STYLE_PROFILE` records.
   * Gate extraction eligibility: only trigger memory extraction when a logical assistant response reaches `COMPLETED` status.
@@ -136,13 +141,13 @@ The current implementation uses a **layer-first** package layout under `com.mira
 | Package | Responsibility |
 | :--- | :--- |
 | `config` | Spring Security filter chain, JWT encoder/decoder, password encoder |
-| `controller` | REST endpoints (`AuthController`, `MeController`, `ConversationController`, `MessageController`, `MemoryController`) |
+| `controller` | REST endpoints (`AuthController`, `MeController`, `ConversationController`, `MessageController`, `MemoryController`, `MemoryCandidateController`) |
 | `dto` | Java records for request/response payloads |
-| `entity` | JPA entities (`UserAccount`, `UserSession`, `RefreshTokenHistory`, `Conversation`, `Message`, `AiResponse`, `AiProcessingAttempt`, `UserStyleProfile`, `UserMemoryControl`) |
+| `entity` | JPA entities (`UserAccount`, `UserSession`, `RefreshTokenHistory`, `Conversation`, `Message`, `AiResponse`, `AiProcessingAttempt`, `UserStyleProfile`, `UserMemoryControl`, `MemoryExtractionJob`, `UserMemoryCandidate`) |
 | `exception` | `@RestControllerAdvice` and domain exception mapping |
 | `repository` | Spring Data JPA repositories and ownership/locking queries |
 | `security` | REST authentication entry point and access-denied handler |
-| `service` | Authentication, token rotation, account, chat orchestration, rate limiting, and style-profile services |
+| `service` | Authentication, token rotation, account, chat orchestration, rate limiting, style-profile, memory-candidate, and memory-extraction services |
 
 > [!NOTE]
 > The original architecture targeted feature packages (`com.mira.auth`, `com.mira.chat`, `com.mira.memory`, `com.mira.ai`). The delivered scaffold uses the layer-first layout above. This is a packaging difference, not a change to the modular-boundary intent. A feature-package refactor can be performed later without changing the API or schema; it is not required for the MVP.
@@ -225,7 +230,7 @@ sequenceDiagram
 ```
 
 > [!NOTE]
-> The memory fetch, extraction gate, and OCC merge shown above describe the Phase 2 target. Current Phase 2 delivery includes the governance API and OCC/generation primitives; chat prompt assembly still uses conversation history only until memory injection lands.
+> The active-profile fetch, advisory injection, eligibility gate, and OCC merge shown above are implemented. Candidate review is exposed through `GET /api/v1/memory/candidates` and the `accept`/`reject` actions. The Android memory UI and the privacy audit remain the Phase 2 target.
 
 ### 4.1 Token Specifications
 * **Access Tokens:**
@@ -284,6 +289,11 @@ The following formal decisions govern MIRA's architecture:
 | Local database orchestration | Implemented (`docker-compose.yml`, `.env.example`) |
 | Continuous Integration pipelines | Implemented (GitHub Actions `backend.yml` & `android.yml`) |
 | Style-memory governance (read/replace/toggle/purge, OCC, generation) | Implemented (Backend `MemoryController` / `StyleProfileService`) |
-| Memory extraction, hybrid policy, prompt injection, Android memory UI | Phase 2 (in progress) |
+| Advisory style-profile injection into chat context | Implemented (Backend; enabled profiles only, omitted when disabled/empty) |
+| Asynchronous memory extraction pipeline (`COMPLETED` gate, hybrid policy, generation/version guards) | Implemented (Backend; Flyway V10) |
+| Candidate review (list/accept/reject pending inferred preferences) | Implemented (Backend) |
+| Extraction reliability (bounded retries, skip-locked claim, stale-job recovery) | Implemented (Backend) |
+| `MEM-TEST-01`..`MEM-TEST-07` concurrency scenarios | Implemented (Testcontainers) |
+| Android memory UI and privacy audit | Phase 2 (in progress) |
 
 The active work breakdown is maintained in [11-phase-2-checklist.md](./11-phase-2-checklist.md). The closed Phase 1 checklist remains at [10-phase-1-checklist.md](./10-phase-1-checklist.md).

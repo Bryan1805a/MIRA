@@ -19,6 +19,7 @@ public class MockAIProvider implements AIProvider {
 
     private volatile Scenario scenario = Scenario.SUCCESS;
     private volatile String content = "Mock assistant response.";
+    private volatile AIRequest lastRequest;
 
     public void setScenario(Scenario scenario) {
         this.scenario = Objects.requireNonNull(
@@ -40,11 +41,18 @@ public class MockAIProvider implements AIProvider {
     public void reset() {
         scenario = Scenario.SUCCESS;
         content = "Mock assistant response.";
+        lastRequest = null;
+    }
+
+    public AIRequest lastRequest() {
+        return lastRequest;
     }
 
     @Override
     public AICompletion generate(AIRequest request) {
         Objects.requireNonNull(request, "request must not be null");
+        
+        lastRequest = request;
 
         return switch (scenario) {
             case SUCCESS -> new AICompletion(content);

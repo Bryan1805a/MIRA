@@ -43,29 +43,25 @@ public class UserAccountService {
     @Transactional
     public UserAccount register(String email, String rawPassword) {
         
-        String normalizedEmail = email == null
-                ? null
-                : email.trim().toLowerCase(Locale.ROOT);
+        // Check valid and then normalise email
+        String normalizedEmail = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
 
-        RegistrationInput input =
-                new RegistrationInput(normalizedEmail, rawPassword);
+        RegistrationInput input = new RegistrationInput(normalizedEmail, rawPassword);
 
-        Set<ConstraintViolation<RegistrationInput>> violations =
-                validator.validate(input);
+        Set<ConstraintViolation<RegistrationInput>> violations = validator.validate(input);
 
+        // Throw exeption if violation occurs
         if (!violations.isEmpty()) {
             throw new InvalidRegistrationException(
                     "Email or password does not meet registration requirements."
             );
         }
 
-
+        // Hashing password
         String passwordHash = passwordEncoder.encode(rawPassword);
 
-        UserAccount account = new UserAccount(
-                normalizedEmail,
-                passwordHash
-        );
+        // Create new account
+        UserAccount account = new UserAccount(normalizedEmail, passwordHash);
 
         try {
             // Flush now so database uniqueness violations happen here.

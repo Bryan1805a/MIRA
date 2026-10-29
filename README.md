@@ -12,7 +12,7 @@
 
 ## Development Status
 
-**Phase 0 and Phase 1 are complete; Phase 1 (Conversation & Chat Core) was merged to `main` via PR #5. Phase 2 (Communication-Style Memory) is active: backend style-memory governance, OCC versioning, and generation-guarded purge are implemented; extraction, prompt injection, and the Android memory UI remain in progress.**
+**Phase 0 and Phase 1 are complete; Phase 1 (Conversation & Chat Core) was merged to `main` via PR #5. Phase 2 (Communication-Style Memory) is active: backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, and the MEM-TEST race scenarios are implemented; the Android memory UI and privacy audit remain in progress.**
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
 - Android client features full authentication flows (Login, Registration, session gate in `MainActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
@@ -23,10 +23,13 @@
 - Per-account message rate limiting (sliding window of 10 requests/minute returning HTTP `429 rate_limited`) and Actuator health/probe endpoints are active.
 - Local PostgreSQL environment is pre-configured via `docker-compose.yml` and `.env.example`.
 - GitHub Actions CI workflows are configured for backend verification (`.github/workflows/backend.yml`) and Android build, test, and lint (`.github/workflows/android.yml`).
-- The backend test suite passes with 68 automated tests (including unit, mock server, PostgreSQL Testcontainers suites, and style-memory governance tests).
+- The backend test suite passes with 89 automated tests (including unit, mock server, PostgreSQL Testcontainers suites, style-memory governance, prompt-injection, extraction, retry/recovery, concurrency, and candidate-review tests).
 - The Android test, build, and lint suites pass via `.\gradlew.bat clean assembleDebug testDebugUnitTest lintDebug`.
 - Backend memory governance is implemented (`GET/PUT/PATCH/DELETE /api/v1/memory/style`) with allow-list validation, OCC `409 version_conflict`, and generation-guarded purge.
-- Memory extraction, hybrid persistence, prompt injection, and the Android memory UI remain Phase 2 work.
+- Enabled style profiles are injected into chat context as an advisory system message; disabled, empty, and all-unspecified profiles inject nothing, and lookup failures never block chat.
+- Asynchronous memory extraction is implemented (Flyway `V10`): `COMPLETED`-only job scheduling, JSON extraction, explicit durable/correction merging, inferred candidate staging, ephemeral discard, generation/version commit guards, bounded retries, skip-locked claiming, and stale-processing recovery.
+- Candidate review is implemented: pending inferred candidates can be listed, accepted with OCC, or rejected; purge deletes pending candidates.
+- The Android memory UI, extraction privacy audit, and remaining injection-dominance/lookup-failure tests remain Phase 2 work.
 
 See [`docs/11-phase-2-checklist.md`](docs/11-phase-2-checklist.md) for the active Phase 2 plan and exit gate.
 See [`docs/10-phase-1-checklist.md`](docs/10-phase-1-checklist.md) for the closed Phase 1 checklist.
@@ -62,7 +65,7 @@ mira/
 │   │   ├── security/               # REST authentication/authorization handlers
 │   │   └── service/                # Domain services
 │   ├── src/main/resources/
-│   │   └── db/migration/           # Flyway migrations (V1–V9)
+│   │   └── db/migration/           # Flyway migrations (V1–V10)
 │   └── src/test/                   # Unit and Testcontainers integration tests
 ├── docs/                           # Requirements, architecture, API, security, testing, deployment
 └── README.md
@@ -119,7 +122,7 @@ cd backend
 .\mvnw.cmd clean verify
 ```
 
-The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1–V9), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (68 automated tests pass).
+The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1–V10), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (89 automated tests pass).
 
 ### Run Locally
 
@@ -158,6 +161,9 @@ Open the `android/` directory in Android Studio to run on an emulator or physica
 | `POST` | `/api/v1/conversations/{conversationId}/messages` | Implemented (Backend & Android) |
 | `POST` | `/api/v1/conversations/{conversationId}/responses/{responseId}/retry` | Implemented (Backend & Android) |
 | `GET/PUT/PATCH/DELETE` | `/api/v1/memory/style` | Implemented (Backend); Android UI Phase 2 |
+| `GET` | `/api/v1/memory/candidates` | Implemented (Backend); Android UI Phase 2 |
+| `POST` | `/api/v1/memory/candidates/{candidateId}/accept` | Implemented (Backend); Android UI Phase 2 |
+| `POST` | `/api/v1/memory/candidates/{candidateId}/reject` | Implemented (Backend); Android UI Phase 2 |
 
 ## Documentation
 

@@ -10,6 +10,7 @@ import com.mira.mira_backend.ai.AIRole;
 import com.mira.mira_backend.entity.MemoryCandidateClassification;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -55,17 +56,21 @@ public class MemoryExtractionWorker {
     private final MemoryExtractionCommitService commitService;
     private final AIProvider aiProvider;
     private final ObjectMapper objectMapper;
+    private final int maxAttempts;
 
     public MemoryExtractionWorker(
             MemoryExtractionService extractionService,
             MemoryExtractionCommitService commitService,
             AIProvider aiProvider,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            @Value("${mira.memory.extraction.max-attempts:3}")
+            int maxAttempts
     ) {
         this.extractionService = extractionService;
         this.commitService = commitService;
         this.aiProvider = aiProvider;
         this.objectMapper = objectMapper;
+        this.maxAttempts = maxAttempts;
     }
 
     public boolean processNextJob() {
@@ -108,15 +113,17 @@ public class MemoryExtractionWorker {
             );
             result = parse(completion.content());
         } catch (AIProviderException exception) {
-            extractionService.markFailed(
+            extractionService.markRetryableFailure(
                     job.id(),
-                    exception.category().name()
+                    exception.category().name(),
+                    maxAttempts
             );
             return;
         } catch (RuntimeException exception) {
-            extractionService.markFailed(
+            extractionService.markRetryableFailure(
                     job.id(),
-                    "INVALID_OUTPUT"
+                    "INVALID_OUTPUT",
+                    maxAttempts
             );
             return;
         }
@@ -124,9 +131,10 @@ public class MemoryExtractionWorker {
         try {
             commitService.commit(job, result);
         } catch (RuntimeException exception) {
-            extractionService.markFailed(
+            extractionService.markRetryableFailure(
                     job.id(),
-                    "COMMIT_FAILED"
+                    "COMMIT_FAILED",
+                    maxAttempts
             );
         }
     }

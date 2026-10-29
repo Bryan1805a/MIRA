@@ -137,6 +137,24 @@ public class MemoryExtractionJob {
         finish(MemoryJobStatus.FAILED, category);
     }
 
+    // Return the job to PENDING, if maximum is reached, mark FAILED
+    public void retryOrFail(int maxAttempts, String category) {
+        if (status != MemoryJobStatus.PROCESSING) {
+            throw new IllegalStateException("Only a PROCESSING job can be retried or failed.");
+        }
+
+        errorCategory = category;
+
+        if (attempts < maxAttempts) {
+            status = MemoryJobStatus.PENDING;
+            startedAt = null;
+            finishedAt = null;
+        } else {
+            status = MemoryJobStatus.FAILED;
+            finishedAt = Instant.now();
+        }
+    }
+
     private void finish(
             MemoryJobStatus nextStatus,
             String category

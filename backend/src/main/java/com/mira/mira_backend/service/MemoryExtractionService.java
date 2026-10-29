@@ -16,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
+
+import java.time.Instant;
 
 @Service
 public class MemoryExtractionService {
@@ -93,12 +96,15 @@ public class MemoryExtractionService {
 
     @Transactional
     public JobWork claimNextJob() {
-        Optional<MemoryExtractionJob> next = jobRepository
-                .findFirstByStatusOrderByCreatedAtAsc(
-                        MemoryJobStatus.PENDING
-                );
+        Optional<UUID> nextId = jobRepository.findNextPendingIdForUpdate();
 
-        return next.map(this::claimInternal).orElse(null);
+        if (nextId.isEmpty()) {
+            return null;
+        }
+
+        return jobRepository.findById(nextId.get())
+                .map(this::claimInternal)
+                .orElse(null);
     }
 
     @Transactional
@@ -132,6 +138,40 @@ public class MemoryExtractionService {
             job.markSkipped();
             jobRepository.saveAndFlush(job);
         });
+    }
+
+    @Transactional
+    public void markRetryableFailure(
+            UUID jobId,
+            String errorCategory,
+            int maxAttempts
+    ) {
+        jobRepository.findByIdForUpdate(jobId).ifPresent(job -> {
+            job.retryOrFail(maxAttempts, errorCategory);
+            jobRepository.saveAndFlush(job);
+        });
+    }
+
+    @Transactional
+    public int requeueStaleProcessing(
+            Instant cutoff,
+            int maxAttempts
+    ) {
+        List<UUID> jobIds = jobRepository
+                .findStaleProcessingIdsForUpdate(cutoff);
+
+        for (UUID jobId : jobIds) {
+            jobRepository.findById(jobId).ifPresent(job -> {
+                job.retryOrFail(
+                        maxAttempts,
+                        "STALE_PROCESSING"
+                );
+                jobRepository.save(job);
+            });
+        }
+
+        jobRepository.flush();
+        return jobIds.size();
     }
 
     @Transactional

@@ -77,6 +77,6 @@ We need to decide:
 * Store the durable `generation` counter in a separate `USER_MEMORY_CONTROL` row so it survives physical deletion of the profile (implemented in Flyway `V5`/`V6`).
 * Build automated concurrency test suites validating that stale tasks abort upon version or generation divergence.
 
-### Delivery Status (2026-10-27)
+### Delivery Status (2026-10-29)
 
-The schema and backend implementation are in place. `user_style_profile.profile`, `version`, and `enabled` are defined in `V5`; `user_memory_control.generation` is defined in `V6`; extraction jobs and staged candidates are defined in `V10`. The governance endpoints, advisory prompt injection, the hybrid extraction pipeline, generation/version commit guards, and candidate list/accept/reject are implemented. The Android memory UI and the full concurrency suite remain tracked in [11-phase-2-checklist.md](../11-phase-2-checklist.md).
+The schema and backend implementation are in place. `user_style_profile.profile`, `version`, and `enabled` are defined in `V5`; `user_memory_control.generation` is defined in `V6`; extraction jobs and staged candidates are defined in `V10`. The governance endpoints, advisory prompt injection, the hybrid extraction pipeline, generation/version commit guards, candidate list/accept/reject, bounded retries, stale-job recovery, and the `MEM-TEST-01`..`MEM-TEST-07` concurrency scenarios are implemented. The Android memory UI and extraction privacy audit remain tracked in [11-phase-2-checklist.md](../11-phase-2-checklist.md).

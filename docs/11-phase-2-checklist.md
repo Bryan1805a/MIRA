@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-002 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-27 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-10-29 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 2 — Communication-Style Memory Subsystem |
 
@@ -20,6 +20,7 @@
 | 1.1.0 | 2026-10-27 | Bryan | Marked advisory prompt injection complete (enabled profiles injected, disabled/empty/unspecified omitted) and updated the suite to 72 tests. Extraction, hybrid policy, Android UI, and race suites remain. |
 | 1.2.0 | 2026-10-27 | Bryan | Marked the extraction pipeline complete: V10 job/candidate tables, `COMPLETED`-only scheduling, hybrid policy, and generation/version commit guards with seven new tests (79 total). Candidate confirmation, Android UI, and race/privacy suites remain. |
 | 1.3.0 | 2026-10-27 | Bryan | Marked backend candidate review complete: list/accept/reject pending inferred candidates with ownership, generation, and allow-list checks; purge deletes pending candidates (83 total tests). Android UI and race/privacy suites remain. |
+| 1.4.0 | 2026-10-29 | Bryan | Marked extraction reliability and the MEM-TEST race scenarios complete: bounded retries, skip-locked claiming, and stale-processing recovery (89 total tests). Android UI and privacy audit remain. |
 
 ---
 
@@ -74,7 +75,7 @@ Phase 2 objectives:
 - Candidate extraction and eligibility gating on `COMPLETED` responses. *(Backend implemented.)*
 - Hybrid persistence classification and staging for inferred preferences. *(Backend implemented; review surfaces implemented.)*
 - Candidate review: list pending inferred candidates and accept/reject them. *(Backend implemented.)*
-- Asynchronous extraction that never blocks chat latency. *(Backend implemented via an in-process poller.)*
+- Asynchronous extraction that never blocks chat latency. *(Backend implemented via in-process pollers with bounded retries and stale-job recovery.)*
 - Memory injection into prompt assembly when `enabled = true`; omission when disabled, empty, or purged. *(Backend implemented.)*
 - Android memory inspection, editing, toggling, and purge UI.
 - Concurrency and privacy test suites.
@@ -102,11 +103,11 @@ Phase 2 objectives:
 | Allow-list validation and OCC | Implemented (backend) |
 | Generation-guarded purge | Implemented (backend) |
 | Advisory prompt injection | Implemented (backend; enabled, non-empty profiles only) |
-| Extraction pipeline (jobs, hybrid policy, commit guards) | Implemented (backend; Flyway V10) |
+| Extraction pipeline (jobs, hybrid policy, commit guards, retries, recovery) | Implemented (backend; Flyway V10) |
 | Candidate review (list/accept/reject) | Implemented (backend) |
-| Backend test suite | 83 passing tests (20 memory-governance, injection, extraction, and candidate tests included) |
+| Backend test suite | 89 passing tests (26 memory-governance, injection, extraction, and candidate tests included) |
 | Android memory UI | Not started |
-| Concurrency race suites | Not started |
+| Privacy audit and remaining unit tests | Not started |
 | Phase 1 open follow-ups | See section 3.1 |
 
 ### 3.1 Phase 1 Follow-Ups Carried Forward
@@ -161,7 +162,7 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Capture an immutable `expected_generation` and `expected_version` when the job is created.
 - [x] Persist extraction attempts/outcomes for audit without storing raw prompts (job status, attempts, error category; evidence is capped at 500 characters).
 - [x] Use JSON response mode for the provider call (`response_format: json_object`).
-- [x] Tests: completed scheduling, timeout suppression, disabled-memory suppression, malformed output.
+- [x] Tests: completed scheduling, timeout suppression, disabled-memory suppression, malformed output, retry exhaustion, and stale-processing recovery.
 - [ ] Add the dedicated `MemoryPrivacyAuditTest` proving no biographical extraction.
 
 ### 4.3 Hybrid Persistence Policy
@@ -185,7 +186,10 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Apply the `version` precondition (OCC) before writing the profile.
 - [x] Commit profile JSONB and version increment atomically.
 - [x] Mark stale/disabled/version-drift jobs `SKIPPED`.
-- [ ] Implement `MEM-TEST-01` through `MEM-TEST-07` from [05-memory-lifecycle.md](./05-memory-lifecycle.md#7-verification--concurrency-test-suite-requirements).
+- [x] Claim pending jobs with `FOR UPDATE SKIP LOCKED`.
+- [x] Retry retryable extraction failures up to `max-attempts`, then mark `FAILED`.
+- [x] Requeue stale `PROCESSING` jobs at startup and on a recovery interval.
+- [x] Implement `MEM-TEST-01` through `MEM-TEST-07` from [05-memory-lifecycle.md](./05-memory-lifecycle.md#7-verification--concurrency-test-suite-requirements).
 
 ### 4.5 Prompt Injection
 
@@ -228,7 +232,7 @@ These are tracked here because Phase 1 closed with them still open:
 | Governance API | Read/replace/toggle/purge/candidate-review happy paths, validation, OCC conflict, auth isolation | Implemented (backend; candidate ownership test included) |
 | Eligibility gate | `COMPLETED` only; no jobs for `PENDING`/`FAILED`/`UNKNOWN` or disabled memory | Implemented (backend tests) |
 | Extraction & hybrid policy | JSON extraction, allow-list re-validation, explicit merge, inferred staging, ephemeral discard | Implemented (explicit/inferred/malformed tests) |
-| Concurrency | Generation mismatch skips, disabled commit skips, OCC collision, deletion race | Partial (sequential guards implemented; race suite pending) |
+| Concurrency | Generation mismatch skips, disabled commit skips, OCC collision, deletion race | Implemented (MEM-TEST-01..07 and related concurrency tests) |
 | Injection | Enabled profile injected, disabled/empty/unspecified profile omitted, current instruction wins | Implemented (injection/omission tests; dominance test pending) |
 | Privacy | No biographical extraction, no prompt/token leakage in logs or audit rows | Partial (guardrails implemented; audit test pending) |
 | Android | Memory screen CRUD, conflict handling, toggle/purge, candidate confirmation, error parsing | Not started |
@@ -256,7 +260,7 @@ All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQ
 
 1. **Extraction provider cost and latency:** Extraction adds a second model call per completed response. Batch or debounce if cost becomes material.
 2. **Candidate promotion policy:** Pending inferred candidates accumulate evidence and can be manually accepted or rejected. Decide whether repeated evidence should auto-promote a candidate or whether confirmation remains strictly manual.
-3. **Background execution model:** Extraction uses an in-process fixed-delay poller that reclaims `PENDING` jobs. It is safe for a single instance because commit is guarded by generation/version checks, but horizontal scaling needs a distributed claim or leader election; failed jobs are terminal and are not retried.
+3. **Background execution model:** Extraction uses in-process fixed-delay pollers with `FOR UPDATE SKIP LOCKED` claiming, bounded retries, and stale-processing recovery. Claims are safe across instances; keep `stale-after-seconds` above the provider timeout. Durable retry audit/backoff tuning remains a future hardening item.
 4. **Immediate vs eventual injection:** A newly extracted preference may not affect the very next response because extraction is asynchronous. Document this so the UI does not overpromise.
 5. **Richer profile schema:** Do not expand the allow-list without a migration and validation update.
 6. **Prompt-injection safety:** Profile values are fixed enums, which limits injection risk. Keep free-form text out of the profile.
@@ -276,7 +280,7 @@ Phase 2 is complete only when every item is verified:
 - [x] Explicit durable preferences merge; inferred preferences are staged; ephemeral instructions are discarded.
 - [x] Candidate confirmation (accept/reject) is exposed over HTTP with ownership and generation checks.
 - [x] Prompt assembly injects the profile only when enabled and omits it when disabled, empty, or all-unspecified.
-- [ ] `MEM-TEST-01`..`MEM-TEST-07` pass against Testcontainers PostgreSQL.
+- [x] `MEM-TEST-01`..`MEM-TEST-07` pass against Testcontainers PostgreSQL.
 - [ ] Privacy audit proves no biographical extraction and no sensitive logging.
 - [ ] Android memory UI supports inspect, edit, toggle, purge, and candidate review with conflict handling.
 - [ ] `mvnw clean verify` and `gradlew assembleDebug` pass in CI.

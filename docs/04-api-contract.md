@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.8.0 |
-| **Last Updated** | 2026-10-27 |
+| **Version** | 1.9.0 |
+| **Last Updated** | 2026-10-29 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
 | **Data Format** | JSON (UTF-8 Encoded) |
@@ -27,6 +27,7 @@
 | 1.6.0 | 2026-10-27 | Bryan | Noted implemented advisory style-profile injection during message send: enabled profiles add a system message, while disabled, empty, or all-unspecified profiles add none. No endpoint shape changes. |
 | 1.7.0 | 2026-10-27 | Bryan | Recorded the internal asynchronous extraction pipeline. No new public endpoints; staged inferred candidates are not yet exposed for confirmation. |
 | 1.8.0 | 2026-10-27 | Bryan | Added the candidate-review endpoints: list pending inferred candidates, accept with OCC, and reject. No schema changes. |
+| 1.9.0 | 2026-10-29 | Bryan | Recorded internal extraction retry/recovery behavior. No endpoint shape changes. |
 
 ---
 
@@ -56,7 +57,7 @@
 | Standard error envelope | **Implemented (Backend & Android)** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler`/`RequestIdFilter` and mapped via `ApiError` in Android. |
 | Conversation endpoints | **Implemented (Backend & Android)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation; Android `ConversationsActivity` delivered. |
 | Message send/list and retry | **Implemented (Backend & Android)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, bounded retries, and Android `ChatActivity` delivered. |
-| Style-memory governance and candidate review | **Implemented (Backend)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, the internal extraction pipeline, and candidate list/accept/reject are live and covered by tests. The Android memory UI remains Phase 2. |
+| Style-memory governance and candidate review | **Implemented (Backend)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, the internal extraction pipeline (bounded retries/recovery), and candidate list/accept/reject are live and covered by tests. The Android memory UI remains Phase 2. |
 
 Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; the remaining Phase 2 work is the Android memory UI and the concurrency/privacy suites.
 

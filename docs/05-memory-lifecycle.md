@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-MEM-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.6.0 |
-| **Last Updated** | 2026-10-27 |
+| **Version** | 1.7.0 |
+| **Last Updated** | 2026-10-29 |
 | **Author / Lead** | Bryan / MIRA Personalization & Memory Team |
 | **Scope** | Persistent Communication-Style Preferences |
 
@@ -24,6 +24,7 @@
 | 1.4.0 | 2026-10-27 | Bryan | Reconciled advisory prompt injection: enabled profiles are appended as a system message, unspecified fields are skipped, and disabled/empty profiles are omitted. Extraction, hybrid policy, Android UI, and MEM-TEST-01..07 remain pending. |
 | 1.5.0 | 2026-10-27 | Bryan | Reconciled the asynchronous extraction pipeline (Flyway V10): `COMPLETED`-only scheduling, hybrid persistence, candidate staging, and generation/version commit guards are implemented. Candidate confirmation, Android UI, and race suites remain pending. |
 | 1.6.0 | 2026-10-27 | Bryan | Reconciled backend candidate review: pending inferred candidates can be listed, accepted with generation/allow-list validation and OCC, or rejected; purge deletes pending candidates. Android UI and race suites remain pending. |
+| 1.7.0 | 2026-10-29 | Bryan | Reconciled extraction retry/recovery (bounded attempts, stale-processing requeue, skip-locked claim) and marked the MEM-TEST race scenarios covered. Android UI and privacy audit remain pending. |
 
 ---
 
@@ -48,7 +49,10 @@ The durable schema, governance surface, advisory injection, and asynchronous ext
 - The extraction pipeline is implemented:
   - `MessageService` schedules a job only after a response reaches `COMPLETED`; scheduling failures never fail the chat request.
   - `MemoryExtractionScheduler` polls `PENDING` jobs on a configurable fixed delay (`mira.memory.extraction.scheduler-enabled`, `poll-interval-ms`) and drains the queue.
-  - `MemoryExtractionWorker` verifies the turn is `COMPLETED`, calls the provider in JSON mode, validates the allow-list and classifications, and records terminal job outcomes (`COMPLETED`, `SKIPPED`, `FAILED`).
+  - Job claiming uses `FOR UPDATE SKIP LOCKED`, so concurrent pollers cannot claim the same row.
+  - `MemoryExtractionWorker` verifies the turn is `COMPLETED`, calls the provider in JSON mode, validates the allow-list and classifications, and records job outcomes (`COMPLETED`, `SKIPPED`, `FAILED`).
+  - Retryable failures return the job to `PENDING` until `mira.memory.extraction.max-attempts` is reached, after which it becomes `FAILED`.
+  - `MemoryExtractionRecovery` requeues jobs stuck in `PROCESSING` beyond `stale-after-seconds` at startup and on a recovery interval (`recovery-interval-ms`), recording `STALE_PROCESSING`.
   - `MemoryExtractionCommitService` locks the control row, profile row, and job; rejects stale generation, disabled memory, or version drift with `SKIPPED`; merges explicit durable/correction updates; stages inferred candidates; and discards ephemeral candidates.
   - Repeated evidence for the same pending inferred candidate increments `evidence_count`.
 - Candidate review is implemented:
@@ -56,9 +60,9 @@ The durable schema, governance surface, advisory injection, and asynchronous ext
   - `POST /api/v1/memory/candidates/{id}/accept` locks the control/profile/candidate rows, validates `generation` and the allow-list, applies the value (incrementing `version` only when it changes), and marks the candidate `ACCEPTED`.
   - `POST /api/v1/memory/candidates/{id}/reject` marks the candidate `REJECTED` without changing the profile.
   - Purge deletes `PENDING` candidates in the same transaction.
-- Integration tests cover provisioning, OCC conflict, allow-list rejection, toggling, purge/generation behavior, injection, extraction scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, malformed output, and candidate list/accept/reject/ownership.
+- Integration tests cover provisioning, OCC conflict, allow-list rejection, toggling, purge/generation behavior, injection, extraction scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, retry exhaustion, stale-processing recovery, malformed output, candidate list/accept/reject/ownership, and the `MEM-TEST-01`..`MEM-TEST-07` scenarios.
 
-Not yet implemented: the Android memory UI, job retry/backoff beyond the terminal `FAILED` state, an automatic evidence threshold for promoting staged candidates, and the `MEM-TEST-01`..`MEM-TEST-07` concurrent race suite. The active plan is [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+Not yet implemented: the Android memory UI, the extraction privacy audit, an automatic evidence threshold for promoting staged candidates, current-instruction dominance coverage, and a unit test for the non-fatal injection lookup path. The active plan is [11-phase-2-checklist.md](./11-phase-2-checklist.md).
 
 ---
 
@@ -245,7 +249,7 @@ Before persisting an extracted profile, the worker must execute within an atomic
 > The generation check, enabled check, and profile write must occur within the **same database transaction under row lock**. An un-locked read outside the write transaction is insufficient to prevent race windows.
 
 > [!NOTE]
-> Implemented in `MemoryExtractionCommitService`: the control row, profile row, and job row are locked, and a generation/version/enabled mismatch marks the job `SKIPPED` without touching the profile. Concurrent-thread verification (`MEM-TEST-03`, `MEM-TEST-06`) is still pending.
+> Implemented in `MemoryExtractionCommitService`: the control row, profile row, and job row are locked, and a generation/version/enabled mismatch marks the job `SKIPPED` without touching the profile. Concurrent purge/extraction and OCC collisions are covered by `MEM-TEST-03`, `MEM-TEST-06`, and the related concurrency tests.
 
 ### 5.4 Disabled Memory Behavior
 * When a user toggles memory to `enabled: false`, the profile is immediately excluded from prompt context assembly for subsequent AI requests.
@@ -337,4 +341,4 @@ The memory subsystem must pass deterministic automated tests covering race condi
 | **MEM-TEST-07** | Worker & Service Restart | Background extraction job persists across server restart. | Stale job still carries its immutable `expected_generation` and is rejected if memory was purged during downtime. |
 
 > [!NOTE]
-> Implemented today: governance tests for first-read provisioning, OCC conflict, allow-list rejection, settings toggle, and purge/generation increment; injection tests for enabled, disabled, empty, and all-unspecified profiles; extraction tests for `COMPLETED`-only scheduling, disabled-memory suppression, explicit merge, inferred staging, stale-generation skip, and malformed output; and candidate tests for list/accept/reject, ownership isolation, and purge cleanup. The concurrent race suites `MEM-TEST-01`..`MEM-TEST-07` remain open in [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+> Implemented and covered: governance, injection, extraction (including retry exhaustion and stale-processing recovery), candidate review, and the `MEM-TEST-01`..`MEM-TEST-07` scenarios. The Android memory UI, extraction privacy audit, explicit current-instruction dominance test, and injection lookup-failure unit test remain open in [11-phase-2-checklist.md](./11-phase-2-checklist.md).

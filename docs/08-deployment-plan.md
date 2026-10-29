@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.7.0 |
-| **Last Updated** | 2026-10-27 |
+| **Version** | 1.8.0 |
+| **Last Updated** | 2026-10-29 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
 
@@ -25,6 +25,7 @@
 | 1.5.0 | 2026-10-27 | Bryan | Recorded backend advisory prompt injection; deployment remains a Phase 3 activity. |
 | 1.6.0 | 2026-10-27 | Bryan | Documented extraction scheduler configuration and the in-process polling model; deployment remains a Phase 3 activity. |
 | 1.7.0 | 2026-10-27 | Bryan | Recorded backend candidate-review endpoints; deployment remains a Phase 3 activity. |
+| 1.8.0 | 2026-10-29 | Bryan | Documented extraction retry/recovery settings and skip-locked claiming. Deployment remains a Phase 3 activity. |
 
 ---
 
@@ -76,6 +77,9 @@ Configuration is strictly divided between non-secret environment properties and 
 | `MIRA_JWT_SECRET_BASE64` | Secret | All | Base64-encoded HMAC-SHA256 signing key; must decode to at least 32 bytes. Application startup fails if missing or invalid. |
 | `mira.memory.extraction.scheduler-enabled` | Non-Secret | All | Enables the in-process extraction poller (default `true`; `false` in the test profile). |
 | `mira.memory.extraction.poll-interval-ms` | Non-Secret | All | Fixed delay between extraction polls in milliseconds (default `2000`). |
+| `mira.memory.extraction.max-attempts` | Non-Secret | All | Maximum claim/processing attempts per job before it becomes `FAILED` (default `3`). |
+| `mira.memory.extraction.stale-after-seconds` | Non-Secret | All | Age after which a `PROCESSING` job is considered abandoned and requeued (default `300`). |
+| `mira.memory.extraction.recovery-interval-ms` | Non-Secret | All | Fixed delay between stale-job recovery sweeps (default `60000`). |
 
 > [!CAUTION]
 > **Zero Secret Check-in Rule:**
@@ -173,10 +177,10 @@ If a sensitive secret (e.g., `DEEPSEEK_API_KEY` or `MIRA_JWT_SECRET_BASE64`) is 
 ## 6. Pre-Production Release Verification Checklist
 
 > [!NOTE]
-> MIRA is not yet deployed. Phase 1 (chat core) is complete and merged to `main`. Phase 2 is in progress: backend memory governance, advisory prompt injection, the in-process extraction pipeline, and candidate review are implemented, while the Android memory UI and the concurrency/privacy suites remain outstanding. Production deployment is a Phase 3 activity, performed after the Phase 2 memory subsystem is complete and verified.
+> MIRA is not yet deployed. Phase 1 (chat core) is complete and merged to `main`. Phase 2 is in progress: backend memory governance, advisory prompt injection, the in-process extraction pipeline (with retries/recovery), candidate review, and the MEM-TEST race scenarios are implemented, while the Android memory UI and the privacy audit remain outstanding. Production deployment is a Phase 3 activity, performed after the Phase 2 memory subsystem is complete and verified.
 
 > [!WARNING]
-> Extraction currently uses an in-process `@Scheduled` poller that reclaims `PENDING` jobs from PostgreSQL. It is safe for a single instance because commit is guarded by generation/version checks, but horizontal scaling requires a distributed claim or leader election and is tracked as a Phase 3 hardening item.
+> Extraction uses in-process `@Scheduled` pollers that claim `PENDING` jobs with `FOR UPDATE SKIP LOCKED` and requeue stale `PROCESSING` jobs. Claims are safe across multiple application instances and commit is guarded by generation/version checks, so leader election is not required. Keep `stale-after-seconds` comfortably above the provider timeout to avoid requeueing healthy work.
 
 Before opening the deployed service to physical Android client connections, verify the following:
 

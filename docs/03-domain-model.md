@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DAT-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.6.0 |
-| **Last Updated** | 2026-10-27 |
+| **Version** | 1.7.0 |
+| **Last Updated** | 2026-10-29 |
 | **Author / Lead** | Bryan / MIRA Data Engineering Team |
 | **Database Engine** | PostgreSQL 15+ (Neon Managed Database; PostgreSQL 18 in Testcontainers) |
 | **Migration Tool** | Flyway |
@@ -25,6 +25,7 @@
 | 1.4.0 | 2026-10-27 | Bryan | Recorded that chat context assembly reads the enabled style profile for advisory injection. No schema changes; migrations remain V1–V9. |
 | 1.5.0 | 2026-10-27 | Bryan | Reconciled Flyway V10: added `memory_extraction_job` and `user_memory_candidate`, their lifecycle constraints, indices, and asynchronous extraction flow. |
 | 1.6.0 | 2026-10-27 | Bryan | Recorded candidate review transitions (accept/reject) and pending-candidate cleanup on purge. No schema changes; migrations remain V1–V10. |
+| 1.7.0 | 2026-10-29 | Bryan | Recorded retry/recovery behavior for extraction jobs (`attempts`, stale `PROCESSING` requeue, skip-locked claiming). No schema changes; migrations remain V1–V10. |
 
 ---
 
@@ -500,7 +501,9 @@ CREATE INDEX idx_memory_job_status_created
   * A job exists at most once per `ai_response` (`response_id` is unique), making scheduling idempotent.
   * Jobs are created only after the response reaches `COMPLETED`; `PENDING`, `FAILED`, and `UNKNOWN` responses produce no job.
   * `expected_generation` and `expected_version` are immutable snapshots captured at scheduling time.
-  * The worker claims `PENDING` jobs, moves them to `PROCESSING`, and finishes them as `COMPLETED`, `SKIPPED`, or `FAILED`.
+  * The worker claims `PENDING` jobs with `FOR UPDATE SKIP LOCKED`, moves them to `PROCESSING`, and finishes them as `COMPLETED`, `SKIPPED`, or `FAILED`.
+  * Retryable failures (provider error, malformed output, commit failure) return the job to `PENDING` while `attempts < max-attempts`; once the limit is reached the job becomes `FAILED`.
+  * Jobs left in `PROCESSING` past `stale-after-seconds` are requeued at application startup and on a recovery interval, carrying `STALE_PROCESSING` as the error category.
   * A generation mismatch, disabled memory, or version mismatch at commit moves the job to `SKIPPED` without touching the profile.
 
 ---

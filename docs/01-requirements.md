@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-PRS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.8.0 |
-| **Last Updated** | 2026-10-27 |
+| **Version** | 1.9.0 |
+| **Last Updated** | 2026-10-29 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, Product, Quality Assurance |
 
@@ -26,6 +26,7 @@
 | 1.6.0 | 2026-10-27 | Bryan | Reconciled backend prompt injection (FR-006): enabled style profiles are serialized into an advisory system message, disabled/empty profiles are omitted, and injection failures do not block chat (72 backend tests). |
 | 1.7.0 | 2026-10-27 | Bryan | Reconciled the asynchronous extraction pipeline (FR-007, FR-008): `COMPLETED`-only eligibility, explicit durable/correction merging, inferred candidate staging, ephemeral discard, and generation/version commit guards. Candidate confirmation and Android UI remain Phase 2 (79 backend tests). |
 | 1.8.0 | 2026-10-27 | Bryan | Reconciled backend candidate review (FR-008, FR-009): pending inferred candidates can be listed, accepted with OCC, or rejected, and purge clears pending candidates. Android memory UI remains Phase 2 (83 backend tests). |
+| 1.9.0 | 2026-10-29 | Bryan | Reconciled extraction reliability (FR-007, NFR-003): bounded retries, stale-processing recovery, skip-locked claiming, and the MEM-TEST race scenarios (89 backend tests). |
 
 ---
 
@@ -244,7 +245,7 @@ flowchart TD
 | **NFR-002** | Privacy Minimization| [`06-security-and-privacy.md#6`](./06-security-and-privacy.md#6-privacy--data-minimization-governance) | Memory Validation Engine | `MemoryPrivacyAuditTest` | Partial (allow-list extraction guardrails + enum-only injection implemented; privacy audit test pending) |
 | **NFR-003** | Fault Isolation | [`02-architecture.md#3`](./02-architecture.md#3-message-processing--failure-semantics) | Provider Abstraction Layer | `MiraBackendApplicationTests`, `MockAIProviderTests`, `DeepSeekAIProviderTests` | Implemented (Backend) |
 | **NFR-004** | Performance & Latency | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | Message Rate Limiter / Endpoints | `MessageRateLimiterTests` | Implemented (Backend 10 req/min sliding window, 5s/30s timeouts) |
-| **NFR-006** | Testability | [`07-testing-strategy.md#2`](./07-testing-strategy.md#2-multi-tier-testing-pyramid) | Maven Build Verification | `CI Pipeline / Testcontainers` | Implemented (Testcontainers, 83 backend tests, Android testDebugUnitTest) |
+| **NFR-006** | Testability | [`07-testing-strategy.md#2`](./07-testing-strategy.md#2-multi-tier-testing-pyramid) | Maven Build Verification | `CI Pipeline / Testcontainers` | Implemented (Testcontainers, 89 backend tests, Android testDebugUnitTest) |
 
 > [!NOTE]
-> Phase 1 (the end-to-end text chat loop) is complete and merged to `main`. Phase 2 is active: backend style-memory governance, OCC/generation controls, advisory prompt injection, the asynchronous extraction pipeline, and candidate review are implemented. The Android memory UI and the concurrency/privacy test suites remain in progress. See [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+> Phase 1 (the end-to-end text chat loop) is complete and merged to `main`. Phase 2 is active: backend style-memory governance, OCC/generation controls, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review, and the `MEM-TEST` race scenarios are implemented. The Android memory UI and the privacy audit remain in progress. See [11-phase-2-checklist.md](./11-phase-2-checklist.md).

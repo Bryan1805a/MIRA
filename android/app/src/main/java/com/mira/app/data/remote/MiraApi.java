@@ -14,13 +14,21 @@ import com.mira.app.data.model.MessagePageResponse;
 import com.mira.app.data.model.RetryResponse;
 import com.mira.app.data.model.SendMessageRequest;
 import com.mira.app.data.model.SendMessageResponse;
+import com.mira.app.data.model.MemoryCandidateListResponse;
+import com.mira.app.data.model.MemorySettingsResponse;
+import com.mira.app.data.model.StyleProfileResponse;
+import com.mira.app.data.model.UpdateMemorySettingsRequest;
+import com.mira.app.data.model.UpdateStyleProfileRequest;
+
 
 import retrofit2.http.Header;
 import retrofit2.Call;
 import retrofit2.http.Body;
+import retrofit2.http.PUT;
 import retrofit2.http.DELETE;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
+import retrofit2.http.PATCH;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 
@@ -76,5 +84,34 @@ public interface MiraApi {
             @Path("conversationId") String conversationId,
             @Path("responseId") String responseId,
             @Header("Idempotency-Key") String idempotencyKey
+    );
+
+    @GET("api/v1/memory/style")
+    Call<StyleProfileResponse> getStyleProfile();
+
+    @PUT("api/v1/memory/style")
+    Call<StyleProfileResponse> replaceStyleProfile(
+            @Body UpdateStyleProfileRequest request
+    );
+
+    @PATCH("api/v1/memory/style/settings")
+    Call<MemorySettingsResponse> updateMemorySettings(
+            @Body UpdateMemorySettingsRequest request
+    );
+
+    @DELETE("api/v1/memory/style")
+    Call<Void> purgeStyleProfile();
+
+    @GET("api/v1/memory/candidates")
+    Call<MemoryCandidateListResponse> listMemoryCandidates();
+
+    @POST("api/v1/memory/candidates/{candidateId}/accept")
+    Call<StyleProfileResponse> acceptMemoryCandidate(
+            @Path("candidateId") String candidateId
+    );
+
+    @POST("api/v1/memory/candidates/{candidateId}/reject")
+    Call<Void> rejectMemoryCandidate(
+            @Path("candidateId") String candidateId
     );
 }

@@ -51,4 +51,60 @@
     <string name="message_status_unknown">Outcome unknown.</string>
     <string name="retry">Retry</string>
     <string name="chat_title">Chat</string>
+
+    <!-- Communication-style memory -->
+    <string name="open_memory">Memory</string>
+    <string name="memory_title">Communication memory</string>
+    <string name="memory_status_title">Personalization</string>
+    <string name="memory_status_on">On. Your preferences are applied to new messages.</string>
+    <string name="memory_status_off">Off. Preferences are saved but not applied.</string>
+    <string name="memory_version">Version %1$d</string>
+    <string name="memory_version_updated">Version %1$d · Updated %2$s</string>
+
+    <string name="memory_preferences_title">Style preferences</string>
+    <string name="memory_preferences_subtitle">Choose how MIRA should explain things. No strong preference leaves the field unset.</string>
+    <string name="memory_save">Save changes</string>
+    <string name="memory_saved">Memory updated.</string>
+    <string name="memory_conflict">Your memory changed elsewhere. Reloading the latest version.</string>
+    <string name="memory_load_failed">Unable to load memory.</string>
+
+    <string name="memory_no_preference">No strong preference</string>
+    <string name="memory_field_depth">Explanation depth</string>
+    <string name="memory_field_tone">Tone</string>
+    <string name="memory_field_examples">Examples</string>
+    <string name="memory_field_formatting">Formatting</string>
+    <string name="memory_field_teaching">Teaching sequence</string>
+
+    <string name="memory_value_concise">Concise</string>
+    <string name="memory_value_balanced">Balanced</string>
+    <string name="memory_value_detailed">Detailed</string>
+    <string name="memory_value_conversational">Conversational</string>
+    <string name="memory_value_formal">Formal</string>
+    <string name="memory_value_academic">Academic</string>
+    <string name="memory_value_concrete_examples">Prefer concrete examples</string>
+    <string name="memory_value_theory_first">Theory first</string>
+    <string name="memory_value_structured">Structured</string>
+    <string name="memory_value_prose">Prose</string>
+    <string name="memory_value_bulleted_lists">Bulleted lists</string>
+    <string name="memory_value_principles_first">Principles first</string>
+    <string name="memory_value_code_first">Code first</string>
+    <string name="memory_value_analogy_first">Analogy first</string>
+
+    <string name="memory_candidates_title">Suggested preferences</string>
+    <string name="memory_candidates_subtitle">Inferred from your conversations. Accept what fits you.</string>
+    <string name="memory_no_candidates">No suggestions right now.</string>
+    <string name="memory_candidate_title">%1$s: %2$s</string>
+    <string name="memory_candidate_evidence">Evidence: %1$s (seen %2$d times)</string>
+    <string name="memory_accept">Accept</string>
+    <string name="memory_reject">Reject</string>
+    <string name="memory_candidate_accepted">Preference applied.</string>
+    <string name="memory_candidate_rejected">Suggestion dismissed.</string>
+
+    <string name="memory_privacy_title">Your data</string>
+    <string name="memory_privacy_body">Deleting memory is permanent. MIRA keeps no copy. Your conversations remain.</string>
+    <string name="memory_purge">Delete memory</string>
+    <string name="memory_purge_title">Delete communication memory?</string>
+    <string name="memory_purge_message">This permanently clears your saved style preferences. Conversations are not deleted.</string>
+    <string name="memory_purge_confirm">Delete</string>
+    <string name="memory_purged">Memory deleted.</string>
 </resources>

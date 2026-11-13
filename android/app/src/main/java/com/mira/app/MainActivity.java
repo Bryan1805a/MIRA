@@ -93,6 +93,12 @@ public class MainActivity extends AppCompatActivity {
                     new Intent(this, ConversationsActivity.class)
             )
         );
+
+        binding.memoryButton.setOnClickListener(
+                view -> startActivity(
+                        new Intent(this, MemoryActivity.class)
+                )
+        );
     }
 
     private void logout() {

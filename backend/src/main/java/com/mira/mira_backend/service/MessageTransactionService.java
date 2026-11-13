@@ -19,6 +19,7 @@ import com.mira.mira_backend.repository.UserAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -172,11 +173,20 @@ public class MessageTransactionService {
             );
         }
 
+        Instant now = Instant.now();
+        Instant userMessageTime = response.getUserMessage() != null
+                ? response.getUserMessage().getCreatedAt()
+                : null;
+        if (userMessageTime != null && !now.isAfter(userMessageTime)) {
+            now = userMessageTime.plus(1, java.time.temporal.ChronoUnit.MICROS);
+        }
+
         Message assistantMessage = messageRepository.saveAndFlush(
                 new Message(
                         response.getConversation(),
                         MessageRole.ASSISTANT,
-                        content
+                        content,
+                        now
                 )
         );
 

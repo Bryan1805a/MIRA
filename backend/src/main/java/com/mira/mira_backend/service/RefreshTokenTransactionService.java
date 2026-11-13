@@ -65,6 +65,9 @@ public class RefreshTokenTransactionService {
 
         RefreshTokenHistory history = historyEntry.get();
         Instant now = Instant.now();
+        if (now.isBefore(history.getIssuedAt())) {
+            now = history.getIssuedAt();
+        }
 
         // A consumed token is a replay. Return normally so revocation commits.
         if (history.getConsumedAt() != null) {

@@ -72,6 +72,16 @@ public class Message {
         this.content = content;
     }
 
+    public Message(
+            Conversation conversation,
+            MessageRole role,
+            String content,
+            Instant createdAt
+    ) {
+        this(conversation, role, content);
+        this.createdAt = createdAt;
+    }
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

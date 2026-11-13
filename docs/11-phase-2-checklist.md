@@ -23,6 +23,7 @@
 | 1.4.0 | 2026-10-29 | Bryan | Marked extraction reliability and the MEM-TEST race scenarios complete: bounded retries, skip-locked claiming, and stale-processing recovery (89 total tests). Android UI and privacy audit remain. |
 | 1.5.0 | 2026-11-13 | Bryan | Marked Android memory client complete (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`, `item_memory_candidate.xml`, `activity_memory.xml`): inspect, edit with OCC, toggle, purge, and candidate review (accept/reject), plus `MemoryOptionsTest` unit tests (4 passing Android unit tests). |
 | 1.6.0 | 2026-11-13 | Bryan | Reconciled all dedicated Phase 2 memory integration test suites (104 backend tests passing: `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`, `MemoryInjectionFailureTest`, `MemoryInjectionSafetyTest`, `MemoryPrivacyAuditTest`) and closed remaining privacy audit, prompt dominance, cross-account, and lookup-failure checklist items. |
+| 1.7.0 | 2026-11-13 | Bryan | Started Phase 3 security hardening: auth rate limiting, account-wide replay revocation, and log-sanitization tests (116 backend tests). Closed the Phase 1 log-sanitization and refresh-replay follow-ups. |
 
 ---
 
@@ -107,7 +108,7 @@ Phase 2 objectives:
 | Advisory prompt injection | Implemented (backend; enabled, non-empty profiles only) |
 | Extraction pipeline (jobs, hybrid policy, commit guards, retries, recovery) | Implemented (backend; Flyway V10) |
 | Candidate review (list/accept/reject) | Implemented (backend & Android `MemoryActivity`) |
-| Backend test suite | 104 passing tests (including all 5 dedicated memory test suites: conflict resolution, endpoint security, injection failure, injection safety, and privacy audit; 0 failures) |
+| Backend test suite | 116 passing tests (including all 5 dedicated memory test suites and the Phase 3 auth/log security suites; 0 failures) |
 | Android test suite | 4 passing unit tests (`MemoryOptionsTest`, `ExampleUnitTest`) |
 | Privacy audit and memory test suites | Complete (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`) |
 | Phase 1 open follow-ups | See section 3.1 |
@@ -117,8 +118,8 @@ Phase 2 objectives:
 These are tracked here because Phase 1 closed with them still open:
 
 - [ ] Install the debug APK on a device/emulator and record the SDK/build-tools versions.
-- [ ] Complete the log-sanitization audit.
-- [ ] Decide the refresh-token replay policy (account-wide vs session-scoped).
+- [x] Complete the log-sanitization audit (`LogSanitizationTest`; `ApiExceptionHandler` logs only the exception class and request ID).
+- [x] Decide the refresh-token replay policy (account-wide revocation implemented and tested).
 - [ ] Add Android unit tests for token storage, the auth interceptor, and error mapping.
 - [ ] Add an instrumented login → conversation → send smoke test.
 - [ ] Split `MiraBackendApplicationTests` by domain.
@@ -177,7 +178,7 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Decide and implement where staged candidates live (`user_memory_candidate`, Flyway `V10`).
 - [x] Expose candidate review (accept/reject) over HTTP with ownership and generation checks.
 - [x] Add the Android candidate-review UI (`MemoryActivity`, `item_memory_candidate.xml`).
-- [ ] Decide whether an evidence threshold should auto-promote candidates (currently manual confirmation only).
+- [x] Decide whether an evidence threshold should auto-promote candidates (decision: manual confirmation only; see `05-memory-lifecycle.md`).
 - [x] Tests: `MemoryConflictResolutionTest` for the full hybrid matrix.
 
 ### 4.4 Concurrency & Tombstone Safety
@@ -238,7 +239,7 @@ These are tracked here because Phase 1 closed with them still open:
 | Injection | Enabled profile injected, disabled/empty/unspecified profile omitted, current instruction wins | Implemented (`MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`) |
 | Privacy | No biographical extraction, no prompt/token leakage in logs or audit rows | Implemented (`MemoryPrivacyAuditTest`) |
 | Android | Memory screen CRUD, conflict handling, toggle/purge, candidate confirmation, options mapping | Implemented (`MemoryActivity`, `MemoryOptionsTest`) |
-| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Local verification green (104 backend, 4 Android unit tests); CI pending |
+| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Local verification green (116 backend, 4 Android unit tests); CI pending |
 
 All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQL.
 
@@ -254,7 +255,7 @@ All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQ
 | **FR-009** User Memory Governance | Read, replace, toggle, purge, and candidate review in backend & Android `MemoryActivity` *(implemented)* |
 | **NFR-002** Privacy & Data Minimization | Extraction prompt guardrails and privacy audit tests (`MemoryPrivacyAuditTest`) *(implemented)* |
 | **NFR-005** Maintainability | Memory module isolation behind service boundaries |
-| **NFR-006** Testability | Deterministic extraction doubles and concurrency suites (104 offline backend tests) |
+| **NFR-006** Testability | Deterministic extraction doubles and concurrency suites (116 offline backend tests) |
 
 ---
 

@@ -28,6 +28,7 @@
 | 1.8.0 | 2026-10-27 | Bryan | Documented candidate-review privacy: evidence is a short owner-scoped quote, accept/reject is owner-scoped, and purge deletes pending candidates. |
 | 1.9.0 | 2026-11-13 | Bryan | Reconciled Android memory management client security: user memory governance and candidate review integrated in Android client (`MemoryActivity`). |
 | 2.0.0 | 2026-11-13 | Bryan | Reconciled memory extraction privacy audit tests (`MemoryPrivacyAuditTest`), token consumption sub-millisecond timestamp alignment, and injection safety validation. |
+| 2.1.0 | 2026-11-13 | Bryan | Added Phase 3 security hardening: authentication rate limiting (login/register/refresh), account-wide refresh-token replay revocation, and dedicated log-sanitization tests. |
 
 ---
 
@@ -121,7 +122,7 @@ sequenceDiagram
 ```
 
 > [!NOTE]
-> Revoking **all** sessions for the user on replay is a stronger defense recommended by the original draft but not yet implemented. Current behavior revokes only the session whose token was replayed. Global revocation remains an open Phase 1 follow-up carried into Phase 2 (see [11-phase-2-checklist.md](./11-phase-2-checklist.md)).
+> Reuse detection now revokes **every active session for the account**, not only the session whose token was replayed. The implicated session is therefore unusable immediately, and any other device sessions are forced to re-authenticate. Stateless access tokens already issued remain valid until their 15-minute expiry.
 
 ### 3.1 Token Lifecycle Invariants
 * **Access Tokens:**
@@ -135,8 +136,9 @@ sequenceDiagram
   * Backend stores only the SHA-256 hash. The plaintext refresh token is returned once to the client and never logged.
   * `refresh_token_history` records every issued hash and its `consumed_at` time. Rotation updates `user_session.refresh_token_hash` in place and appends the successor to history.
 * **Reuse Detection Defense:**
-  * If an already-consumed refresh token is submitted again, it indicates potential token interception. The backend revokes the **implicated session** and returns `401 Unauthorized`.
-  * Revoking every session for the account on replay is a recommended hardening step but is not current behavior; it remains an open Phase 1 follow-up.
+  * If an already-consumed refresh token is submitted again, it indicates potential token interception. The backend revokes **every active session for the account** and returns `401 Unauthorized`.
+  * The same account-wide revocation applies when a token's history row and the session's current token hash disagree (a fail-closed replay signal).
+  * Access tokens are stateless and remain valid until their 15-minute expiry; refresh revocation prevents any further rotation or refresh-token use.
 
 ---
 
@@ -165,6 +167,7 @@ flowchart LR
 ```
 
 * **Server-Side Quota Enforcement:** Per-account request throttling limits brute-force generation or API depletion.
+* **Authentication Throttling:** Login attempts are limited per normalized email (default 5/minute) and per client IP (default 30/minute). Registration is limited per IP (default 5/minute), and refresh attempts per IP (default 60/minute). Exceeding a limit returns `429 rate_limited`. Counters are in-memory per application instance and are configurable via `mira.auth.rate-limit.*`.
 * **Payload Constraints:** Strict maximum character lengths prevent large context submissions that could inflate billing tokens.
 * **Timeout & Circuit Breaking:** HTTP requests to DeepSeek enforce a 5-second connection timeout and 30-second read timeout. Network failures transition the request to `UNKNOWN` or `FAILED` rather than initiating unbounded retry storms.
 * **Mock Implementations in Test Suites:** CI/CD builds and automated tests execute strictly against `MockAIProvider` once provider integration lands in Phase 1. No automated build or integration test may touch the live DeepSeek API, ensuring zero unintentional billing. *Implemented: the test profile is pinned to `MockAIProvider`, and `DeepSeekAIProvider` is verified with `MockRestServiceServer`.*
@@ -202,12 +205,13 @@ flowchart LR
 | :--- | :--- |
 | Argon2id password hashing | Implemented |
 | SHA-256 refresh-token hashing | Implemented |
-| Rotating refresh tokens with replay detection | Implemented (revokes implicated session only; auto-refresh on Android client; timestamp-aligned) |
+| Rotating refresh tokens with replay detection | Implemented (account-wide revocation on replay; auto-refresh on Android client; timestamp-aligned) |
 | HS256 JWT validation, 15-minute expiry | Implemented |
 | Stateless security filter chain and JSON 401/403 responses | Implemented |
 | Uniform error envelope with `requestId`/`details` | Implemented (Backend & Android) |
-| Per-account rate limiting | Implemented (Backend in-memory sliding window, 10 requests/min per user) |
-| Sanitized structured logging and request-ID correlation | Implemented (Backend) |
+| Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 requests/min per user) |
+| Authentication rate limiting | Implemented (Backend per-email and per-IP sliding windows for login, register, and refresh) |
+| Sanitized structured logging and request-ID correlation | Implemented (Backend; `LogSanitizationTest` verifies no prompts, passwords, or tokens are logged) |
 | Android Keystore / `EncryptedSharedPreferences` | Implemented (Android) |
 | TLS-only network security config | Implemented (Android) |
 | Memory allow-list validation and generation-guarded purge | Implemented (Backend & Android `MemoryActivity`) |

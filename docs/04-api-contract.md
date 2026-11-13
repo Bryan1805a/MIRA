@@ -30,6 +30,7 @@
 | 1.9.0 | 2026-10-29 | Bryan | Recorded internal extraction retry/recovery behavior. No endpoint shape changes. |
 | 2.0.0 | 2026-11-13 | Bryan | Reconciled Android client delivery for style memory governance and candidate review (`MemoryActivity`, `MiraApi`, `MemoryRepository`). |
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration and privacy audit test verification (104 backend tests, 0 failures; sub-millisecond token consumption alignment and message ordering tie-breaker fixed). |
+| 2.2.0 | 2026-11-13 | Bryan | Documented authentication rate limiting (`429 rate_limited` on login/register/refresh) and account-wide refresh-token replay revocation. |
 
 ---
 
@@ -90,6 +91,7 @@ Endpoints marked Implemented are live and covered by automated test suites. Phas
 ```
 * Registration does **not** issue tokens. The client authenticates via `POST /api/v1/auth/login` after a successful registration.
 * Passwords must be 12–128 characters. Emails are trimmed and lowercased before storage.
+* Excessive registration attempts from one client IP return `429 Too Many Requests` with `rate_limited`.
 
 #### Error Responses
 * `400 Bad Request` / `invalid_registration` — email or password fails service-level registration rules.
@@ -125,6 +127,7 @@ Endpoints marked Implemented are live and covered by automated test suites. Phas
 }
 ```
 * Invalid credentials return `401 Unauthorized` with `invalid_credentials`; the response does not distinguish between an unknown email and a wrong password.
+* Excessive attempts for the same normalized email or client IP return `429 Too Many Requests` with `rate_limited`.
 
 ---
 
@@ -154,7 +157,7 @@ Endpoints marked Implemented are live and covered by automated test suites. Phas
 }
 ```
 > [!NOTE]
-> Refresh token rotation is atomic. The submitted token is marked consumed in `refresh_token_history`, the session's current token hash is updated in place, and a newly generated refresh token is returned. The absolute session expiry is not extended. Presenting an already-consumed token is treated as replay: the implicated session is revoked and the request is rejected with `401 Unauthorized` (`invalid_credentials`). Global revocation across every device remains an open Phase 1 follow-up carried into Phase 2; it is not current behavior.
+> Refresh token rotation is atomic. The submitted token is marked consumed in `refresh_token_history`, the session's current token hash is updated in place, and a newly generated refresh token is returned. The absolute session expiry is not extended. Presenting an already-consumed token is treated as replay: **every active session for the account is revoked** and the request is rejected with `401 Unauthorized` (`invalid_credentials`). Access tokens already issued remain valid until their 15-minute expiry. Excessive refresh attempts from one client IP return `429 rate_limited`.
 
 ---
 
@@ -575,7 +578,7 @@ A catch-all `500` handler in `ApiExceptionHandler` guarantees unexpected backend
 | `409 Conflict` | `email_already_registered` | Normalized email already exists. | Implemented |
 | `409 Conflict` | `idempotency_conflict` | Idempotency key reused with a different payload hash. | Implemented |
 | `409 Conflict` | `version_conflict` | OCC `expectedVersion` mismatch on style-memory update. | Implemented |
-| `429 Too Many Requests`| `rate_limited` | Exceeded per-account request quota (10 requests/minute on message send/retry). | Implemented |
+| `429 Too Many Requests`| `rate_limited` | Exceeded a quota: message send/retry (10/minute per account), login (5/minute per email or 30/minute per IP), registration (5/minute per IP), or refresh (60/minute per IP). | Implemented |
 | `502 Bad Gateway` | `ai_provider_unavailable` | Reserved. Provider terminal errors are persisted as response status `FAILED`; the API returns `201 Created` with that status rather than a gateway error. | Not emitted |
 | `504 Gateway Timeout` | `ai_provider_timeout` | Reserved. Provider timeouts are persisted as response status `UNKNOWN`; the API returns `200 OK` with that status rather than a gateway error. | Not emitted |
 | `500 Internal Error` | `internal_error` | Unexpected backend fault (sanitized and logged with request ID). | Implemented |

@@ -29,6 +29,7 @@
 | 1.9.0 | 2026-10-29 | Bryan | Recorded extraction reliability: bounded retries (`max-attempts`), stale `PROCESSING` recovery at startup and on an interval, and `FOR UPDATE SKIP LOCKED` claiming. The `MEM-TEST-01`..`MEM-TEST-07` scenarios are now covered (89 passing tests). |
 | 2.0.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery: delivered `MemoryActivity`, `MemoryRepository`, `MemoryOptions`, candidate review UI (accept/reject), OCC save/reload, toggle, and purge. |
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites and test verification baseline: completed `MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, and `MemoryEndpointSecurityTest` (104 passing backend tests, 0 failures). |
+| 2.2.0 | 2026-11-13 | Bryan | Started Phase 3 production hardening: authentication rate limiting, account-wide refresh-token replay revocation, and log-sanitization verification (116 passing backend tests). |
 
 ---
 
@@ -136,10 +137,10 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 | :--- | :--- | :--- |
 | **Phase 0** | Complete (Android APK install verification carried into Phase 1) | Repository, toolchain, backend/Android skeletons, Flyway baseline |
 | **Phase 1** | **Complete** (merged to `main`) | Conversation API, message orchestration, AI provider abstraction, Android auth/chat client, hardening, CI |
-| **Phase 2** | **Active** | Communication-style memory governance, prompt injection, extraction + retry/recovery, candidate review, OCC/generation concurrency, memory UI |
-| **Phase 3** | Planned | Production hardening, deployment, release signing, operational readiness |
+| **Phase 2** | **Complete** (functional exit gate; CI verification pending) | Communication-style memory governance, prompt injection, extraction + retry/recovery, candidate review, OCC/generation concurrency, memory UI |
+| **Phase 3** | **Active** | Production hardening: security hardening, release signing, backend deployment, observability, operational readiness |
 
-Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 is the active milestone: backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), the `MEM-TEST-01`..`MEM-TEST-07` race scenarios, the Android memory client (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`) are implemented and fully passing (104 backend tests, 0 failures). See [11-phase-2-checklist.md](./11-phase-2-checklist.md) and [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 delivered backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), the `MEM-TEST-01`..`MEM-TEST-07` race scenarios, the Android memory client (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). Phase 3 is active: authentication rate limiting, account-wide replay revocation, and log-sanitization tests are complete (116 backend tests, 0 failures); release signing, backend deployment, and observability remain. See [12-phase-3-checklist.md](./12-phase-3-checklist.md), [11-phase-2-checklist.md](./11-phase-2-checklist.md), and [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
 ---
 
@@ -158,6 +159,7 @@ The complete engineering specification is partitioned into modular, version-cont
 * [09-phase-0-checklist.md](./09-phase-0-checklist.md) — Phase 0 Repository Baseline, Verification Steps, and Readiness Gates (complete; Android APK verification carried into Phase 1).
 * [10-phase-1-checklist.md](./10-phase-1-checklist.md) — Phase 1 Conversation & Chat Core milestone (complete; open follow-ups carried into Phase 2).
 * [11-phase-2-checklist.md](./11-phase-2-checklist.md) — Phase 2 Communication-Style Memory milestone, workstreams, and exit gate.
+* [12-phase-3-checklist.md](./12-phase-3-checklist.md) — Phase 3 Production Hardening, Deployment, and Operational Readiness.
 * [ADR-001-backend-stack.md](./decisions/ADR-001-backend-stack.md) — Architectural Decision Record: Backend Technology Selection.
 * [ADR-002-memory-model.md](./decisions/ADR-002-memory-model.md) — Architectural Decision Record: Memory Lifecycle & Concurrency Model.
 * [ADR-003-file-processing.md](./decisions/ADR-003-file-processing.md) — Architectural Decision Record: Multimodal Processing Phasing.

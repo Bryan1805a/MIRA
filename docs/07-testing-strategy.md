@@ -30,6 +30,7 @@
 | 2.0.0 | 2026-10-29 | Bryan | Reconciled extraction retry/recovery and the MEM-TEST race scenarios: six new tests (68 integration, 89 total). |
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled Android memory options unit test suite (`MemoryOptionsTest`, 3 tests; 4 total passing Android unit tests). |
 | 2.2.0 | 2026-11-13 | Bryan | Reconciled memory integration and privacy audit test suites (15 tests across `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`, `MemoryInjectionFailureTest`, `MemoryInjectionSafetyTest`, `MemoryPrivacyAuditTest`; inventory now 104 passing backend tests, 0 failures). |
+| 2.3.0 | 2026-11-13 | Bryan | Added Phase 3 security hardening suites: `AuthRateLimiterTests`, `AuthSecurityTest`, and `LogSanitizationTest` (12 tests; inventory now 116 passing backend tests). |
 
 ---
 
@@ -86,7 +87,7 @@ flowchart TD
 * **Framework:** Spring MockMvc / WebTestClient with Spring Security context.
 * **Verification Scope:**
   * **Authentication:** Verify registration, login, token rotation, and invalid credential rejections. Registration, login, refresh, logout, and `/me` are implemented and covered; dedicated rotation/replay tests remain an open Phase 1 follow-up.
-  * **Session Revocation & Reuse:** Verify that using an already-rotated refresh token revokes the implicated session and rejects further use of that token. Current tests cover logout revocation and post-logout refresh rejection; replay-specific tests remain an open Phase 1 follow-up.
+  * **Session Revocation & Reuse:** Verify that using an already-rotated refresh token revokes every active session for the account and rejects further use of the token. Covered by `AuthSecurityTest` (account-wide revocation and cross-account isolation).
   * **Object-Level Authorization (IDOR):** Verify that User A attempting to read, modify, or delete User B's conversation receives `404 Not Found`.
   * **Uniform Error Formatting:** Verify that invalid inputs return the standard JSON error schema with appropriate error codes.
 
@@ -118,11 +119,14 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | Suite | Type | Tests | Scope |
 | :--- | :--- | :--- | :--- |
 | `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 68 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, per-account rate limiting (`429 rate_limited`), cross-account isolation, style-memory governance, prompt injection, extraction (scheduling/eligibility, explicit merge, inferred staging, retry exhaustion, stale-processing recovery, malformed output), the `MEM-TEST-01`..`MEM-TEST-07` scenarios, and candidate review (list/accept, reject, purge cleanup, cross-account rejection). |
-| `MemoryConflictResolutionTest` | Spring Boot + Testcontainers + MockMvc | 4 | Full hybrid persistence matrix: explicit durable auto-merge, inferred candidate staging with evidence counter accumulation, ephemeral instruction discard, and immediate user correction overwrite. |
-| `MemoryEndpointSecurityTest` | Spring Boot + Testcontainers + MockMvc | 3 | Multi-tenant authorization boundaries: profile mutations and candidate accept/reject are strictly scoped to the owner, rejecting cross-account IDOR attempts with 404/403. |
-| `MemoryInjectionFailureTest` | Spring Boot + Testcontainers + MockMvc | 2 | Fault tolerance: simulated style profile lookup failures during chat context assembly are caught non-fatally, allowing chat to proceed smoothly without memory. |
-| `MemoryInjectionSafetyTest` | Spring Boot + Testcontainers + MockMvc | 3 | Prompt injection safety: immediate explicit user prompt instruction is strictly ordered last, advisory style injection is subordinate, and purged memory is omitted from subsequent chat requests. |
-| `MemoryPrivacyAuditTest` | Spring Boot + Testcontainers + MockMvc | 3 | Privacy & data minimization audit: biographical/unknown candidate keys are never persisted, candidate evidence is capped at 500 characters, no transcript/prompt columns exist in extraction tables, and user content/tokens are never emitted to logs. |
+| `MemoryConflictResolutionTest` | Spring Boot + Testcontainers + MockMvc | 5 | Full hybrid persistence matrix: explicit durable auto-merge, inferred candidate staging with evidence counter accumulation, ephemeral instruction discard, and immediate user correction overwrite. |
+| `MemoryEndpointSecurityTest` | Spring Boot + Testcontainers + MockMvc | 2 | Multi-tenant authorization boundaries: profile mutations and candidate accept/reject are strictly scoped to the owner, rejecting cross-account IDOR attempts with 404/403. |
+| `MemoryInjectionFailureTest` | Spring Boot + Testcontainers + MockMvc | 1 | Fault tolerance: simulated style profile lookup failures during chat context assembly are caught non-fatally, allowing chat to proceed smoothly without memory. |
+| `MemoryInjectionSafetyTest` | Spring Boot + Testcontainers + MockMvc | 2 | Prompt injection safety: immediate explicit user prompt instruction is strictly ordered last, advisory style injection is subordinate, and purged memory is omitted from subsequent chat requests. |
+| `MemoryPrivacyAuditTest` | Spring Boot + Testcontainers + MockMvc | 5 | Privacy & data minimization audit: biographical/unknown candidate keys are never persisted, candidate evidence is capped at 500 characters, no transcript/prompt columns exist in extraction tables, and user content/tokens are never emitted to logs. |
+| `AuthRateLimiterTests` | Unit | 6 | Auth sliding-window limits: login per email/IP, register per IP, refresh per IP, email normalization, window refill, and IP isolation. |
+| `AuthSecurityTest` | Spring Boot + Testcontainers + MockMvc | 3 | Account-wide refresh-token replay revocation, cross-account replay isolation, and `429 rate_limited` on repeated failed logins. |
+| `LogSanitizationTest` | Spring Boot + Testcontainers + MockMvc | 3 | Log audit: login credentials, tokens, chat prompts, and completions never appear in application logs. |
 | `MessageRateLimiterTests` | Unit | 4 | In-memory sliding-window rate limiter accounting, quota enforcement (10 req/min), multi-user isolation, and window expiration. |
 | `DeepSeekAIProviderTests` | Unit + MockRestServiceServer | 6 | OpenAI-compatible request serialization, Bearer authorization, response parsing, and HTTP status/error mapping (timeout, 429 rate limit, 5xx unavailable, 4xx provider error, invalid/blank output). |
 | `MockAIProviderTests` | Unit | 5 | Deterministic simulation of instant success, timeout, HTTP 429 rate limiting, HTTP 5xx error, and malformed response scenarios. |
@@ -131,7 +135,7 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `MemoryOptionsTest` (Android) | Unit | 3 | Style options indexing, unspecified value mapping, allow-list enum selection, and invalid value rejection. |
 | `ExampleUnitTest` (Android) | Unit | 1 | Android unit testing baseline. |
 
-The backend suite (104 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (4 tests total) executes via `.\gradlew.bat testDebugUnitTest`. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 104 backend tests pass offline without failures or errors.
+The backend suite (116 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (4 tests total) executes via `.\gradlew.bat testDebugUnitTest`. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 116 backend tests pass offline without failures or errors.
 
 ---
 
@@ -173,7 +177,9 @@ The backend suite (104 tests total) runs against a real PostgreSQL container (`p
 | **Memory Concurrency** | OCC Version Collision (concurrent) | Two jobs race to commit with the same `expectedVersion`. | One commit succeeds; the other is skipped without overwriting the profile. | Implemented (MEM-TEST-06) |
 | **Memory Deletion Race**| Background Extraction vs User Purge | Extraction task starts; User executes `DELETE /memory/style`; Extraction finishes. | Extraction task detects incremented `generation` counter and aborts; profile remains completely purged. | Implemented (MEM-TEST-01/03) |
 | **Session Security** | Refresh Token Rotation | Client calls `POST /auth/refresh` with valid RT1. | RT1 is marked consumed; RT2 is issued and verified active; the session ID is unchanged. | Implemented (Backend) |
-| **Session Security** | Token Reuse Interception | Client attempts to reuse consumed RT1. | Server detects reuse, revokes the implicated session, and returns `401 Unauthorized`. Global all-session revocation is a hardening item. | Implemented (Backend) |
+| **Session Security** | Token Reuse Interception | Client attempts to reuse consumed RT1. | Server detects reuse, revokes every active session for the account, and returns `401 Unauthorized` (`AuthSecurityTest`). | Implemented (Backend) |
+| **Authentication Security** | Auth throttling | Repeated failed logins or registration/refresh attempts. | `429 rate_limited` per configured email/IP window (`AuthRateLimiterTests`, `AuthSecurityTest`). | Implemented (Backend) |
+| **Log Security** | Sensitive-data log audit | Login, failed login, successful chat, and provider failure. | Passwords, tokens, prompts, and completions never appear in logs (`LogSanitizationTest`). | Implemented (Backend) |
 
 ---
 
@@ -226,7 +232,7 @@ Before any feature or sprint release is accepted into the production branch, all
 - [ ] 100% of backend unit and Testcontainers integration tests pass locally and in CI.
 - [ ] Cross-account authorization (IDOR) tests verify that resources cannot be accessed across user boundaries.
 - [ ] Memory concurrency tests prove that stale background tasks cannot overwrite manual user edits or resurrect deleted memory.
-- [ ] Refresh token rotation and token reuse detection are verified with automated test cases.
+- [x] Refresh token rotation and token reuse detection are verified with automated test cases.
 - [ ] All database migrations (`V1`..`Vn`) execute cleanly against an empty PostgreSQL instance.
 - [ ] No API keys, passwords, or raw user message transcripts are emitted into application log files.
 - [ ] Android application builds cleanly in debug and release modes with zero lint errors.

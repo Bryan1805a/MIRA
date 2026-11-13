@@ -27,6 +27,7 @@
 | 1.7.0 | 2026-10-27 | Bryan | Recorded backend candidate-review endpoints; deployment remains a Phase 3 activity. |
 | 1.8.0 | 2026-10-29 | Bryan | Documented extraction retry/recovery settings and skip-locked claiming. Deployment remains a Phase 3 activity. |
 | 1.9.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery; deployment remains a Phase 3 activity. |
+| 2.0.0 | 2026-11-13 | Bryan | Recorded Phase 3 security hardening: authentication rate-limit configuration and account-wide replay revocation. Deployment remains a Phase 3 activity. |
 
 ---
 
@@ -81,6 +82,13 @@ Configuration is strictly divided between non-secret environment properties and 
 | `mira.memory.extraction.max-attempts` | Non-Secret | All | Maximum claim/processing attempts per job before it becomes `FAILED` (default `3`). |
 | `mira.memory.extraction.stale-after-seconds` | Non-Secret | All | Age after which a `PROCESSING` job is considered abandoned and requeued (default `300`). |
 | `mira.memory.extraction.recovery-interval-ms` | Non-Secret | All | Fixed delay between stale-job recovery sweeps (default `60000`). |
+| `mira.auth.rate-limit.login-email-limit` | Non-Secret | All | Login attempts per normalized email per window (default `5`; `0` disables). |
+| `mira.auth.rate-limit.login-ip-limit` | Non-Secret | All | Login attempts per client IP per window (default `30`; `0` disables). |
+| `mira.auth.rate-limit.register-ip-limit` | Non-Secret | All | Registration attempts per client IP per window (default `5`; `0` disables). |
+| `mira.auth.rate-limit.refresh-ip-limit` | Non-Secret | All | Refresh attempts per client IP per window (default `60`; `0` disables). |
+| `mira.auth.rate-limit.window-seconds` | Non-Secret | All | Sliding-window length for auth throttling (default `60`). |
+| `mira.auth.rate-limit.trust-forwarded-headers` | Non-Secret | Prod | Trust `X-Forwarded-For` for client IP resolution. Enable only behind a trusted reverse proxy. |
+| `mira.auth.rate-limit.cleanup-interval-ms` | Non-Secret | All | Expired-window cleanup interval (default `600000`). |
 
 > [!CAUTION]
 > **Zero Secret Check-in Rule:**
@@ -178,7 +186,7 @@ If a sensitive secret (e.g., `DEEPSEEK_API_KEY` or `MIRA_JWT_SECRET_BASE64`) is 
 ## 6. Pre-Production Release Verification Checklist
 
 > [!NOTE]
-> MIRA is not yet deployed. Phase 1 (chat core) is complete and merged to `main`. Phase 2 is in progress: backend memory governance, advisory prompt injection, the in-process extraction pipeline (with retries/recovery), candidate review, the MEM-TEST race scenarios, and the Android memory client (`MemoryActivity`) are implemented, while the extraction privacy audit remains outstanding. Production deployment is a Phase 3 activity, performed after the Phase 2 memory subsystem is complete and verified.
+> MIRA is not yet deployed. Phase 1 (chat core) and Phase 2 (communication-style memory) are complete. Phase 3 is in progress: authentication rate limiting and account-wide replay revocation are implemented; release signing, backend deployment, and observability remain. Production deployment is a Phase 3 activity.
 
 > [!WARNING]
 > Extraction uses in-process `@Scheduled` pollers that claim `PENDING` jobs with `FOR UPDATE SKIP LOCKED` and requeue stale `PROCESSING` jobs. Claims are safe across multiple application instances and commit is guarded by generation/version checks, so leader election is not required. Keep `stale-after-seconds` comfortably above the provider timeout to avoid requeueing healthy work.
@@ -191,6 +199,7 @@ Before opening the deployed service to physical Android client connections, veri
 - [ ] Public endpoint enforces TLS 1.3; plain HTTP traffic is redirected or rejected.
 - [ ] Actuator health check returns `{"status":"UP"}` on `/actuator/health`.
 - [ ] Rate limiting actively blocks rapid unauthenticated requests.
+- [ ] Repeated failed logins return `429 rate_limited` after the configured threshold.
 - [ ] End-to-end smoke test creates an account, starts a conversation, and receives an AI response.
 - [ ] Cloud application logs confirm that raw user prompts, passwords, and tokens are completely absent.
 - [ ] Android release APK connects successfully to the public HTTPS domain.

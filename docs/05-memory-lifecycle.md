@@ -70,7 +70,7 @@ The durable schema, governance surface, advisory injection, and asynchronous ext
   - Displays pending inferred candidates with evidence and evidence count, allowing user acceptance or rejection.
 - Integration tests cover provisioning, OCC conflict, allow-list rejection, toggling, purge/generation behavior, injection, extraction scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, retry exhaustion, stale-processing recovery, malformed output, candidate list/accept/reject/ownership, and the `MEM-TEST-01`..`MEM-TEST-07` scenarios. Dedicated memory suites cover the extraction privacy audit (`MemoryPrivacyAuditTest`), injection safety and instruction dominance (`MemoryInjectionSafetyTest`), lookup failure tolerance (`MemoryInjectionFailureTest`), hybrid conflict resolution (`MemoryConflictResolutionTest`), and multi-tenant endpoint security (`MemoryEndpointSecurityTest`). Android unit tests cover options mapping (`MemoryOptionsTest`).
 
-Open decisions remaining: whether an automatic evidence threshold should promote staged candidates without manual confirmation (currently manual confirmation only). The active plan is [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+Candidate promotion decision: repeated inferred evidence increments `evidence_count` but never auto-promotes; explicit user acceptance remains required (see section 4.1). Phase 3 production hardening is tracked in [12-phase-3-checklist.md](./12-phase-3-checklist.md); the closed Phase 2 plan remains at [11-phase-2-checklist.md](./11-phase-2-checklist.md).
 
 ---
 
@@ -188,6 +188,13 @@ stateDiagram-v2
 
 > [!NOTE]
 > The backend implements all four paths: explicit durable values merge automatically, explicit corrections override same-field values, inferred candidates are staged in `user_memory_candidate` with an incremented `evidence_count`, and ephemeral candidates are discarded. Pending inferred candidates are surfaced to the user for acceptance through the candidate-review endpoints and in `MemoryActivity` on Android.
+
+> [!NOTE]
+> **Candidate promotion decision (2026-11-13):**
+> Repeated inferred evidence increments `evidence_count` but never
+> auto-promotes a candidate. Promotion requires explicit user acceptance.
+> This preserves user sovereignty and prevents uncertain inferences from
+> silently entering persistent memory.
 
 ---
 

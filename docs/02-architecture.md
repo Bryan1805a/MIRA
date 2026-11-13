@@ -29,6 +29,7 @@
 | 1.9.0 | 2026-10-29 | Bryan | Documented extraction reliability: bounded retries, `FOR UPDATE SKIP LOCKED` claiming, and startup/interval recovery of stale `PROCESSING` jobs. MEM-TEST race scenarios are covered. |
 | 2.0.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery: `MemoryActivity`, `MemoryRepository`, `MemoryOptions`, candidate review UI (accept/reject), OCC save/reload, toggle, and purge. |
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites and security verification: privacy audit, injection safety, non-fatal lookup failure, and hybrid conflict resolution tests (104 passing backend tests). |
+| 2.2.0 | 2026-11-13 | Bryan | Added Phase 3 security hardening: authentication rate limiting, account-wide replay revocation, and log-sanitization coverage. |
 
 ---
 
@@ -98,7 +99,8 @@ flowchart TD
   * Issue cryptographically random, revocable refresh tokens.
   * Store only SHA-256 hashes of refresh tokens in the `USER_SESSION` table, and retain an append-only issuance/consumption audit trail in `REFRESH_TOKEN_HISTORY`.
   * Enforce atomic single-use refresh token rotation: using a valid refresh token yields a new token, marks the presented token consumed, and updates the session's current token hash in place.
-  * Detect refresh token reuse (potential token theft) and immediately revoke the implicated session.
+  * Detect refresh token reuse (potential token theft) and immediately revoke every active session for the account.
+  * Throttle login, registration, and refresh attempts per email and/or client IP, returning `429 rate_limited` when a window is exhausted.
 
 ### 2.2 Chat Orchestration Module (`chat` domain)
 * **Primary Scope:** Conversation management, message persistence, context aggregation, and interaction orchestration.
@@ -113,7 +115,7 @@ flowchart TD
 
 ### 2.3 Memory Subsystem Module (`memory` domain)
 * **Primary Scope:** Style memory extraction, validation, conflict resolution, versioning, and user governance.
-* **Current Delivery Status:** The governance surface, concurrency primitives, advisory prompt injection, asynchronous extraction pipeline, candidate review, Android memory client, and dedicated integration test suites are implemented: profile provisioning on first read, allow-list validation, OCC version checks with `409 version_conflict`, the enabled/disabled toggle, atomic purge with a generation increment, enum-only advisory injection during chat context assembly, `COMPLETED`-only extraction job scheduling, JSON extraction, hybrid candidate handling (explicit merge, inferred staging, ephemeral discard), generation/version commit guards, pending-candidate list/accept/reject, bounded retries, `SKIP LOCKED` claiming, stale-processing recovery, full Android UI (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`), and dedicated integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). All 104 backend tests pass offline.
+* **Current Delivery Status:** The governance surface, concurrency primitives, advisory prompt injection, asynchronous extraction pipeline, candidate review, Android memory client, and dedicated integration test suites are implemented: profile provisioning on first read, allow-list validation, OCC version checks with `409 version_conflict`, the enabled/disabled toggle, atomic purge with a generation increment, enum-only advisory injection during chat context assembly, `COMPLETED`-only extraction job scheduling, JSON extraction, hybrid candidate handling (explicit merge, inferred staging, ephemeral discard), generation/version commit guards, pending-candidate list/accept/reject, bounded retries, `SKIP LOCKED` claiming, stale-processing recovery, full Android UI (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`), and dedicated integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). All 116 backend tests pass offline.
 * **Core Responsibilities:**
   * Manage persistent `USER_STYLE_PROFILE` records.
   * Gate extraction eligibility: only trigger memory extraction when a logical assistant response reaches `COMPLETED` status.
@@ -232,7 +234,7 @@ sequenceDiagram
 ```
 
 > [!NOTE]
-> The active-profile fetch, advisory injection, eligibility gate, and OCC merge shown above are implemented. Candidate review is exposed through `GET /api/v1/memory/candidates` and the `accept`/`reject` actions. The memory governance surface and candidate review are fully integrated into the Android client (`MemoryActivity`). The extraction privacy audit remains the Phase 2 target.
+> The active-profile fetch, advisory injection, eligibility gate, and OCC merge shown above are implemented. Candidate review is exposed through `GET /api/v1/memory/candidates` and the `accept`/`reject` actions. The memory governance surface and candidate review are fully integrated into the Android client (`MemoryActivity`).
 
 ### 4.1 Token Specifications
 * **Access Tokens:**
@@ -246,7 +248,7 @@ sequenceDiagram
   * Stored on the backend strictly as a SHA-256 hash.
   * `USER_SESSION.refresh_token_hash` holds the current token hash; `REFRESH_TOKEN_HISTORY` is an append-only audit trail of every issued token and its `consumed_at` timestamp.
   * Rotation runs in a single transaction: lock the session with `SELECT ... FOR UPDATE`, re-read history under the lock, mark the presented token consumed, update the session hash in place, append the successor history row, and issue a new access token.
-  * Presenting a consumed history row is treated as replay. The implicated session is revoked before the request is rejected with `401 Unauthorized`.
+  * Presenting a consumed history row is treated as replay. Every active session for the account is revoked before the request is rejected with `401 Unauthorized`. Stateless access tokens remain valid until their 15-minute expiry.
 
 ---
 
@@ -273,19 +275,20 @@ The following formal decisions govern MIRA's architecture:
 
 ---
 
-## 7. Current Implementation Status (2026-10-26)
+## 7. Current Implementation Status (2026-11-13)
 
 | Capability | Status |
 | :--- | :--- |
 | Phase 1 conversation & chat core | Complete (merged to `main` via PR #5) |
 | Registration, login, JWT validation | Implemented (Backend & Android) |
-| Refresh-token rotation, history, replay rejection | Implemented (Backend & Android auto-refresh authenticator) |
+| Refresh-token rotation, history, replay rejection | Implemented (Backend & Android auto-refresh authenticator; account-wide revocation on replay) |
 | Logout, `/me` | Implemented (Backend & Android) |
 | Conversation entity, ownership query, cursor pagination query | Implemented |
 | Conversation HTTP endpoints | Implemented (Backend & Android `ConversationsActivity`) |
 | Message persistence, response lifecycle, retries, idempotency | Implemented (Backend & Android `ChatActivity`) |
 | `AIProvider` abstraction, `MockAIProvider`, and `DeepSeekAIProvider` | Implemented (Backend) |
 | Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min) |
+| Authentication rate limiting | Implemented (Backend per-email/per-IP windows for login, register, refresh) |
 | Android authentication and chat client | Fully delivered (Auth, Conversations, Chat, Retries, Encrypted storage) |
 | Actuator health and liveness/readiness probes | Implemented (`/actuator/health`) |
 | Local database orchestration | Implemented (`docker-compose.yml`, `.env.example`) |
@@ -297,6 +300,8 @@ The following formal decisions govern MIRA's architecture:
 | Extraction reliability (bounded retries, skip-locked claim, stale-job recovery) | Implemented (Backend) |
 | `MEM-TEST-01`..`MEM-TEST-07` concurrency scenarios | Implemented (Testcontainers) |
 | Android memory UI (`MemoryActivity`, candidate review, toggle, OCC save, purge) | Implemented (Android Views/XML) |
-| Extraction privacy audit | Phase 2 (in progress) |
+| Extraction privacy audit | Implemented (`MemoryPrivacyAuditTest`) |
+| Log-sanitization audit | Implemented (`LogSanitizationTest`; no prompts, passwords, or tokens logged) |
+| Phase 3 security hardening | In progress (auth throttling and replay revocation complete) |
 
 The active work breakdown is maintained in [11-phase-2-checklist.md](./11-phase-2-checklist.md). The closed Phase 1 checklist remains at [10-phase-1-checklist.md](./10-phase-1-checklist.md).

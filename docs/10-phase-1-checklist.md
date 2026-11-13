@@ -27,6 +27,7 @@
 | 1.8.0 | 2026-10-27 | Bryan | Recorded the current suite at 83 tests after Phase 2 candidate-review coverage; Phase 1 closed with 68. |
 | 1.9.0 | 2026-10-29 | Bryan | Recorded the current suite at 89 tests after Phase 2 retry/recovery and race-suite coverage; Phase 1 closed with 68. |
 | 2.0.0 | 2026-11-13 | Bryan | Recorded current test inventory at 104 passing backend tests (and 4 Android unit tests) following Phase 2 memory integration and privacy audit test suite delivery; Phase 1 closed with 68. |
+| 2.1.0 | 2026-11-13 | Bryan | Closed the log-sanitization and refresh-replay follow-ups during Phase 3 security hardening (116 backend tests; account-wide replay revocation). |
 
 ---
 
@@ -120,7 +121,7 @@ Phase 1 objectives:
 | Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min per user) |
 | Request-ID propagation and enriched error envelope | Implemented (Backend & Android) |
 | Schema `V1`–`V9` at closure (V10 added in Phase 2) | Implemented |
-| Backend test suite | 104 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
+| Backend test suite | 116 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
 | Android application | Full UI delivered (Login, Register, session gate, encrypted token store, auto-refresh authenticator, Conversations list, Chat with retry; compiles via `assembleDebug`, passes `testDebugUnitTest`, lint-clean) |
 | CI workflows | Configured (GitHub Actions for backend verification and Android build/test/lint) |
 | Android debug APK verification | Verified (build passes cleanly) |
@@ -152,10 +153,11 @@ Phase 1 objectives:
   - [x] Choose a single-instance in-memory token bucket for the MVP and document the limitation (`MessageRateLimiter`).
   - [x] Do not rate-limit health checks or authentication by the same bucket; use separate policies if auth throttling is added.
 - [x] Enable Actuator liveness/readiness health groups and restrict exposed endpoints to health only.
-- [ ] Sanitize logs: no passwords, tokens, prompts, assistant content, or provider payloads.
-- [ ] Decide the refresh-token replay policy:
-  - [ ] Implement account-wide session revocation on replay, **or**
+- [x] Sanitize logs: no passwords, tokens, prompts, assistant content, or provider payloads (`LogSanitizationTest`).
+- [x] Decide the refresh-token replay policy:
+  - [x] Implement account-wide session revocation on replay, **or**
   - [ ] Record the accepted risk and keep session-scoped revocation, updating [06-security-and-privacy.md](./06-security-and-privacy.md) accordingly.
+  - Account-wide revocation is implemented and covered by `AuthSecurityTest`.
 
 ### 4.2 Conversation API
 
@@ -325,7 +327,7 @@ Tests must run without internet access or paid DeepSeek calls. Testcontainers re
 
 1. **Synchronous provider latency:** Message send may hold an HTTP request for up to 30 seconds. This is acceptable for the MVP; an asynchronous job/polling model can replace it later without changing the persisted lifecycle.
 2. **In-memory rate limiting:** A single-instance bucket resets on restart and does not coordinate across replicas. Revisit when the backend scales horizontally.
-3. **Replay revocation scope:** Current behavior revokes only the implicated session; the original security draft recommends revoking every session. Phase 1 must either implement account-wide revocation or explicitly accept and document the narrower behavior.
+3. **Replay revocation scope:** Resolved in Phase 3: replay now revokes every active session for the account. Stateless access tokens remain valid until their 15-minute expiry. See [06-security-and-privacy.md](./06-security-and-privacy.md).
 4. **Cursor stability:** Cursors embed `(updatedAt, id)`. Updates to a conversation's `updatedAt` can move it between pages; document this as accepted behavior for the MVP.
 5. **Provider model selection:** The DeepSeek model name, pricing, and output limits must be configurable, not hardcoded.
 6. **No memory in Phase 1:** Users should not expect personalization yet. The UI should not claim memory is active until Phase 2 ships.
@@ -357,8 +359,8 @@ These items do not block the Phase 1 chat core, but remain unchecked and are tra
 
 - [ ] Install the debug APK on an emulator or physical device and confirm launch.
 - [ ] Record the Android SDK/build-tools versions used for the verified build.
-- [ ] Complete the log-sanitization audit (no prompts, tokens, or completions).
-- [ ] Decide the refresh-token replay policy: account-wide revocation, or formally accept session-scoped revocation.
+- [x] Complete the log-sanitization audit (no prompts, tokens, or completions).
+- [x] Decide the refresh-token replay policy: account-wide revocation implemented.
 - [ ] Add Android unit tests for token storage, the authorization interceptor, and API error mapping.
 - [ ] Add an instrumented smoke test for login → conversation → send.
 - [ ] Split the consolidated `MiraBackendApplicationTests` class by domain as the surface grows.

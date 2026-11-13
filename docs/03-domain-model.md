@@ -27,6 +27,7 @@
 | 1.6.0 | 2026-10-27 | Bryan | Recorded candidate review transitions (accept/reject) and pending-candidate cleanup on purge. No schema changes; migrations remain V1–V10. |
 | 1.7.0 | 2026-10-29 | Bryan | Recorded retry/recovery behavior for extraction jobs (`attempts`, stale `PROCESSING` requeue, skip-locked claiming). No schema changes; migrations remain V1–V10. |
 | 1.8.0 | 2026-11-13 | Bryan | Recorded Android client integration for candidate review and style profile governance (`MemoryActivity`). |
+| 1.9.0 | 2026-11-13 | Bryan | Recorded account-wide refresh-token replay revocation. No schema changes; migrations remain V1–V10. |
 
 ---
 
@@ -248,7 +249,7 @@ CREATE INDEX idx_refresh_token_history_session
   * Only the SHA-256 hash of a refresh token is stored. Plaintext tokens are never persisted.
   * `user_session.refresh_token_hash` holds the **current** token for the session. On rotation, the hash is updated in place; the previous hash remains in `refresh_token_history` with `consumed_at` set.
   * `refresh_token_history.token_hash` is globally unique; a hash cannot identify two sessions.
-  * If a consumed token is presented again, the transaction revokes the implicated session, and the token endpoint returns `401 Unauthorized`.
+  * If a consumed token is presented again, the transaction revokes **every active session for the account**, and the token endpoint returns `401 Unauthorized`.
   * V7 introduced `uq_user_session_token_hash`; the older non-unique `idx_user_session_token_hash` from V2 is now redundant and may be dropped in a future cleanup migration.
 
 ---

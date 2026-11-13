@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DAT-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.7.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 1.8.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Data Engineering Team |
 | **Database Engine** | PostgreSQL 15+ (Neon Managed Database; PostgreSQL 18 in Testcontainers) |
 | **Migration Tool** | Flyway |
@@ -26,6 +26,7 @@
 | 1.5.0 | 2026-10-27 | Bryan | Reconciled Flyway V10: added `memory_extraction_job` and `user_memory_candidate`, their lifecycle constraints, indices, and asynchronous extraction flow. |
 | 1.6.0 | 2026-10-27 | Bryan | Recorded candidate review transitions (accept/reject) and pending-candidate cleanup on purge. No schema changes; migrations remain V1–V10. |
 | 1.7.0 | 2026-10-29 | Bryan | Recorded retry/recovery behavior for extraction jobs (`attempts`, stale `PROCESSING` requeue, skip-locked claiming). No schema changes; migrations remain V1–V10. |
+| 1.8.0 | 2026-11-13 | Bryan | Recorded Android client integration for candidate review and style profile governance (`MemoryActivity`). |
 
 ---
 
@@ -549,7 +550,7 @@ CREATE INDEX idx_memory_candidate_user_status
   * Only `INFERRED` preferences are staged. `EXPLICIT_DURABLE` and `EXPLICIT_CORRECTION` candidates are merged directly into the profile; `EPHEMERAL` candidates are discarded.
   * Repeated evidence for the same pending `(user_id, field, value)` increments `evidence_count` and refreshes `evidence` instead of creating duplicates.
   * `generation` records the generation observed at staging time; a later purge invalidates the staged evidence.
-  * **Implementation status (Phase 2):** The transitions are exposed by `MemoryCandidateController`: `GET /api/v1/memory/candidates` lists `PENDING` candidates newest-first; `POST /api/v1/memory/candidates/{id}/accept` applies the value under the same control/profile locks used by governance, increments `version` only when the value changes, and marks the candidate `ACCEPTED`; `POST .../reject` marks it `REJECTED` and returns `204`. Unknown, foreign, or already-decided candidates return `404 resource_not_found`. Purge deletes `PENDING` candidates. The Android UI is not implemented yet.
+  * **Implementation status (Phase 2):** The transitions are exposed by `MemoryCandidateController`: `GET /api/v1/memory/candidates` lists `PENDING` candidates newest-first; `POST /api/v1/memory/candidates/{id}/accept` applies the value under the same control/profile locks used by governance, increments `version` only when the value changes, and marks the candidate `ACCEPTED`; `POST .../reject` marks it `REJECTED` and returns `204`. Unknown, foreign, or already-decided candidates return `404 resource_not_found`. Purge deletes `PENDING` candidates. The Android client consumes these candidate review transitions in `MemoryActivity`.
 
 ---
 

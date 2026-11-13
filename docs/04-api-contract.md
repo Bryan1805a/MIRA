@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.9.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 2.1.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
 | **Data Format** | JSON (UTF-8 Encoded) |
@@ -28,6 +28,8 @@
 | 1.7.0 | 2026-10-27 | Bryan | Recorded the internal asynchronous extraction pipeline. No new public endpoints; staged inferred candidates are not yet exposed for confirmation. |
 | 1.8.0 | 2026-10-27 | Bryan | Added the candidate-review endpoints: list pending inferred candidates, accept with OCC, and reject. No schema changes. |
 | 1.9.0 | 2026-10-29 | Bryan | Recorded internal extraction retry/recovery behavior. No endpoint shape changes. |
+| 2.0.0 | 2026-11-13 | Bryan | Reconciled Android client delivery for style memory governance and candidate review (`MemoryActivity`, `MiraApi`, `MemoryRepository`). |
+| 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration and privacy audit test verification (104 backend tests, 0 failures; sub-millisecond token consumption alignment and message ordering tie-breaker fixed). |
 
 ---
 
@@ -57,9 +59,9 @@
 | Standard error envelope | **Implemented (Backend & Android)** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler`/`RequestIdFilter` and mapped via `ApiError` in Android. |
 | Conversation endpoints | **Implemented (Backend & Android)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation; Android `ConversationsActivity` delivered. |
 | Message send/list and retry | **Implemented (Backend & Android)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, bounded retries, and Android `ChatActivity` delivered. |
-| Style-memory governance and candidate review | **Implemented (Backend)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, the internal extraction pipeline (bounded retries/recovery), and candidate list/accept/reject are live and covered by tests. The Android memory UI remains Phase 2. |
+| Style-memory governance and candidate review | **Implemented (Backend & Android)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, the internal extraction pipeline (bounded retries/recovery), and candidate list/accept/reject are live and covered by tests; integrated into Android via `MemoryActivity`. |
 
-Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; the remaining Phase 2 work is the Android memory UI and the concurrency/privacy suites.
+Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; Phase 2 memory endpoints, candidate review, advisory injection, and dedicated test suites (including privacy audit, safety, and conflict resolution) are implemented and verified.
 
 ---
 
@@ -375,7 +377,7 @@ If an upstream AI provider times out after the user message has been safely pers
 
 ## 5. Communication-Style Memory Endpoints
 
-> **Delivery status:** Backend governance, advisory injection, the internal extraction pipeline, and candidate review are implemented. `GET`, `PUT`, `PATCH /settings`, and `DELETE /api/v1/memory/style` are live, including first-read provisioning, allow-list validation, OCC version checks, and generation-guarded purge. During message send, an enabled profile is serialized into an advisory system message; disabled, empty, or all-unspecified profiles add none. After a `COMPLETED` response, an asynchronous job extracts candidates and applies the hybrid policy. Pending inferred candidates can be listed, accepted, or rejected. The Android memory UI remains Phase 2 work.
+> **Delivery status:** Backend governance, advisory injection, the internal extraction pipeline, candidate review, and the Android memory UI (`MemoryActivity`) are implemented. `GET`, `PUT`, `PATCH /settings`, and `DELETE /api/v1/memory/style` as well as candidate review endpoints (`GET /candidates`, `POST .../accept`, `POST .../reject`) are live, including first-read provisioning, allow-list validation, OCC version checks, generation-guarded purge, and Android UI integration. During message send, an enabled profile is serialized into an advisory system message; disabled, empty, or all-unspecified profiles add none. After a `COMPLETED` response, an asynchronous job extracts candidates and applies the hybrid policy. Pending inferred candidates can be listed, accepted, or rejected both via HTTP and in the Android app.
 
 ### 5.1 Read Style Profile
 * **Endpoint:** `GET /api/v1/memory/style`

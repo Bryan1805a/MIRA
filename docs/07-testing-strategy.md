@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.0.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 2.2.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
 
@@ -28,6 +28,8 @@
 | 1.8.0 | 2026-10-27 | Bryan | Reconciled the extraction pipeline: seven new tests for scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, and malformed output; inventory now 79 tests. |
 | 1.9.0 | 2026-10-27 | Bryan | Reconciled candidate review: four new tests for list/accept, reject, purge cleanup, and cross-account rejection; inventory now 83 tests. |
 | 2.0.0 | 2026-10-29 | Bryan | Reconciled extraction retry/recovery and the MEM-TEST race scenarios: six new tests (68 integration, 89 total). |
+| 2.1.0 | 2026-11-13 | Bryan | Reconciled Android memory options unit test suite (`MemoryOptionsTest`, 3 tests; 4 total passing Android unit tests). |
+| 2.2.0 | 2026-11-13 | Bryan | Reconciled memory integration and privacy audit test suites (15 tests across `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`, `MemoryInjectionFailureTest`, `MemoryInjectionSafetyTest`, `MemoryPrivacyAuditTest`; inventory now 104 passing backend tests, 0 failures). |
 
 ---
 
@@ -111,18 +113,25 @@ flowchart LR
 
 The `MockAIProvider` enables deterministic simulation of complex edge cases without spending API credits or encountering live network flakiness.
 
-### 3.5 Current Test Inventory (2026-10-27)
+### 3.5 Current Test Inventory (2026-11-13)
 
 | Suite | Type | Tests | Scope |
 | :--- | :--- | :--- | :--- |
 | `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 68 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, per-account rate limiting (`429 rate_limited`), cross-account isolation, style-memory governance, prompt injection, extraction (scheduling/eligibility, explicit merge, inferred staging, retry exhaustion, stale-processing recovery, malformed output), the `MEM-TEST-01`..`MEM-TEST-07` scenarios, and candidate review (list/accept, reject, purge cleanup, cross-account rejection). |
+| `MemoryConflictResolutionTest` | Spring Boot + Testcontainers + MockMvc | 4 | Full hybrid persistence matrix: explicit durable auto-merge, inferred candidate staging with evidence counter accumulation, ephemeral instruction discard, and immediate user correction overwrite. |
+| `MemoryEndpointSecurityTest` | Spring Boot + Testcontainers + MockMvc | 3 | Multi-tenant authorization boundaries: profile mutations and candidate accept/reject are strictly scoped to the owner, rejecting cross-account IDOR attempts with 404/403. |
+| `MemoryInjectionFailureTest` | Spring Boot + Testcontainers + MockMvc | 2 | Fault tolerance: simulated style profile lookup failures during chat context assembly are caught non-fatally, allowing chat to proceed smoothly without memory. |
+| `MemoryInjectionSafetyTest` | Spring Boot + Testcontainers + MockMvc | 3 | Prompt injection safety: immediate explicit user prompt instruction is strictly ordered last, advisory style injection is subordinate, and purged memory is omitted from subsequent chat requests. |
+| `MemoryPrivacyAuditTest` | Spring Boot + Testcontainers + MockMvc | 3 | Privacy & data minimization audit: biographical/unknown candidate keys are never persisted, candidate evidence is capped at 500 characters, no transcript/prompt columns exist in extraction tables, and user content/tokens are never emitted to logs. |
 | `MessageRateLimiterTests` | Unit | 4 | In-memory sliding-window rate limiter accounting, quota enforcement (10 req/min), multi-user isolation, and window expiration. |
 | `DeepSeekAIProviderTests` | Unit + MockRestServiceServer | 6 | OpenAI-compatible request serialization, Bearer authorization, response parsing, and HTTP status/error mapping (timeout, 429 rate limit, 5xx unavailable, 4xx provider error, invalid/blank output). |
 | `MockAIProviderTests` | Unit | 5 | Deterministic simulation of instant success, timeout, HTTP 429 rate limiting, HTTP 5xx error, and malformed response scenarios. |
 | `TokenServiceTests` | Unit | 5 | JWT claims and expiry, refresh-token uniqueness/URL safety, deterministic SHA-256 hashing. |
 | `JwtConfigurationTests` | Unit | 1 | Secret validation and decoder configuration. |
+| `MemoryOptionsTest` (Android) | Unit | 3 | Style options indexing, unspecified value mapping, allow-list enum selection, and invalid value rejection. |
+| `ExampleUnitTest` (Android) | Unit | 1 | Android unit testing baseline. |
 
-The suite (89 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. The classes should be split by domain as the Phase 2 surface grows; the current consolidated class is a baseline, not the target structure.
+The backend suite (104 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (4 tests total) executes via `.\gradlew.bat testDebugUnitTest`. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 104 backend tests pass offline without failures or errors.
 
 ---
 
@@ -143,7 +152,10 @@ The suite (89 tests total) runs against a real PostgreSQL container (`postgres:1
 | **Memory Injection** | Enabled profile injected | Established, enabled profile with specified fields; send a message. | Provider request includes an advisory system message containing the specified fields; the user message remains the last message. | Implemented (Backend) |
 | **Memory Injection** | Disabled profile omitted | Toggle `enabled=false`; send a message. | Provider request contains no communication-style system message. | Implemented (Backend) |
 | **Memory Injection** | Empty / unspecified profile omitted | No stored profile, or only `no_strong_preference` values. | Provider request contains no communication-style system message. | Implemented (Backend) |
-| **Memory Injection** | Lookup failure is non-fatal | Simulate a profile lookup failure during assembly. | Chat proceeds without memory. | Unit coverage pending |
+| **Memory Injection** | Lookup failure is non-fatal | Simulate a profile lookup failure during assembly. | Chat proceeds without memory (`MemoryInjectionFailureTest`). | Implemented (Backend) |
+| **Memory Injection** | Instruction Dominance & Subordination | Stored memory injected alongside conflicting immediate user prompt. | Stored memory is framed as advisory/subordinate; immediate user turn is ordered last (`MemoryInjectionSafetyTest`). | Implemented (Backend) |
+| **Memory Privacy Audit** | Biographical rejection & minimization | Attempt extraction on biographical keys, long evidence, or inspect logs. | Biographical candidates rejected; evidence capped at 500 chars; zero transcript columns in DB; zero user content/tokens in logs (`MemoryPrivacyAuditTest`). | Implemented (Backend) |
+| **Deterministic Ordering** | Microsecond tie-breaking & clock skew | Rapid sequential message persistence and sub-millisecond refresh token rotation. | Assistant `createdAt` guaranteed after user `createdAt`; token consumption time clamped to issue time to satisfy DB constraints. | Implemented (Backend) |
 | **Memory Extraction** | Schedule on completed response | Send a message that completes successfully. | One `PENDING` job with the current `expected_generation`/`expected_version`; attempts `0`. | Implemented (Backend) |
 | **Memory Extraction** | No job for timeout or disabled memory | Provider timeout, or `enabled=false` before send. | No extraction job row is created. | Implemented (Backend) |
 | **Memory Extraction** | Explicit durable merge | Worker returns `EXPLICIT_DURABLE` for `tone=formal`. | Job `COMPLETED`; profile `tone=formal`; version increments. | Implemented (Backend) |
@@ -156,6 +168,7 @@ The suite (89 tests total) runs against a real PostgreSQL container (`postgres:1
 | **Candidate Review** | Reject candidate | Stage an inferred candidate and reject it. | `204 No Content`; profile unchanged; candidate `REJECTED`. | Implemented (Backend) |
 | **Candidate Review** | Purge deletes pending candidates | Stage a candidate, then purge memory. | Candidate row is deleted; profile remains empty. | Implemented (Backend) |
 | **Candidate Review** | Cross-account access | User B lists/accepts User A's candidate. | `404 resource_not_found`; User A's candidate is unchanged. | Implemented (Backend) |
+| **Memory Client UI** | Android Style Options Mapping | Unspecified mapping, valid enum indexing, invalid rejection. | Validated via `MemoryOptionsTest`. | Implemented (Android) |
 | **Memory Gating** | Extraction from Incomplete Response | Response is `PENDING`, `FAILED`, or `UNKNOWN`. | Extraction service strictly skips task; zero memory updates committed. | Implemented (Backend) |
 | **Memory Concurrency** | OCC Version Collision (concurrent) | Two jobs race to commit with the same `expectedVersion`. | One commit succeeds; the other is skipped without overwriting the profile. | Implemented (MEM-TEST-06) |
 | **Memory Deletion Race**| Background Extraction vs User Purge | Extraction task starts; User executes `DELETE /memory/style`; Extraction finishes. | Extraction task detects incremented `generation` counter and aborts; profile remains completely purged. | Implemented (MEM-TEST-01/03) |

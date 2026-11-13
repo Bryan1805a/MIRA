@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.9.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 2.1.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
 
@@ -27,6 +27,8 @@
 | 1.7.0 | 2026-10-27 | Bryan | Recorded the asynchronous memory extraction pipeline (Flyway V10): jobs scheduled only for `COMPLETED` responses, explicit durable corrections merged, inferred candidates staged, ephemeral candidates discarded, and generation/version guards enforced at commit. Test suite now 79 passing tests. |
 | 1.8.0 | 2026-10-27 | Bryan | Recorded backend candidate review: pending inferred candidates can be listed, accepted with OCC, or rejected; purge clears pending candidates. Test suite now 83 passing tests. |
 | 1.9.0 | 2026-10-29 | Bryan | Recorded extraction reliability: bounded retries (`max-attempts`), stale `PROCESSING` recovery at startup and on an interval, and `FOR UPDATE SKIP LOCKED` claiming. The `MEM-TEST-01`..`MEM-TEST-07` scenarios are now covered (89 passing tests). |
+| 2.0.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery: delivered `MemoryActivity`, `MemoryRepository`, `MemoryOptions`, candidate review UI (accept/reject), OCC save/reload, toggle, and purge. |
+| 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites and test verification baseline: completed `MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, and `MemoryEndpointSecurityTest` (104 passing backend tests, 0 failures). |
 
 ---
 
@@ -137,7 +139,7 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 | **Phase 2** | **Active** | Communication-style memory governance, prompt injection, extraction + retry/recovery, candidate review, OCC/generation concurrency, memory UI |
 | **Phase 3** | Planned | Production hardening, deployment, release signing, operational readiness |
 
-Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 is the active milestone: backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), and the `MEM-TEST-01`..`MEM-TEST-07` race scenarios are implemented. The Android memory UI and the privacy audit remain scheduled in [11-phase-2-checklist.md](./11-phase-2-checklist.md) and specified in [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 is the active milestone: backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), the `MEM-TEST-01`..`MEM-TEST-07` race scenarios, the Android memory client (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`) are implemented and fully passing (104 backend tests, 0 failures). See [11-phase-2-checklist.md](./11-phase-2-checklist.md) and [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
 ---
 

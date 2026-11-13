@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-PRS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.9.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 2.1.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, Product, Quality Assurance |
 
@@ -27,6 +27,8 @@
 | 1.7.0 | 2026-10-27 | Bryan | Reconciled the asynchronous extraction pipeline (FR-007, FR-008): `COMPLETED`-only eligibility, explicit durable/correction merging, inferred candidate staging, ephemeral discard, and generation/version commit guards. Candidate confirmation and Android UI remain Phase 2 (79 backend tests). |
 | 1.8.0 | 2026-10-27 | Bryan | Reconciled backend candidate review (FR-008, FR-009): pending inferred candidates can be listed, accepted with OCC, or rejected, and purge clears pending candidates. Android memory UI remains Phase 2 (83 backend tests). |
 | 1.9.0 | 2026-10-29 | Bryan | Reconciled extraction reliability (FR-007, NFR-003): bounded retries, stale-processing recovery, skip-locked claiming, and the MEM-TEST race scenarios (89 backend tests). |
+| 2.0.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery (FR-006, FR-008, FR-009): `MemoryActivity` delivers profile viewing, toggle, OCC editing, purge, and candidate review (accept/reject); verified with `MemoryOptionsTest` (4 passing Android unit tests). |
+| 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites and requirements traceability (NFR-002, NFR-006): delivered `MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, and `MemoryConflictResolutionTest` (104 passing backend tests, 0 failures). |
 
 ---
 
@@ -235,17 +237,17 @@ flowchart TD
 | **FR-003** | Conversation Mgmt | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `GET`, `POST`, `DELETE /conversations` | `MiraBackendApplicationTests` | Implemented (Backend & Android `ConversationsActivity`) |
 | **FR-004** | Chat Orchestration | [`02-architecture.md#3`](./02-architecture.md#3-message-processing--failure-semantics) | `POST /conversations/{id}/messages` | `MiraBackendApplicationTests` | Implemented (Backend & Android `ChatActivity`) |
 | **FR-005** | Idempotent Retries | [`02-architecture.md#32`](./02-architecture.md#32-bounded-retry--idempotency-rules) | `POST /conversations/{id}/messages`, `POST .../retry` | `MiraBackendApplicationTests` | Implemented (Backend & Android `ChatActivity` bounded retry) |
-| **FR-006** | Profile Retrieval & Injection | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `GET /api/v1/memory/style` | `MiraBackendApplicationTests` | Implemented (Backend: retrieval, governance, advisory injection) |
+| **FR-006** | Profile Retrieval & Injection | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `GET /api/v1/memory/style` | `MiraBackendApplicationTests`, `MemoryOptionsTest` | Implemented (Backend & Android `MemoryActivity`) |
 | **FR-007** | Memory Gate | [`05-memory-lifecycle.md#2`](./05-memory-lifecycle.md#2-memory-extraction--ingestion-pipeline) | Internal Service Boundary | `MiraBackendApplicationTests` | Implemented (Backend: `COMPLETED`-only job scheduling) |
-| **FR-008** | Memory Merging (OCC)| [`05-memory-lifecycle.md#4`](./05-memory-lifecycle.md#4-candidate-classification--the-hybrid-persistence-policy) | `PUT /api/v1/memory/style`, `GET/POST /memory/candidates` | `MiraBackendApplicationTests`, `MemoryConflictResolutionTest` | Implemented (Backend: policy, OCC, staging, manual confirmation) |
-| **FR-009** | Memory Governance | [`05-memory-lifecycle.md#6`](./05-memory-lifecycle.md#6-memory-governance-operations) | `PATCH`, `DELETE /memory/style`, `GET/POST /memory/candidates` | `MiraBackendApplicationTests`, `MemoryDeletionRaceTest` | Implemented (Backend governance + candidate review); Android UI pending |
+| **FR-008** | Memory Merging (OCC)| [`05-memory-lifecycle.md#4`](./05-memory-lifecycle.md#4-candidate-classification--the-hybrid-persistence-policy) | `PUT /api/v1/memory/style`, `GET/POST /memory/candidates` | `MiraBackendApplicationTests`, `MemoryConflictResolutionTest` | Implemented (Backend: policy, OCC, staging; Android candidate review) |
+| **FR-009** | Memory Governance | [`05-memory-lifecycle.md#6`](./05-memory-lifecycle.md#6-memory-governance-operations) | `PATCH`, `DELETE /memory/style`, `GET/POST /memory/candidates` | `MiraBackendApplicationTests`, `MemoryDeletionRaceTest` | Implemented (Backend & Android `MemoryActivity`) |
 | **FR-010** | Data Isolation | [`02-architecture.md#5`](./02-architecture.md#5-security--boundary-controls) | All Endpoints | `MiraBackendApplicationTests` | Implemented (Backend) |
 | **FR-011** | Error Formatting | [`04-api-contract.md#6`](./04-api-contract.md#6-standardized-error-handling) | Global Exception Handler | `MiraBackendApplicationTests` | Implemented (Backend & Android, including `rate_limited`) |
 | **NFR-001** | Transport & Key Sec | [`06-security-and-privacy.md#3`](./06-security-and-privacy.md#3-authentication--token-session-architecture) | Server Configuration | `SecurityHeadersTest` | Implemented (HS256, Argon2id, hashed tokens); TLS at deployment |
-| **NFR-002** | Privacy Minimization| [`06-security-and-privacy.md#6`](./06-security-and-privacy.md#6-privacy--data-minimization-governance) | Memory Validation Engine | `MemoryPrivacyAuditTest` | Partial (allow-list extraction guardrails + enum-only injection implemented; privacy audit test pending) |
+| **NFR-002** | Privacy Minimization| [`06-security-and-privacy.md#6`](./06-security-and-privacy.md#6-privacy--data-minimization-governance) | Memory Validation Engine | `MemoryPrivacyAuditTest` | Implemented (Backend: allow-list guardrails, enum-only injection, and dedicated privacy audit tests) |
 | **NFR-003** | Fault Isolation | [`02-architecture.md#3`](./02-architecture.md#3-message-processing--failure-semantics) | Provider Abstraction Layer | `MiraBackendApplicationTests`, `MockAIProviderTests`, `DeepSeekAIProviderTests` | Implemented (Backend) |
 | **NFR-004** | Performance & Latency | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | Message Rate Limiter / Endpoints | `MessageRateLimiterTests` | Implemented (Backend 10 req/min sliding window, 5s/30s timeouts) |
-| **NFR-006** | Testability | [`07-testing-strategy.md#2`](./07-testing-strategy.md#2-multi-tier-testing-pyramid) | Maven Build Verification | `CI Pipeline / Testcontainers` | Implemented (Testcontainers, 89 backend tests, Android testDebugUnitTest) |
+| **NFR-006** | Testability | [`07-testing-strategy.md#2`](./07-testing-strategy.md#2-multi-tier-testing-pyramid) | Maven Build Verification | `CI Pipeline / Testcontainers` | Implemented (Testcontainers, 104 backend tests, Android testDebugUnitTest) |
 
 > [!NOTE]
-> Phase 1 (the end-to-end text chat loop) is complete and merged to `main`. Phase 2 is active: backend style-memory governance, OCC/generation controls, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review, and the `MEM-TEST` race scenarios are implemented. The Android memory UI and the privacy audit remain in progress. See [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+> Phase 1 (the end-to-end text chat loop) is complete and merged to `main`. Phase 2 is functionally complete: backend style-memory governance, OCC/generation controls, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review, the `MEM-TEST` race scenarios, the Android memory UI (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`) are implemented and verified with 104 passing backend tests and 4 passing Android unit tests. See [11-phase-2-checklist.md](./11-phase-2-checklist.md).

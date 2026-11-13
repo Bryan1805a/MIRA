@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.8.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 1.9.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
 
@@ -26,6 +26,7 @@
 | 1.6.0 | 2026-10-27 | Bryan | Documented extraction scheduler configuration and the in-process polling model; deployment remains a Phase 3 activity. |
 | 1.7.0 | 2026-10-27 | Bryan | Recorded backend candidate-review endpoints; deployment remains a Phase 3 activity. |
 | 1.8.0 | 2026-10-29 | Bryan | Documented extraction retry/recovery settings and skip-locked claiming. Deployment remains a Phase 3 activity. |
+| 1.9.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery; deployment remains a Phase 3 activity. |
 
 ---
 
@@ -177,7 +178,7 @@ If a sensitive secret (e.g., `DEEPSEEK_API_KEY` or `MIRA_JWT_SECRET_BASE64`) is 
 ## 6. Pre-Production Release Verification Checklist
 
 > [!NOTE]
-> MIRA is not yet deployed. Phase 1 (chat core) is complete and merged to `main`. Phase 2 is in progress: backend memory governance, advisory prompt injection, the in-process extraction pipeline (with retries/recovery), candidate review, and the MEM-TEST race scenarios are implemented, while the Android memory UI and the privacy audit remain outstanding. Production deployment is a Phase 3 activity, performed after the Phase 2 memory subsystem is complete and verified.
+> MIRA is not yet deployed. Phase 1 (chat core) is complete and merged to `main`. Phase 2 is in progress: backend memory governance, advisory prompt injection, the in-process extraction pipeline (with retries/recovery), candidate review, the MEM-TEST race scenarios, and the Android memory client (`MemoryActivity`) are implemented, while the extraction privacy audit remains outstanding. Production deployment is a Phase 3 activity, performed after the Phase 2 memory subsystem is complete and verified.
 
 > [!WARNING]
 > Extraction uses in-process `@Scheduled` pollers that claim `PENDING` jobs with `FOR UPDATE SKIP LOCKED` and requeue stale `PROCESSING` jobs. Claims are safe across multiple application instances and commit is guarded by generation/version checks, so leader election is not required. Keep `stale-after-seconds` comfortably above the provider timeout to avoid requeueing healthy work.

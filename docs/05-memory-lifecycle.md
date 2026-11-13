@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-MEM-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.7.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 1.9.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Personalization & Memory Team |
 | **Scope** | Persistent Communication-Style Preferences |
 
@@ -25,10 +25,12 @@
 | 1.5.0 | 2026-10-27 | Bryan | Reconciled the asynchronous extraction pipeline (Flyway V10): `COMPLETED`-only scheduling, hybrid persistence, candidate staging, and generation/version commit guards are implemented. Candidate confirmation, Android UI, and race suites remain pending. |
 | 1.6.0 | 2026-10-27 | Bryan | Reconciled backend candidate review: pending inferred candidates can be listed, accepted with generation/allow-list validation and OCC, or rejected; purge deletes pending candidates. Android UI and race suites remain pending. |
 | 1.7.0 | 2026-10-29 | Bryan | Reconciled extraction retry/recovery (bounded attempts, stale-processing requeue, skip-locked claim) and marked the MEM-TEST race scenarios covered. Android UI and privacy audit remain pending. |
+| 1.8.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery (`MemoryActivity`, candidate review, toggle, OCC save/reload, purge). |
+| 1.9.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites: delivered `MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, and `MemoryEndpointSecurityTest` (104 backend tests passing). |
 
 ---
 
-## Implementation Status (2026-10-27)
+## Implementation Status (2026-11-13)
 
 The durable schema, governance surface, advisory injection, and asynchronous extraction pipeline are in place:
 
@@ -60,9 +62,15 @@ The durable schema, governance surface, advisory injection, and asynchronous ext
   - `POST /api/v1/memory/candidates/{id}/accept` locks the control/profile/candidate rows, validates `generation` and the allow-list, applies the value (incrementing `version` only when it changes), and marks the candidate `ACCEPTED`.
   - `POST /api/v1/memory/candidates/{id}/reject` marks the candidate `REJECTED` without changing the profile.
   - Purge deletes `PENDING` candidates in the same transaction.
-- Integration tests cover provisioning, OCC conflict, allow-list rejection, toggling, purge/generation behavior, injection, extraction scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, retry exhaustion, stale-processing recovery, malformed output, candidate list/accept/reject/ownership, and the `MEM-TEST-01`..`MEM-TEST-07` scenarios.
+- Android memory management client is implemented (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`, `item_memory_candidate.xml`, `activity_memory.xml`):
+  - Inspects active preferences, version, enabled status, and last-updated timestamp.
+  - Toggles personalization on/off via `PATCH /api/v1/memory/style/settings`.
+  - Allows manual OCC profile updates with `expectedVersion` and handles `409 version_conflict` by reloading.
+  - Supports permanent purge with confirmation dialog.
+  - Displays pending inferred candidates with evidence and evidence count, allowing user acceptance or rejection.
+- Integration tests cover provisioning, OCC conflict, allow-list rejection, toggling, purge/generation behavior, injection, extraction scheduling/eligibility, explicit merge, inferred staging, stale-generation skip, retry exhaustion, stale-processing recovery, malformed output, candidate list/accept/reject/ownership, and the `MEM-TEST-01`..`MEM-TEST-07` scenarios. Dedicated memory suites cover the extraction privacy audit (`MemoryPrivacyAuditTest`), injection safety and instruction dominance (`MemoryInjectionSafetyTest`), lookup failure tolerance (`MemoryInjectionFailureTest`), hybrid conflict resolution (`MemoryConflictResolutionTest`), and multi-tenant endpoint security (`MemoryEndpointSecurityTest`). Android unit tests cover options mapping (`MemoryOptionsTest`).
 
-Not yet implemented: the Android memory UI, the extraction privacy audit, an automatic evidence threshold for promoting staged candidates, current-instruction dominance coverage, and a unit test for the non-fatal injection lookup path. The active plan is [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+Open decisions remaining: whether an automatic evidence threshold should promote staged candidates without manual confirmation (currently manual confirmation only). The active plan is [11-phase-2-checklist.md](./11-phase-2-checklist.md).
 
 ---
 
@@ -117,7 +125,7 @@ flowchart TD
 ```
 
 > [!NOTE]
-> Implemented in `MemoryExtractionWorker` / `MemoryExtractionCommitService`. The gate, schema validation, and commit guards are live. Staged inferred candidates are persisted for evidence accumulation and exposed through the candidate-review endpoints; the Android review UI is still pending.
+> Implemented in `MemoryExtractionWorker` / `MemoryExtractionCommitService`. The gate, schema validation, and commit guards are live. Staged inferred candidates are persisted for evidence accumulation, exposed through candidate-review endpoints, and surfaced in the Android client (`MemoryActivity`) for review.
 
 ---
 
@@ -179,7 +187,7 @@ stateDiagram-v2
    * *Action:* High-priority update. Overwrites historical preferences immediately.
 
 > [!NOTE]
-> The backend implements all four paths: explicit durable values merge automatically, explicit corrections override same-field values, inferred candidates are staged in `user_memory_candidate` with an incremented `evidence_count`, and ephemeral candidates are discarded. Pending inferred candidates are surfaced to the user for acceptance through the candidate-review endpoints.
+> The backend implements all four paths: explicit durable values merge automatically, explicit corrections override same-field values, inferred candidates are staged in `user_memory_candidate` with an incremented `evidence_count`, and ephemeral candidates are discarded. Pending inferred candidates are surfaced to the user for acceptance through the candidate-review endpoints and in `MemoryActivity` on Android.
 
 ---
 
@@ -341,4 +349,4 @@ The memory subsystem must pass deterministic automated tests covering race condi
 | **MEM-TEST-07** | Worker & Service Restart | Background extraction job persists across server restart. | Stale job still carries its immutable `expected_generation` and is rejected if memory was purged during downtime. |
 
 > [!NOTE]
-> Implemented and covered: governance, injection, extraction (including retry exhaustion and stale-processing recovery), candidate review, and the `MEM-TEST-01`..`MEM-TEST-07` scenarios. The Android memory UI, extraction privacy audit, explicit current-instruction dominance test, and injection lookup-failure unit test remain open in [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+> Implemented and covered: governance, injection, extraction (including retry exhaustion and stale-processing recovery), candidate review, the `MEM-TEST-01`..`MEM-TEST-07` scenarios, and the Android memory client (`MemoryActivity`). The extraction privacy audit, explicit current-instruction dominance test, and injection lookup-failure unit test remain open in [11-phase-2-checklist.md](./11-phase-2-checklist.md).

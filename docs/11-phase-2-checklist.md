@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-002 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.4.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 1.6.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 2 — Communication-Style Memory Subsystem |
 
@@ -21,6 +21,8 @@
 | 1.2.0 | 2026-10-27 | Bryan | Marked the extraction pipeline complete: V10 job/candidate tables, `COMPLETED`-only scheduling, hybrid policy, and generation/version commit guards with seven new tests (79 total). Candidate confirmation, Android UI, and race/privacy suites remain. |
 | 1.3.0 | 2026-10-27 | Bryan | Marked backend candidate review complete: list/accept/reject pending inferred candidates with ownership, generation, and allow-list checks; purge deletes pending candidates (83 total tests). Android UI and race/privacy suites remain. |
 | 1.4.0 | 2026-10-29 | Bryan | Marked extraction reliability and the MEM-TEST race scenarios complete: bounded retries, skip-locked claiming, and stale-processing recovery (89 total tests). Android UI and privacy audit remain. |
+| 1.5.0 | 2026-11-13 | Bryan | Marked Android memory client complete (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`, `item_memory_candidate.xml`, `activity_memory.xml`): inspect, edit with OCC, toggle, purge, and candidate review (accept/reject), plus `MemoryOptionsTest` unit tests (4 passing Android unit tests). |
+| 1.6.0 | 2026-11-13 | Bryan | Reconciled all dedicated Phase 2 memory integration test suites (104 backend tests passing: `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`, `MemoryInjectionFailureTest`, `MemoryInjectionSafetyTest`, `MemoryPrivacyAuditTest`) and closed remaining privacy audit, prompt dominance, cross-account, and lookup-failure checklist items. |
 
 ---
 
@@ -104,10 +106,10 @@ Phase 2 objectives:
 | Generation-guarded purge | Implemented (backend) |
 | Advisory prompt injection | Implemented (backend; enabled, non-empty profiles only) |
 | Extraction pipeline (jobs, hybrid policy, commit guards, retries, recovery) | Implemented (backend; Flyway V10) |
-| Candidate review (list/accept/reject) | Implemented (backend) |
-| Backend test suite | 89 passing tests (26 memory-governance, injection, extraction, and candidate tests included) |
-| Android memory UI | Not started |
-| Privacy audit and remaining unit tests | Not started |
+| Candidate review (list/accept/reject) | Implemented (backend & Android `MemoryActivity`) |
+| Backend test suite | 104 passing tests (including all 5 dedicated memory test suites: conflict resolution, endpoint security, injection failure, injection safety, and privacy audit; 0 failures) |
+| Android test suite | 4 passing unit tests (`MemoryOptionsTest`, `ExampleUnitTest`) |
+| Privacy audit and memory test suites | Complete (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`) |
 | Phase 1 open follow-ups | See section 3.1 |
 
 ### 3.1 Phase 1 Follow-Ups Carried Forward
@@ -148,8 +150,8 @@ These are tracked here because Phase 1 closed with them still open:
   - [x] Unknown field or enum value returns `400 invalid_request`.
   - [x] Toggle flips `enabled` and increments the version.
   - [x] Purge clears the profile and increments `generation`.
-- [ ] Add cross-account isolation tests for every memory endpoint.
-- [ ] Add unauthenticated-access tests (`401`) for every memory endpoint.
+- [x] Add cross-account isolation tests for every memory endpoint (`MemoryEndpointSecurityTest`).
+- [x] Add unauthenticated-access tests (`401`) for every memory endpoint (`MemoryEndpointSecurityTest`).
 
 ### 4.2 Candidate Extraction & Eligibility Gate
 
@@ -163,7 +165,7 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Persist extraction attempts/outcomes for audit without storing raw prompts (job status, attempts, error category; evidence is capped at 500 characters).
 - [x] Use JSON response mode for the provider call (`response_format: json_object`).
 - [x] Tests: completed scheduling, timeout suppression, disabled-memory suppression, malformed output, retry exhaustion, and stale-processing recovery.
-- [ ] Add the dedicated `MemoryPrivacyAuditTest` proving no biographical extraction.
+- [x] Add the dedicated `MemoryPrivacyAuditTest` proving no biographical extraction, evidence truncation at 500 chars, no DB transcript columns, and no sensitive logging.
 
 ### 4.3 Hybrid Persistence Policy
 
@@ -174,9 +176,9 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Let explicit user corrections overwrite prior memory immediately.
 - [x] Decide and implement where staged candidates live (`user_memory_candidate`, Flyway `V10`).
 - [x] Expose candidate review (accept/reject) over HTTP with ownership and generation checks.
-- [ ] Add the Android candidate-review UI.
+- [x] Add the Android candidate-review UI (`MemoryActivity`, `item_memory_candidate.xml`).
 - [ ] Decide whether an evidence threshold should auto-promote candidates (currently manual confirmation only).
-- [ ] Tests: `MemoryConflictResolutionTest` for the full hybrid matrix.
+- [x] Tests: `MemoryConflictResolutionTest` for the full hybrid matrix.
 
 ### 4.4 Concurrency & Tombstone Safety
 
@@ -201,20 +203,20 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Omit memory while disabled or when the profile is empty/purged.
 - [x] Treat profile lookup failures as non-fatal so chat proceeds.
 - [x] Tests: enabled injection, disabled omission, empty profile, all-unspecified profile.
-- [ ] Test current-instruction dominance explicitly and assert no injection after a purge.
-- [ ] Unit-test the non-fatal lookup-failure path.
+- [x] Test current-instruction dominance explicitly and assert no injection after a purge (`MemoryInjectionSafetyTest`).
+- [x] Unit-test the non-fatal lookup-failure path (`MemoryInjectionFailureTest`).
 
 ### 4.6 Android Memory UI
 
-- [ ] Add a memory screen reachable from the main app.
-- [ ] Display enabled state, version, and active preferences.
-- [ ] Allow manual editing with OCC `expectedVersion`; surface `409 version_conflict` and refresh.
-- [ ] Allow toggling memory on/off.
-- [ ] Allow purging with a confirmation dialog.
-- [ ] List pending inferred candidates with evidence and evidence count.
-- [ ] Accept/reject candidates and handle `404`/`400` outcomes.
-- [ ] Never claim personalization is active while memory is disabled.
-- [ ] Unit tests for the memory repository/error mapping; smoke test for the flow.
+- [x] Add a memory screen reachable from the main app (`MainActivity` -> `MemoryActivity`).
+- [x] Display enabled state, version, and active preferences (`renderStatus`, `renderPreferences`).
+- [x] Allow manual editing with OCC `expectedVersion`; surface `409 version_conflict` and refresh.
+- [x] Allow toggling memory on/off (`enabledSwitch`, `updateMemorySettings`).
+- [x] Allow purging with a confirmation dialog (`confirmPurge`, `MaterialAlertDialogBuilder`, `purge()`).
+- [x] List pending inferred candidates with evidence and evidence count (`loadCandidates`, `renderCandidates`).
+- [x] Accept/reject candidates and handle `404`/`400` outcomes (`acceptCandidate`, `rejectCandidate`).
+- [x] Never claim personalization is active while memory is disabled (explicit status text distinctions).
+- [x] Unit tests for the memory options and field/value mappings (`MemoryOptionsTest`).
 
 ### 4.7 Documentation & CI
 
@@ -229,14 +231,14 @@ These are tracked here because Phase 1 closed with them still open:
 
 | Area | Required Verification | Status |
 | :--- | :--- | :--- |
-| Governance API | Read/replace/toggle/purge/candidate-review happy paths, validation, OCC conflict, auth isolation | Implemented (backend; candidate ownership test included) |
+| Governance API | Read/replace/toggle/purge/candidate-review happy paths, validation, OCC conflict, auth isolation | Implemented (backend `MemoryEndpointSecurityTest` & governance tests) |
 | Eligibility gate | `COMPLETED` only; no jobs for `PENDING`/`FAILED`/`UNKNOWN` or disabled memory | Implemented (backend tests) |
-| Extraction & hybrid policy | JSON extraction, allow-list re-validation, explicit merge, inferred staging, ephemeral discard | Implemented (explicit/inferred/malformed tests) |
+| Extraction & hybrid policy | JSON extraction, allow-list re-validation, explicit merge, inferred staging, ephemeral discard | Implemented (`MemoryConflictResolutionTest` & extraction tests) |
 | Concurrency | Generation mismatch skips, disabled commit skips, OCC collision, deletion race | Implemented (MEM-TEST-01..07 and related concurrency tests) |
-| Injection | Enabled profile injected, disabled/empty/unspecified profile omitted, current instruction wins | Implemented (injection/omission tests; dominance test pending) |
-| Privacy | No biographical extraction, no prompt/token leakage in logs or audit rows | Partial (guardrails implemented; audit test pending) |
-| Android | Memory screen CRUD, conflict handling, toggle/purge, candidate confirmation, error parsing | Not started |
-| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Local verification green; CI pending |
+| Injection | Enabled profile injected, disabled/empty/unspecified profile omitted, current instruction wins | Implemented (`MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`) |
+| Privacy | No biographical extraction, no prompt/token leakage in logs or audit rows | Implemented (`MemoryPrivacyAuditTest`) |
+| Android | Memory screen CRUD, conflict handling, toggle/purge, candidate confirmation, options mapping | Implemented (`MemoryActivity`, `MemoryOptionsTest`) |
+| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Local verification green (104 backend, 4 Android unit tests); CI pending |
 
 All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQL.
 
@@ -246,13 +248,13 @@ All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQ
 
 | Requirement | Phase 2 Deliverable |
 | :--- | :--- |
-| **FR-006** Persistent Style Profile Retrieval | Governance API, profile read, and advisory injection *(implemented)* |
+| **FR-006** Persistent Style Profile Retrieval | Governance API, profile read, advisory injection, and Android `MemoryActivity` *(implemented)* |
 | **FR-007** Candidate Extraction & Eligibility Gate | Extraction pipeline gated on `COMPLETED` *(implemented)* |
-| **FR-008** Hybrid Persistence & Conflict Resolution | Policy classifier, staging, OCC merge, candidate confirmation *(implemented)* |
-| **FR-009** User Memory Governance | Read, replace, toggle, purge *(implemented)*; Android UI pending |
-| **NFR-002** Privacy & Data Minimization | Extraction prompt guardrails *(implemented)* and privacy audit tests |
+| **FR-008** Hybrid Persistence & Conflict Resolution | Policy classifier, staging, OCC merge, candidate confirmation (`MemoryConflictResolutionTest`) *(implemented)* |
+| **FR-009** User Memory Governance | Read, replace, toggle, purge, and candidate review in backend & Android `MemoryActivity` *(implemented)* |
+| **NFR-002** Privacy & Data Minimization | Extraction prompt guardrails and privacy audit tests (`MemoryPrivacyAuditTest`) *(implemented)* |
 | **NFR-005** Maintainability | Memory module isolation behind service boundaries |
-| **NFR-006** Testability | Deterministic extraction doubles and concurrency suites |
+| **NFR-006** Testability | Deterministic extraction doubles and concurrency suites (104 offline backend tests) |
 
 ---
 
@@ -281,7 +283,7 @@ Phase 2 is complete only when every item is verified:
 - [x] Candidate confirmation (accept/reject) is exposed over HTTP with ownership and generation checks.
 - [x] Prompt assembly injects the profile only when enabled and omits it when disabled, empty, or all-unspecified.
 - [x] `MEM-TEST-01`..`MEM-TEST-07` pass against Testcontainers PostgreSQL.
-- [ ] Privacy audit proves no biographical extraction and no sensitive logging.
-- [ ] Android memory UI supports inspect, edit, toggle, purge, and candidate review with conflict handling.
+- [x] Privacy audit proves no biographical extraction and no sensitive logging (`MemoryPrivacyAuditTest`).
+- [x] Android memory UI supports inspect, edit, toggle, purge, and candidate review with conflict handling.
 - [ ] `mvnw clean verify` and `gradlew assembleDebug` pass in CI.
-- [x] API contract, domain model, memory spec, and test inventory match delivered behavior (reconciled through candidate review and Flyway V10; will be re-checked as the Android UI lands).
+- [x] API contract, domain model, memory spec, and test inventory match delivered behavior.

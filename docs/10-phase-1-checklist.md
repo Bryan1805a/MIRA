@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.9.0 |
-| **Last Updated** | 2026-10-29 |
+| **Version** | 2.0.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 1 — End-to-End Text Chat |
 
@@ -26,6 +26,7 @@
 | 1.7.0 | 2026-10-27 | Bryan | Recorded the current suite at 79 tests after Phase 2 extraction coverage; Phase 1 closed with 68. |
 | 1.8.0 | 2026-10-27 | Bryan | Recorded the current suite at 83 tests after Phase 2 candidate-review coverage; Phase 1 closed with 68. |
 | 1.9.0 | 2026-10-29 | Bryan | Recorded the current suite at 89 tests after Phase 2 retry/recovery and race-suite coverage; Phase 1 closed with 68. |
+| 2.0.0 | 2026-11-13 | Bryan | Recorded current test inventory at 104 passing backend tests (and 4 Android unit tests) following Phase 2 memory integration and privacy audit test suite delivery; Phase 1 closed with 68. |
 
 ---
 
@@ -119,7 +120,7 @@ Phase 1 objectives:
 | Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min per user) |
 | Request-ID propagation and enriched error envelope | Implemented (Backend & Android) |
 | Schema `V1`–`V9` at closure (V10 added in Phase 2) | Implemented |
-| Backend test suite | 89 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
+| Backend test suite | 104 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
 | Android application | Full UI delivered (Login, Register, session gate, encrypted token store, auto-refresh authenticator, Conversations list, Chat with retry; compiles via `assembleDebug`, passes `testDebugUnitTest`, lint-clean) |
 | CI workflows | Configured (GitHub Actions for backend verification and Android build/test/lint) |
 | Android debug APK verification | Verified (build passes cleanly) |
@@ -373,5 +374,5 @@ Phase 2 is now active and tracked in [11-phase-2-checklist.md](./11-phase-2-chec
 - Allow-list schema validation and the hybrid persistence policy.
 - OCC version checks plus durable generation locking for deletion-race safety.
 - Memory injection into prompt assembly when enabled.
-- Android memory inspection, edit, toggle, and purge UI.
+- Android memory inspection, edit, toggle, purge, and candidate review UI. *(Android implemented.)*
 - Concurrency test suites `MEM-TEST-01` through `MEM-TEST-07`.

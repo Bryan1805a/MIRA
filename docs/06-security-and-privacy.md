@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-SEC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.8.0 |
-| **Last Updated** | 2026-10-27 |
+| **Version** | 2.0.0 |
+| **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Security & Privacy Lead |
 | **Compliance Baseline** | OWASP Mobile & API Top 10, Data Minimization Standards |
 
@@ -26,6 +26,8 @@
 | 1.6.0 | 2026-10-27 | Bryan | Documented advisory prompt injection: only allow-listed enum values are serialized, no free-form memory text is injected, and lookup failures never block chat. |
 | 1.7.0 | 2026-10-27 | Bryan | Documented extraction privacy guardrails: style-only prompt, untrusted-turn framing, allow-list/classification validation, evidence truncation, and enum-only staging. Audit test remains pending. |
 | 1.8.0 | 2026-10-27 | Bryan | Documented candidate-review privacy: evidence is a short owner-scoped quote, accept/reject is owner-scoped, and purge deletes pending candidates. |
+| 1.9.0 | 2026-11-13 | Bryan | Reconciled Android memory management client security: user memory governance and candidate review integrated in Android client (`MemoryActivity`). |
+| 2.0.0 | 2026-11-13 | Bryan | Reconciled memory extraction privacy audit tests (`MemoryPrivacyAuditTest`), token consumption sub-millisecond timestamp alignment, and injection safety validation. |
 
 ---
 
@@ -194,13 +196,13 @@ flowchart LR
 
 ---
 
-## 7. Implementation Status (2026-10-26)
+## 7. Implementation Status (2026-11-13)
 
 | Control | Status |
 | :--- | :--- |
 | Argon2id password hashing | Implemented |
 | SHA-256 refresh-token hashing | Implemented |
-| Rotating refresh tokens with replay detection | Implemented (revokes implicated session only; auto-refresh on Android client) |
+| Rotating refresh tokens with replay detection | Implemented (revokes implicated session only; auto-refresh on Android client; timestamp-aligned) |
 | HS256 JWT validation, 15-minute expiry | Implemented |
 | Stateless security filter chain and JSON 401/403 responses | Implemented |
 | Uniform error envelope with `requestId`/`details` | Implemented (Backend & Android) |
@@ -208,8 +210,8 @@ flowchart LR
 | Sanitized structured logging and request-ID correlation | Implemented (Backend) |
 | Android Keystore / `EncryptedSharedPreferences` | Implemented (Android) |
 | TLS-only network security config | Implemented (Android) |
-| Memory allow-list validation and generation-guarded purge | Implemented (Backend) |
+| Memory allow-list validation and generation-guarded purge | Implemented (Backend & Android `MemoryActivity`) |
 | Advisory style-profile injection (allow-listed values only) | Implemented (Backend) |
 | Extraction privacy guardrails (style-only prompt, allow-list re-validation, evidence cap) | Implemented (Backend) |
-| Candidate review (owner-scoped list/accept/reject; purge cleanup) | Implemented (Backend) |
-| Memory extraction privacy audit tests | Phase 2 |
+| Candidate review (owner-scoped list/accept/reject; purge cleanup) | Implemented (Backend & Android `MemoryActivity`) |
+| Memory extraction privacy audit tests | Implemented (`MemoryPrivacyAuditTest`) |

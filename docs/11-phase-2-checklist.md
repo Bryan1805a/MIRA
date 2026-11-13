@@ -4,8 +4,8 @@
 | :--- | :--- |
 | **Document ID** | MIRA-CHK-002 |
 | **Classification** | Internal Engineering Specification |
-| **Status** | Active Execution Baseline |
-| **Version** | 1.6.0 |
+| **Status** | Complete Execution Baseline |
+| **Version** | 1.8.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 2 — Communication-Style Memory Subsystem |
@@ -24,6 +24,7 @@
 | 1.5.0 | 2026-11-13 | Bryan | Marked Android memory client complete (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`, `item_memory_candidate.xml`, `activity_memory.xml`): inspect, edit with OCC, toggle, purge, and candidate review (accept/reject), plus `MemoryOptionsTest` unit tests (4 passing Android unit tests). |
 | 1.6.0 | 2026-11-13 | Bryan | Reconciled all dedicated Phase 2 memory integration test suites (104 backend tests passing: `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`, `MemoryInjectionFailureTest`, `MemoryInjectionSafetyTest`, `MemoryPrivacyAuditTest`) and closed remaining privacy audit, prompt dominance, cross-account, and lookup-failure checklist items. |
 | 1.7.0 | 2026-11-13 | Bryan | Started Phase 3 security hardening: auth rate limiting, account-wide replay revocation, and log-sanitization tests (116 backend tests). Closed the Phase 1 log-sanitization and refresh-replay follow-ups. |
+| 1.8.0 | 2026-11-13 | Bryan | Closed Phase 2: fixed the Android CI SDK/JDK setup, verified `mvnw clean verify` and the Android build/test/lint workflow green, and marked the exit gate complete. |
 
 ---
 
@@ -224,7 +225,7 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Update the API contract, domain model, architecture, security, and testing docs for the implemented governance surface.
 - [x] Add this Phase 2 checklist and update the overview roadmap.
 - [x] Keep the test inventory and migration baseline current through extraction and Flyway V10.
-- [ ] Add CI coverage for the memory suites; no live provider calls.
+- [x] Add CI coverage for the memory suites; no live provider calls.
 
 ---
 
@@ -239,7 +240,7 @@ These are tracked here because Phase 1 closed with them still open:
 | Injection | Enabled profile injected, disabled/empty/unspecified profile omitted, current instruction wins | Implemented (`MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`) |
 | Privacy | No biographical extraction, no prompt/token leakage in logs or audit rows | Implemented (`MemoryPrivacyAuditTest`) |
 | Android | Memory screen CRUD, conflict handling, toggle/purge, candidate confirmation, options mapping | Implemented (`MemoryActivity`, `MemoryOptionsTest`) |
-| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Local verification green (116 backend, 4 Android unit tests); CI pending |
+| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Complete: local verification green (116 backend, 4 Android unit tests) and both GitHub Actions workflows pass |
 
 All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQL.
 
@@ -286,5 +287,5 @@ Phase 2 is complete only when every item is verified:
 - [x] `MEM-TEST-01`..`MEM-TEST-07` pass against Testcontainers PostgreSQL.
 - [x] Privacy audit proves no biographical extraction and no sensitive logging (`MemoryPrivacyAuditTest`).
 - [x] Android memory UI supports inspect, edit, toggle, purge, and candidate review with conflict handling.
-- [ ] `mvnw clean verify` and `gradlew assembleDebug` pass in CI.
+- [x] `mvnw clean verify` and `gradlew assembleDebug` pass in CI.
 - [x] API contract, domain model, memory spec, and test inventory match delivered behavior.

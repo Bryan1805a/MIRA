@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -17,6 +17,7 @@
 | Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
 | 1.0.0 | 2026-11-13 | Bryan | Initial Phase 3 baseline: security hardening, release signing, backend deployment, observability, Android production readiness, test hardening, and documentation/release. |
+| 1.1.0 | 2026-11-13 | Bryan | Completed P3.0 (CI green, Phase 2 closed) and P3.1 (auth rate limiting, account-wide replay revocation, log-sanitization audit). |
 
 ---
 
@@ -117,9 +118,9 @@ flowchart LR
 
 - [x] Replace `android-actions/setup-android@v3` with `@v4` so the removed `tools` SDK package is not requested.
 - [x] Install `platforms;android-37` and `build-tools;36.0.0` explicitly.
-- [ ] Backend and Android workflows green on `main`.
-- [ ] Check the final Phase 2 exit-gate item in [11-phase-2-checklist.md](./11-phase-2-checklist.md#8-phase-2-exit-gate).
-- [ ] Mark Phase 2 complete in the roadmap and revision history.
+- [x] Backend and Android workflows green on `main`.
+- [x] Check the final Phase 2 exit-gate item in [11-phase-2-checklist.md](./11-phase-2-checklist.md#8-phase-2-exit-gate).
+- [x] Mark Phase 2 complete in the roadmap and revision history.
 
 ### 4.2 P3.1 — Security Hardening
 

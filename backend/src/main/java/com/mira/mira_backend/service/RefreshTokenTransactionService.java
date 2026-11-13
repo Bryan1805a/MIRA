@@ -71,13 +71,13 @@ public class RefreshTokenTransactionService {
 
         // A consumed token is a replay. Return normally so revocation commits.
         if (history.getConsumedAt() != null) {
-            session.revoke(now);
+            revokeAllActiveSessions(session.getUser().getId(), now);
             return RotationResult.replayDetected();
         }
 
         // Fail closed if the history and current session state disagree.
         if (!presentedHash.equals(session.getRefreshTokenHash())) {
-            session.revoke(now);
+            revokeAllActiveSessions(session.getUser().getId(), now);
             return RotationResult.replayDetected();
         }
 
@@ -112,6 +112,13 @@ public class RefreshTokenTransactionService {
                 newRefreshToken,
                 session.getExpiresAt()
         );
+    }
+
+    private void revokeAllActiveSessions(
+            UUID userId,
+            Instant revokedAt
+    ) {
+        userSessionRepository.revokeAllActiveForUser(userId, revokedAt);
     }
 
     public enum Status {

@@ -10,8 +10,10 @@ import com.mira.mira_backend.service.AuthenticationService;
 import com.mira.mira_backend.dto.RefreshRequest;
 import com.mira.mira_backend.dto.RefreshResponse;
 import com.mira.mira_backend.service.RefreshTokenService;
+import com.mira.mira_backend.service.AuthRateLimiter;
 import com.mira.mira_backend.dto.LogoutRequest;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
 
@@ -28,21 +30,28 @@ public class AuthController {
     private final UserAccountService userAccountService;
     private final AuthenticationService authenticationService;
     private final RefreshTokenService refreshTokenService;
+    private final AuthRateLimiter authRateLimiter;
 
     public AuthController(
         UserAccountService userAccountService,
         AuthenticationService authenticationService,
-        RefreshTokenService refreshTokenService) {
+        RefreshTokenService refreshTokenService,
+        AuthRateLimiter authRateLimiter) {
                 this.userAccountService = userAccountService;
                 this.authenticationService = authenticationService;
                 this.refreshTokenService = refreshTokenService;
+                this.authRateLimiter = authRateLimiter;
     }
 
     // Register endpoint
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> register(
-            @Valid @RequestBody RegisterRequest request
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest
     ) {
+        authRateLimiter.checkRegister(
+                authRateLimiter.clientIp(httpRequest));
+
         UserAccount account = userAccountService.register(
                 request.email(),
                 request.password()
@@ -61,8 +70,13 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
-            @Valid @RequestBody LoginRequest request
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest
     ) {
+        authRateLimiter.checkLogin(
+                request.email(),
+                authRateLimiter.clientIp(httpRequest));
+
         AuthenticationService.LoginResult result =
                 authenticationService.login(
                         request.email(),
@@ -85,8 +99,12 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<RefreshResponse> refresh(
-            @Valid @RequestBody RefreshRequest request
+            @Valid @RequestBody RefreshRequest request,
+            HttpServletRequest httpRequest
     ) {
+        authRateLimiter.checkRefresh(
+                authRateLimiter.clientIp(httpRequest));
+
         RefreshTokenService.RefreshResult result =
                 refreshTokenService.refresh(request.refreshToken());
     

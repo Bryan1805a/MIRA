@@ -158,11 +158,9 @@ public class ApiExceptionHandler {
             HttpServletRequest request
     ) {
         log.error(
-                "Unhandled request failure requestId={} exception={} message={} cause={}",
+                "Unhandled request failure requestId={} exception={}",
                 RequestIdFilter.requestId(request),
-                exception.getClass().getName(),
-                exception.getMessage(),
-                exception.getCause()
+                exception.getClass().getName()
         );
 
         return error(

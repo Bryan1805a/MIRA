@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.2.0 |
+| **Version** | 1.3.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -19,6 +19,7 @@
 | 1.0.0 | 2026-11-13 | Bryan | Initial Phase 3 baseline: security hardening, release signing, backend deployment, observability, Android production readiness, test hardening, and documentation/release. |
 | 1.1.0 | 2026-11-13 | Bryan | Completed P3.0 (CI green, Phase 2 closed) and P3.1 (auth rate limiting, account-wide replay revocation, log-sanitization audit). |
 | 1.2.0 | 2026-11-14 | Bryan | Completed P3.2 implementation: release signing config, R8 rules, configurable API URL/versioning, local signed APK/AAB verification, tag-based release workflow, and ADR-005. |
+| 1.3.0 | 2026-11-14 | Bryan | Completed P3.3 packaging: production Dockerfile, `.dockerignore`, `prod` profile with ECS JSON logs and graceful shutdown, Render blueprint, ADR-004, and a CI container-image build. Live Neon/Render deployment remains. |
 
 ---
 
@@ -107,9 +108,9 @@ flowchart LR
 | Local database | `docker-compose.yml`, `.env.example` |
 | CI workflows | Backend verify and Android build/test/lint configured |
 | Release signing | Configurable via environment variables / `keystore.properties`; R8 rules and a tag-based release workflow are in place. Keystore creation and GitHub Secrets remain operator steps. |
-| Backend container image | Not configured (no `Dockerfile`) |
-| Deployment | Not deployed |
-| Observability | Request IDs and health probes only; no metrics or alerts |
+| Backend container image | Implemented (`backend/Dockerfile`); image builds, runs, migrates, and serves health locally |
+| Deployment | Render blueprint ready (`render.yaml`); Neon provisioning and live deployment remain |
+| Observability | Request IDs, ECS JSON logs in the `prod` profile, and health probes; metrics and alerts remain |
 
 ---
 
@@ -149,15 +150,15 @@ flowchart LR
 
 ### 4.4 P3.3 — Backend Packaging & Deployment
 
-- [ ] Add `backend/Dockerfile` (multi-stage build, JRE 21 runtime, non-root user, healthcheck).
-- [ ] Add `.dockerignore`.
-- [ ] Add a `prod` profile with JSON logging, graceful shutdown, Hikari settings, and Flyway on boot.
-- [ ] Fail fast on missing production secrets (`MIRA_JWT_SECRET_BASE64`, datasource, DeepSeek key).
-- [ ] Choose the hosting platform and record an ADR (recommended: one PaaS such as Render or Fly.io).
+- [x] Add `backend/Dockerfile` (multi-stage build, JRE 21 runtime, non-root user, healthcheck).
+- [x] Add `.dockerignore`.
+- [x] Add a `prod` profile with JSON logging, graceful shutdown, Hikari settings, and Flyway on boot.
+- [x] Fail fast on missing production secrets (`MIRA_JWT_SECRET_BASE64`, datasource, DeepSeek key).
+- [x] Choose the hosting platform and record an ADR (Render + Neon, ADR-004).
 - [ ] Provision Neon PostgreSQL, enforce `sslmode=require`, and configure backups.
 - [ ] Deploy the backend and verify Flyway `V1`–`V10` against the managed database.
 - [ ] Verify `/actuator/health`, liveness, and readiness over public HTTPS.
-- [ ] Add a CI/CD deploy workflow (image publish + deploy on tag or main).
+- [x] Add a CI container-image build and a Render blueprint with auto-deploy.
 - [ ] Run the end-to-end smoke flow against staging.
 
 ### 4.5 P3.4 — Observability & Operations

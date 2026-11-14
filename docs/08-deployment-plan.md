@@ -5,10 +5,10 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.1.0 |
+| **Version** | 2.2.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
-| **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
+| **Hosting Platform** | Render (Docker Web Service) + Neon PostgreSQL |
 
 ---
 
@@ -29,6 +29,7 @@
 | 1.9.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery; deployment remains a Phase 3 activity. |
 | 2.0.0 | 2026-11-13 | Bryan | Recorded Phase 3 security hardening: authentication rate-limit configuration and account-wide replay revocation. Deployment remains a Phase 3 activity. |
 | 2.1.0 | 2026-11-14 | Bryan | Documented Android release signing, configurable version/API values, and the tag-based release workflow. |
+| 2.2.0 | 2026-11-14 | Bryan | Documented the production Docker image, `prod` profile, Render + Neon deployment flow, and local container verification. |
 
 ---
 
@@ -149,6 +150,59 @@ When making schema modifications (e.g., renaming columns or adding constraints):
 1. **Expand:** Add new columns as nullable in migration `V_n`. Deploy application code capable of reading both old and new columns.
 2. **Backfill:** Populate the new columns via background update scripts.
 3. **Contract:** In subsequent release migration `V_n+1`, apply `NOT NULL` constraints and drop deprecated columns.
+
+### 3.2 Container Image
+
+The backend ships as a multi-stage Docker image defined in `backend/Dockerfile`:
+
+- Build stage: `eclipse-temurin:21-jdk-jammy`, Maven wrapper, tests skipped (CI already runs them).
+- Runtime stage: `eclipse-temurin:21-jre-alpine`, non-root `mira` user, JRE 21.
+- Default profile: `prod`.
+- Binds to `${PORT}` (Render) with `SERVER_PORT` fallback.
+- Container healthcheck: `GET /actuator/health`.
+
+Build and run locally:
+
+```powershell
+docker build -t mira-backend:ci backend
+
+docker run --rm -p 8080:8080 `
+  -e SPRING_PROFILES_ACTIVE=prod `
+  -e MIRA_JWT_SECRET_BASE64="<base64-secret>" `
+  -e SPRING_DATASOURCE_URL="jdbc:postgresql://host.docker.internal:5432/mira" `
+  -e SPRING_DATASOURCE_USERNAME="mira" `
+  -e SPRING_DATASOURCE_PASSWORD="admin123" `
+  -e DEEPSEEK_API_KEY="<key>" `
+  mira-backend:ci
+```
+
+The `prod` profile enables ECS-formatted JSON logs, graceful shutdown, forward-header handling, Hikari pool settings, and Flyway validation. The backend workflow builds the image on every push so Dockerfile regressions fail CI.
+
+### 3.3 Render Deployment
+
+1. Create a Neon PostgreSQL project and copy the **pooled** JDBC URL, including `?sslmode=require`.
+2. Push the repository to GitHub.
+3. In Render, choose **New → Blueprint**, select the repository, and apply `render.yaml`.
+4. Set the following secrets on the service:
+   - `MIRA_JWT_SECRET_BASE64`
+   - `SPRING_DATASOURCE_URL`
+   - `SPRING_DATASOURCE_USERNAME`
+   - `SPRING_DATASOURCE_PASSWORD`
+   - `DEEPSEEK_API_KEY`
+5. Confirm `SPRING_PROFILES_ACTIVE=prod`, `MIRA_TRUST_FORWARDED_HEADERS=true`, and `JAVA_OPTS` from the blueprint.
+6. Deploy. Render builds `backend/Dockerfile`, injects `PORT`, and polls `/actuator/health/readiness`.
+7. Verify:
+
+```powershell
+curl https://<service>.onrender.com/actuator/health
+curl https://<service>.onrender.com/actuator/health/readiness
+```
+
+8. Register a smoke account and send a message through the Android client or API.
+9. Set the Android release `MIRA_API_BASE_URL` to the Render HTTPS URL.
+
+> [!WARNING]
+> Neon's direct (non-pooled) connection string can exhaust PostgreSQL connection limits under load. Use the pooled URL and keep the Hikari maximum at or below the plan limit.
 
 ---
 

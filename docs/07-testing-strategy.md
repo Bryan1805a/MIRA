@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.2.0 |
+| **Version** | 2.4.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
@@ -31,6 +31,7 @@
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled Android memory options unit test suite (`MemoryOptionsTest`, 3 tests; 4 total passing Android unit tests). |
 | 2.2.0 | 2026-11-13 | Bryan | Reconciled memory integration and privacy audit test suites (15 tests across `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`, `MemoryInjectionFailureTest`, `MemoryInjectionSafetyTest`, `MemoryPrivacyAuditTest`; inventory now 104 passing backend tests, 0 failures). |
 | 2.3.0 | 2026-11-13 | Bryan | Added Phase 3 security hardening suites: `AuthRateLimiterTests`, `AuthSecurityTest`, and `LogSanitizationTest` (12 tests; inventory now 116 passing backend tests). |
+| 2.4.0 | 2026-11-14 | Bryan | Added the backend container-image build to CI and documented the signed Android release workflow. |
 
 ---
 
@@ -221,7 +222,7 @@ flowchart TD
 ```
 
 > [!NOTE]
-> GitHub Actions workflows are configured in `.github/workflows/backend.yml` (Maven verify with Testcontainers) and `.github/workflows/android.yml` (Gradle build, testDebugUnitTest, lintDebug, and APK artifact upload). Both pipelines run on push, pull request, and manual dispatch.
+> GitHub Actions workflows are configured in `.github/workflows/backend.yml` (Maven verify with Testcontainers plus a production container-image build) and `.github/workflows/android.yml` (Gradle build, testDebugUnitTest, lintDebug, and APK artifact upload). The `Android Release` workflow builds and signs an APK/AAB on `v*` tags. Both verification pipelines run on push, pull request, and manual dispatch.
 
 ---
 

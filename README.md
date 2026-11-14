@@ -12,7 +12,7 @@
 
 ## Development Status
 
-**Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (production hardening) is active: authentication rate limiting, account-wide refresh-token replay revocation, and log-sanitization verification are implemented, with 116 passing backend tests and 4 passing Android unit tests. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
+**Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (production hardening) is active: authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, and backend container packaging are implemented, with 116 passing backend tests and 4 passing Android unit tests. Live Neon/Render deployment, observability, and device verification remain. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
 - Android client features full authentication flows (Login, Registration, session gate in `MainActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
@@ -135,6 +135,25 @@ cd backend
 ```
 
 Verify the service is up at `http://localhost:8080/actuator/health`.
+
+### Container & Deployment
+
+The backend ships as a multi-stage Docker image (`backend/Dockerfile`) and runs with the `prod` profile:
+
+```powershell
+docker build -t mira-backend:ci backend
+
+docker run --rm -p 8080:8080 `
+  -e SPRING_PROFILES_ACTIVE=prod `
+  -e MIRA_JWT_SECRET_BASE64="<base64-secret>" `
+  -e SPRING_DATASOURCE_URL="jdbc:postgresql://host.docker.internal:5432/mira" `
+  -e SPRING_DATASOURCE_USERNAME="mira" `
+  -e SPRING_DATASOURCE_PASSWORD="admin123" `
+  -e DEEPSEEK_API_KEY="<key>" `
+  mira-backend:ci
+```
+
+The `prod` profile enables ECS JSON logging, graceful shutdown, forward-header handling, Hikari pool settings, and Flyway on boot. Deployment uses Render + Neon via `render.yaml`; see [`docs/08-deployment-plan.md`](docs/08-deployment-plan.md) and [`docs/decisions/ADR-004-hosting-platform.md`](docs/decisions/ADR-004-hosting-platform.md).
 
 ## Android
 

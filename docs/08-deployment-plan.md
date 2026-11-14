@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.3.0 |
+| **Version** | 2.4.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Render (Docker Web Service) + Neon PostgreSQL |
@@ -31,6 +31,7 @@
 | 2.1.0 | 2026-11-14 | Bryan | Documented Android release signing, configurable version/API values, and the tag-based release workflow. |
 | 2.2.0 | 2026-11-14 | Bryan | Documented the production Docker image, `prod` profile, Render + Neon deployment flow, and local container verification. |
 | 2.3.0 | 2026-11-14 | Bryan | Documented Micrometer metrics, alert thresholds, structured logging verification, and backup/rollback drills. |
+| 2.4.0 | 2026-11-14 | Bryan | Recorded the live Render + Neon deployment and verified health/readiness; added the production URL to the runbook. |
 
 ---
 
@@ -330,7 +331,7 @@ Neon provides point-in-time recovery and branching. Perform this drill quarterly
 ## 6. Pre-Production Release Verification Checklist
 
 > [!NOTE]
-> MIRA is not yet deployed. Phase 1 (chat core) and Phase 2 (communication-style memory) are complete. Phase 3 is in progress: authentication rate limiting and account-wide replay revocation are implemented; release signing, backend deployment, and observability remain. Production deployment is a Phase 3 activity.
+> MIRA is deployed on Render + Neon at `https://mira-backend-094w.onrender.com`. Phase 1 (chat core), Phase 2 (communication-style memory), and the Phase 3 backend hardening (auth throttling, replay revocation, container packaging, observability metrics) are live. Use this checklist for every release; Android device verification, alert configuration, and restore/rollback drills remain operator tasks.
 
 > [!WARNING]
 > Extraction uses in-process `@Scheduled` pollers that claim `PENDING` jobs with `FOR UPDATE SKIP LOCKED` and requeue stale `PROCESSING` jobs. Claims are safe across multiple application instances and commit is guarded by generation/version checks, so leader election is not required. Keep `stale-after-seconds` comfortably above the provider timeout to avoid requeueing healthy work.

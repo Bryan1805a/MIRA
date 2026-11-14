@@ -12,7 +12,7 @@
 
 ## Development Status
 
-**Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (production hardening) is active: authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, backend container packaging, observability metrics, and Android session/error tests are implemented, with 125 passing backend tests, 16 passing Android unit tests, and a compiled instrumented API smoke test. Live Neon/Render deployment verification, alert configuration, and physical-device verification remain. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
+**Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (production hardening) is active: authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, backend container packaging, observability metrics, and Android session/error tests are implemented, with 125 passing backend tests, 16 passing Android unit tests, and a compiled instrumented API smoke test. The backend is live at `https://mira-backend-094w.onrender.com`, and v1.2.0 is tagged. Alert configuration, operational drills, and physical-device verification remain. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
 - Android client features full authentication flows (Login, Registration, session gate in `MainActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
@@ -223,6 +223,8 @@ The `Android Release` GitHub Actions workflow does the same on a `v*` tag, using
 - [`docs/10-phase-1-checklist.md`](docs/10-phase-1-checklist.md) — Closed conversation and chat milestone
 - [`docs/11-phase-2-checklist.md`](docs/11-phase-2-checklist.md) — Completed communication-style memory milestone
 - [`docs/12-phase-3-checklist.md`](docs/12-phase-3-checklist.md) — Active production hardening, deployment, and operational readiness
+- [`docs/13-release-process.md`](docs/13-release-process.md) — Versioning, release checklist, hotfix, and rollback process
+- [`CHANGELOG.md`](CHANGELOG.md) — Release notes and change history
 - [`docs/decisions/ADR-005-release-signing.md`](docs/decisions/ADR-005-release-signing.md) — Android release signing and artifact strategy
 
 ## Security Notes

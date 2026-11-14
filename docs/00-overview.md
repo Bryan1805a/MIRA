@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.5.0 |
+| **Version** | 2.6.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
@@ -33,6 +33,7 @@
 | 2.3.0 | 2026-11-14 | Bryan | Recorded P3.4 observability: ECS structured logs, custom Micrometer metrics, authenticated metrics endpoint, and 124 passing backend tests. |
 | 2.4.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests: 16 unit tests and an instrumented API smoke test. |
 | 2.5.0 | 2026-11-14 | Bryan | Split the backend suite by domain, introduced a shared singleton Testcontainers base, and added an NFR-004 latency smoke test (125 backend tests). |
+| 2.6.0 | 2026-11-14 | Bryan | Recorded Phase 3 release engineering: release notes, version/tag strategy, live deployment verification, and the v1.2.0 release. |
 
 ---
 
@@ -141,7 +142,7 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 | **Phase 0** | Complete (Android APK install verification carried into Phase 1) | Repository, toolchain, backend/Android skeletons, Flyway baseline |
 | **Phase 1** | **Complete** (merged to `main`) | Conversation API, message orchestration, AI provider abstraction, Android auth/chat client, hardening, CI |
 | **Phase 2** | **Complete** (CI verified) | Communication-style memory governance, prompt injection, extraction + retry/recovery, candidate review, OCC/generation concurrency, memory UI |
-| **Phase 3** | **Active** | Production hardening: security hardening, release signing, backend deployment, observability, operational readiness |
+| **Phase 3** | **Active** (v1.2.0 tagged; operator verification pending) | Production hardening: security hardening, release signing, backend deployment, observability, operational readiness |
 
 Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 delivered backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), the `MEM-TEST-01`..`MEM-TEST-07` race scenarios, the Android memory client (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). Phase 3 is active: authentication rate limiting, account-wide replay revocation, log-sanitization tests, Android release signing, backend packaging, observability metrics, and the domain-split backend suite are complete (125 backend tests, 0 failures); live Neon/Render deployment verification and operational drills remain. See [12-phase-3-checklist.md](./12-phase-3-checklist.md), [11-phase-2-checklist.md](./11-phase-2-checklist.md), and [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
@@ -163,6 +164,8 @@ The complete engineering specification is partitioned into modular, version-cont
 * [10-phase-1-checklist.md](./10-phase-1-checklist.md) — Phase 1 Conversation & Chat Core milestone (complete; open follow-ups carried into Phase 2).
 * [11-phase-2-checklist.md](./11-phase-2-checklist.md) — Phase 2 Communication-Style Memory milestone, workstreams, and exit gate.
 * [12-phase-3-checklist.md](./12-phase-3-checklist.md) — Phase 3 Production Hardening, Deployment, and Operational Readiness.
+* [13-release-process.md](./13-release-process.md) — Versioning, release checklist, hotfix, and rollback process.
+* [CHANGELOG.md](../CHANGELOG.md) — Release notes and change history.
 * [ADR-001-backend-stack.md](./decisions/ADR-001-backend-stack.md) — Architectural Decision Record: Backend Technology Selection.
 * [ADR-002-memory-model.md](./decisions/ADR-002-memory-model.md) — Architectural Decision Record: Memory Lifecycle & Concurrency Model.
 * [ADR-003-file-processing.md](./decisions/ADR-003-file-processing.md) — Architectural Decision Record: Multimodal Processing Phasing.

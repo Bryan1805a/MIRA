@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.7.0 |
+| **Version** | 1.8.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -24,6 +24,7 @@
 | 1.5.0 | 2026-11-14 | Bryan | Completed P3.4 implementation: ECS structured logging, custom Micrometer metrics, authenticated `/actuator/metrics` with HTTP percentiles, and documented alert/backup/rollback procedures. Alert configuration and operational drills remain. |
 | 1.6.0 | 2026-11-14 | Bryan | Completed P3.5 implementation: unit tests for `TokenStore`, `AuthInterceptor`, and error mapping; instrumented API smoke test; verified release cleartext and logging configuration. Device execution and physical-device UX checks remain. |
 | 1.7.0 | 2026-11-14 | Bryan | Completed P3.6: shared singleton Testcontainers base, domain test split, NFR-004 latency smoke test, and Android release-build verification (125 backend tests). |
+| 1.8.0 | 2026-11-14 | Bryan | Completed P3.7: release notes, version/tag strategy, live deployment verification, and the v1.2.0 release. Operator device/alerts/drill checks remain. |
 
 ---
 
@@ -111,9 +112,9 @@ flowchart LR
 | Backend health probes | Implemented (`/actuator/health`, liveness, readiness) |
 | Local database | `docker-compose.yml`, `.env.example` |
 | CI workflows | Backend verify and Android build/test/lint configured |
-| Release signing | Configurable via environment variables / `keystore.properties`; R8 rules and a tag-based release workflow are in place. Keystore creation and GitHub Secrets remain operator steps. |
-| Backend container image | Implemented (`backend/Dockerfile`); image builds, runs, migrates, and serves health locally |
-| Deployment | Render blueprint ready (`render.yaml`); Neon provisioning and live deployment remain |
+| Release signing | Complete: signed release workflow and keystore configuration; v1.1.x artifacts produced by CI. |
+| Backend container image | Implemented and deployed (`backend/Dockerfile`; Render builds it from `render.yaml`). |
+| Deployment | Deployed on Render + Neon at `https://mira-backend-094w.onrender.com`; health and readiness verified. |
 | Observability | ECS JSON logs in `prod`, health probes, custom Micrometer counters, and authenticated `/actuator/metrics` with HTTP percentiles; external alerts and drills remain |
 
 ---
@@ -160,11 +161,11 @@ flowchart LR
 - [x] Add a `prod` profile with JSON logging, graceful shutdown, Hikari settings, and Flyway on boot.
 - [x] Fail fast on missing production secrets (`MIRA_JWT_SECRET_BASE64`, datasource, DeepSeek key).
 - [x] Choose the hosting platform and record an ADR (Render + Neon, ADR-004).
-- [ ] Provision Neon PostgreSQL, enforce `sslmode=require`, and configure backups.
-- [ ] Deploy the backend and verify Flyway `V1`–`V10` against the managed database.
-- [ ] Verify `/actuator/health`, liveness, and readiness over public HTTPS.
+- [x] Provision Neon PostgreSQL, enforce `sslmode=require`, and configure backups.
+- [x] Deploy the backend and verify Flyway `V1`–`V10` against the managed database.
+- [x] Verify `/actuator/health`, liveness, and readiness over public HTTPS.
 - [x] Add a CI container-image build and a Render blueprint with auto-deploy.
-- [ ] Run the end-to-end smoke flow against staging.
+- [x] Run the end-to-end smoke flow against staging (operator-verified).
 
 ### 4.5 P3.4 — Observability & Operations
 
@@ -198,13 +199,13 @@ flowchart LR
 
 ### 4.8 P3.7 — Documentation & Release
 
-- [ ] Keep this checklist current as workstreams complete.
+- [x] Keep this checklist current as workstreams complete.
 - [x] Add ADR-005 (release signing).
-- [ ] Add ADR-004 (hosting platform).
-- [ ] Update [08-deployment-plan.md](./08-deployment-plan.md) with the chosen provider, domains, and runbook.
-- [ ] Update the README with deployment, release, and operational instructions.
-- [ ] Write release notes and choose the version/tag strategy.
-- [ ] Produce the first tagged release artifact and deployment.
+- [x] Add ADR-004 (hosting platform).
+- [x] Update [08-deployment-plan.md](./08-deployment-plan.md) with the chosen provider, domains, and runbook.
+- [x] Update the README with deployment, release, and operational instructions.
+- [x] Write release notes and choose the version/tag strategy ([CHANGELOG.md](../CHANGELOG.md), [13-release-process.md](./13-release-process.md)).
+- [x] Produce tagged release artifacts (v1.1.0, v1.1.1; v1.2.0 for Phase 3).
 
 ---
 
@@ -212,16 +213,16 @@ flowchart LR
 
 Phase 3 is complete only when every item is verified:
 
-- [ ] Backend and Android CI workflows are green on `main`.
-- [ ] Authentication rate limiting and account-wide replay revocation are deployed and verified.
+- [x] Backend and Android CI workflows are green on `main`.
+- [x] Authentication rate limiting and account-wide replay revocation are deployed and verified.
 - [ ] Log-sanitization audit passes in the deployed environment.
 - [ ] A signed release AAB/APK is produced by CI and installs on a physical device.
 - [ ] The release build connects to the staging backend over HTTPS.
-- [ ] The backend is deployed to staging with TLS, health probes, and Flyway migrations applied.
-- [ ] An end-to-end smoke test (register → login → conversation → message → memory settings) passes against staging.
+- [x] The backend is deployed to staging with TLS, health probes, and Flyway migrations applied.
+- [x] An end-to-end smoke test (register → login → conversation → message → memory settings) passes against staging (operator-verified).
 - [ ] Metrics and alerts are active for health, 5xx, provider errors, and extraction backlog.
 - [ ] Backup/restore and rollback procedures have been exercised.
-- [ ] Documentation, ADRs, and release notes match the deployed system.
+- [x] Documentation, ADRs, and release notes match the deployed system.
 
 ---
 

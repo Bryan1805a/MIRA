@@ -1,5 +1,9 @@
 package com.mira.mira_backend.service;
 
+import com.mira.mira_backend.metrics.MiraMetrics;
+
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -24,7 +28,8 @@ class AuthRateLimiterTests {
             60,
             Duration.ofMinutes(1),
             false,
-            clock
+            clock,
+            new MiraMetrics(new SimpleMeterRegistry())
     );
 
     @Test

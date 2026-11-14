@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.1.0 |
+| **Version** | 2.3.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
@@ -30,6 +30,7 @@
 | 2.0.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery: `MemoryActivity`, `MemoryRepository`, `MemoryOptions`, candidate review UI (accept/reject), OCC save/reload, toggle, and purge. |
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites and security verification: privacy audit, injection safety, non-fatal lookup failure, and hybrid conflict resolution tests (104 passing backend tests). |
 | 2.2.0 | 2026-11-13 | Bryan | Added Phase 3 security hardening: authentication rate limiting, account-wide replay revocation, and log-sanitization coverage. |
+| 2.3.0 | 2026-11-14 | Bryan | Added Phase 3 observability: ECS structured logging, custom Micrometer metrics, and authenticated metrics exposure. |
 
 ---
 
@@ -115,7 +116,7 @@ flowchart TD
 
 ### 2.3 Memory Subsystem Module (`memory` domain)
 * **Primary Scope:** Style memory extraction, validation, conflict resolution, versioning, and user governance.
-* **Current Delivery Status:** The governance surface, concurrency primitives, advisory prompt injection, asynchronous extraction pipeline, candidate review, Android memory client, and dedicated integration test suites are implemented: profile provisioning on first read, allow-list validation, OCC version checks with `409 version_conflict`, the enabled/disabled toggle, atomic purge with a generation increment, enum-only advisory injection during chat context assembly, `COMPLETED`-only extraction job scheduling, JSON extraction, hybrid candidate handling (explicit merge, inferred staging, ephemeral discard), generation/version commit guards, pending-candidate list/accept/reject, bounded retries, `SKIP LOCKED` claiming, stale-processing recovery, full Android UI (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`), and dedicated integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). All 116 backend tests pass offline.
+* **Current Delivery Status:** The governance surface, concurrency primitives, advisory prompt injection, asynchronous extraction pipeline, candidate review, Android memory client, and dedicated integration test suites are implemented: profile provisioning on first read, allow-list validation, OCC version checks with `409 version_conflict`, the enabled/disabled toggle, atomic purge with a generation increment, enum-only advisory injection during chat context assembly, `COMPLETED`-only extraction job scheduling, JSON extraction, hybrid candidate handling (explicit merge, inferred staging, ephemeral discard), generation/version commit guards, pending-candidate list/accept/reject, bounded retries, `SKIP LOCKED` claiming, stale-processing recovery, full Android UI (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`), and dedicated integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). All 124 backend tests pass offline.
 * **Core Responsibilities:**
   * Manage persistent `USER_STYLE_PROFILE` records.
   * Gate extraction eligibility: only trigger memory extraction when a logical assistant response reaches `COMPLETED` status.

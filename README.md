@@ -12,7 +12,7 @@
 
 ## Development Status
 
-**Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (production hardening) is active: authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, and backend container packaging are implemented, with 116 passing backend tests and 4 passing Android unit tests. Live Neon/Render deployment, observability, and device verification remain. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
+**Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (production hardening) is active: authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, backend container packaging, and observability metrics are implemented, with 124 passing backend tests and 4 passing Android unit tests. Live Neon/Render deployment verification, alert configuration, and device verification remain. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
 - Android client features full authentication flows (Login, Registration, session gate in `MainActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
@@ -23,7 +23,7 @@
 - Per-account message rate limiting (sliding window of 10 requests/minute returning HTTP `429 rate_limited`) and Actuator health/probe endpoints are active.
 - Local PostgreSQL environment is pre-configured via `docker-compose.yml` and `.env.example`.
 - GitHub Actions CI workflows are configured for backend verification (`.github/workflows/backend.yml`) and Android build, test, and lint (`.github/workflows/android.yml`).
-- The backend test suite passes with 116 automated tests across unit, mock server, and PostgreSQL Testcontainers suites (including `AuthRateLimiterTests`, `AuthSecurityTest`, `LogSanitizationTest`, `MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`, and `MiraBackendApplicationTests`).
+- The backend test suite passes with 124 automated tests across unit, mock server, and PostgreSQL Testcontainers suites (including `MiraMetricsTests`, `ObservabilityTest`, `AuthRateLimiterTests`, `AuthSecurityTest`, `LogSanitizationTest`, the memory suites, and `MiraBackendApplicationTests`).
 - The Android test, build, and lint suites pass via `.\gradlew.bat clean assembleDebug testDebugUnitTest lintDebug`.
 - Backend memory governance is implemented (`GET/PUT/PATCH/DELETE /api/v1/memory/style`) with allow-list validation, OCC `409 version_conflict`, and generation-guarded purge.
 - Enabled style profiles are injected into chat context as an advisory system message; disabled, empty, and all-unspecified profiles inject nothing, and lookup failures never block chat.
@@ -32,6 +32,7 @@
 - Android client delivers complete communication-style memory management and candidate review (`MemoryActivity`, `MemoryRepository`, `MemoryOptions`) with profile inspection, toggling, manual OCC save, permanent purge, and candidate acceptance/rejection.
 - Extraction privacy audit tests prove that biographical/unknown attributes are discarded, evidence is capped at 500 characters, no prompt/transcript columns exist in audit tables, and user content/tokens are never leaked to logs. Current-instruction dominance and post-purge omission are verified.
 - Phase 3 security hardening: login is throttled per email and client IP, registration and refresh per client IP, and replay of a consumed refresh token revokes every active session for the account. Log-sanitization tests assert that passwords, tokens, prompts, and completions never reach application logs.
+- Phase 3 observability: the `prod` profile emits ECS JSON logs and exposes authenticated Micrometer metrics for chat outcomes, provider errors, extraction jobs, auth throttling, purges, and HTTP latency percentiles. Alert thresholds, backup/restore, and rollback drills are documented in `docs/08-deployment-plan.md`.
 
 See [`docs/12-phase-3-checklist.md`](docs/12-phase-3-checklist.md) for the active Phase 3 plan.
 See [`docs/11-phase-2-checklist.md`](docs/11-phase-2-checklist.md) for the Phase 2 plan and exit gate.
@@ -125,7 +126,7 @@ cd backend
 .\mvnw.cmd clean verify
 ```
 
-The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1–V10), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (116 automated tests pass).
+The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1–V10), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (124 automated tests pass).
 
 ### Run Locally
 

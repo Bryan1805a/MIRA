@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.4.0 |
+| **Version** | 1.5.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -21,6 +21,7 @@
 | 1.2.0 | 2026-11-14 | Bryan | Completed P3.2 implementation: release signing config, R8 rules, configurable API URL/versioning, local signed APK/AAB verification, tag-based release workflow, and ADR-005. |
 | 1.3.0 | 2026-11-14 | Bryan | Completed P3.3 packaging: production Dockerfile, `.dockerignore`, `prod` profile with ECS JSON logs and graceful shutdown, Render blueprint, ADR-004, and a CI container-image build. Live Neon/Render deployment remains. |
 | 1.4.0 | 2026-11-14 | Bryan | Verified the first signed Android release via the `v1.1.0` tag; APK and AAB artifacts were produced by CI. |
+| 1.5.0 | 2026-11-14 | Bryan | Completed P3.4 implementation: ECS structured logging, custom Micrometer metrics, authenticated `/actuator/metrics` with HTTP percentiles, and documented alert/backup/rollback procedures. Alert configuration and operational drills remain. |
 
 ---
 
@@ -103,7 +104,7 @@ flowchart LR
 | :--- | :--- |
 | Phase 1 chat core | Complete; merged to `main` |
 | Phase 2 memory subsystem | Complete; final CI verification pending |
-| Backend test suite | 116 passing tests (unit, MockRestServiceServer, Testcontainers PostgreSQL) |
+| Backend test suite | 124 passing tests (unit, MockRestServiceServer, Testcontainers PostgreSQL) |
 | Android test suite | 4 passing unit tests (`MemoryOptionsTest`, `ExampleUnitTest`) |
 | Backend health probes | Implemented (`/actuator/health`, liveness, readiness) |
 | Local database | `docker-compose.yml`, `.env.example` |
@@ -111,7 +112,7 @@ flowchart LR
 | Release signing | Configurable via environment variables / `keystore.properties`; R8 rules and a tag-based release workflow are in place. Keystore creation and GitHub Secrets remain operator steps. |
 | Backend container image | Implemented (`backend/Dockerfile`); image builds, runs, migrates, and serves health locally |
 | Deployment | Render blueprint ready (`render.yaml`); Neon provisioning and live deployment remain |
-| Observability | Request IDs, ECS JSON logs in the `prod` profile, and health probes; metrics and alerts remain |
+| Observability | ECS JSON logs in `prod`, health probes, custom Micrometer counters, and authenticated `/actuator/metrics` with HTTP percentiles; external alerts and drills remain |
 
 ---
 
@@ -165,13 +166,14 @@ flowchart LR
 
 ### 4.5 P3.4 — Observability & Operations
 
-- [ ] Enable structured JSON logging.
-- [ ] Add Micrometer metrics for chat requests, provider errors/timeouts, extraction jobs, auth failures, and rate limits.
+- [x] Enable structured JSON logging.
+- [x] Add Micrometer metrics for chat requests, provider errors/timeouts, extraction jobs, auth failures, and rate limits.
+- [x] Expose authenticated `/actuator/metrics` in `prod`, including HTTP latency percentiles.
 - [ ] Configure alerts for health failures, 5xx spikes, provider latency, and extraction backlog.
 - [ ] Document the rollback procedure and exercise it once.
 - [ ] Perform a Neon backup/restore drill and record recovery time.
-- [ ] Document secret rotation for `DEEPSEEK_API_KEY`, `MIRA_JWT_SECRET_BASE64`, and database credentials.
-- [ ] Confirm logs contain no prompts, completions, passwords, tokens, or provider payloads.
+- [x] Document secret rotation for `DEEPSEEK_API_KEY`, `MIRA_JWT_SECRET_BASE64`, and database credentials.
+- [x] Confirm logs contain no prompts, completions, passwords, tokens, or provider payloads.
 
 ### 4.6 P3.5 — Android Production Readiness
 

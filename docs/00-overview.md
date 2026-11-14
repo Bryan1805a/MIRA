@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.1.0 |
+| **Version** | 2.3.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
@@ -30,6 +30,7 @@
 | 2.0.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery: delivered `MemoryActivity`, `MemoryRepository`, `MemoryOptions`, candidate review UI (accept/reject), OCC save/reload, toggle, and purge. |
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites and test verification baseline: completed `MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, and `MemoryEndpointSecurityTest` (104 passing backend tests, 0 failures). |
 | 2.2.0 | 2026-11-13 | Bryan | Started Phase 3 production hardening: authentication rate limiting, account-wide refresh-token replay revocation, and log-sanitization verification (116 passing backend tests). |
+| 2.3.0 | 2026-11-14 | Bryan | Recorded P3.4 observability: ECS structured logs, custom Micrometer metrics, authenticated metrics endpoint, and 124 passing backend tests. |
 
 ---
 
@@ -140,7 +141,7 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 | **Phase 2** | **Complete** (CI verified) | Communication-style memory governance, prompt injection, extraction + retry/recovery, candidate review, OCC/generation concurrency, memory UI |
 | **Phase 3** | **Active** | Production hardening: security hardening, release signing, backend deployment, observability, operational readiness |
 
-Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 delivered backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), the `MEM-TEST-01`..`MEM-TEST-07` race scenarios, the Android memory client (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). Phase 3 is active: authentication rate limiting, account-wide replay revocation, log-sanitization tests, Android release signing, and backend packaging are complete (116 backend tests, 0 failures); live Neon/Render deployment and observability remain. See [12-phase-3-checklist.md](./12-phase-3-checklist.md), [11-phase-2-checklist.md](./11-phase-2-checklist.md), and [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 delivered backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), the `MEM-TEST-01`..`MEM-TEST-07` race scenarios, the Android memory client (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). Phase 3 is active: authentication rate limiting, account-wide replay revocation, log-sanitization tests, Android release signing, backend packaging, and observability metrics are complete (124 backend tests, 0 failures); live Neon/Render deployment verification and operational drills remain. See [12-phase-3-checklist.md](./12-phase-3-checklist.md), [11-phase-2-checklist.md](./11-phase-2-checklist.md), and [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
 ---
 

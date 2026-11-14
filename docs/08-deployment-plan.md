@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.2.0 |
+| **Version** | 2.3.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Render (Docker Web Service) + Neon PostgreSQL |
@@ -30,6 +30,7 @@
 | 2.0.0 | 2026-11-13 | Bryan | Recorded Phase 3 security hardening: authentication rate-limit configuration and account-wide replay revocation. Deployment remains a Phase 3 activity. |
 | 2.1.0 | 2026-11-14 | Bryan | Documented Android release signing, configurable version/API values, and the tag-based release workflow. |
 | 2.2.0 | 2026-11-14 | Bryan | Documented the production Docker image, `prod` profile, Render + Neon deployment flow, and local container verification. |
+| 2.3.0 | 2026-11-14 | Bryan | Documented Micrometer metrics, alert thresholds, structured logging verification, and backup/rollback drills. |
 
 ---
 
@@ -223,6 +224,49 @@ MIRA leverages **Spring Boot Actuator** to provide secure, non-leaking health te
 * Structured JSON logging via SLF4J / Logback.
 * User prompts, full AI completions, passwords, and Authorization headers are automatically scrubbed.
 * Every HTTP request receives a unique UUID tracking header (`X-Request-Id`) that propagates through all backend log statements for seamless incident correlation.
+* The `prod` profile emits ECS-formatted JSON. `LogSanitizationTest` verifies that prompts, completions, passwords, and tokens never reach application logs.
+
+### 4.3 Metrics
+
+The backend exposes custom Micrometer counters in addition to Spring Boot's JVM, Hikari, and HTTP metrics. In `prod`, `/actuator/metrics` is exposed but requires authentication; only `/actuator/health` is public.
+
+| Metric | Tags | Meaning | Suggested alert |
+| :--- | :--- | :--- | :--- |
+| `mira.chat.requests` | `outcome=completed\|failed\|unknown` | Chat generation outcomes. | `failed + unknown` > 5% over 5 minutes. |
+| `mira.chat.provider.errors` | `category=TIMEOUT\|UNAVAILABLE\|RATE_LIMITED\|...` | Normalized provider failures. | Any sustained `TIMEOUT`/`UNAVAILABLE` increase over 5 minutes. |
+| `mira.chat.retries` | none | Client retry attempts. | More than 3× the 1-hour baseline. |
+| `mira.extraction.jobs` | `status=COMPLETED\|SKIPPED\|FAILED\|RETRY` | Memory extraction outcomes. | Any `FAILED` over 15 minutes, or `RETRY` growing continuously. |
+| `mira.auth.rate_limited` | `scope=login-email\|login-ip\|register-ip\|refresh-ip` | Auth throttling events. | Login scopes spiking above baseline (credential stuffing). |
+| `mira.memory.purges` | none | User-initiated memory purges. | Informational; sudden spikes may indicate a bug. |
+| `mira.memory.candidates` | `action=accept\|reject` | Candidate review activity. | Informational. |
+| `http.server.requests` | Spring Boot tags | Request latency and status counts, with p50/p95/p99 percentiles enabled in `prod`. | p95 > 1 s for 5 minutes, or 5xx rate > 1%. |
+| `jvm.memory.used`, `jvm.gc.pause`, `hikaricp.connections.*` | Spring Boot tags | Runtime and pool health. | Memory > 85% sustained, GC pauses growing, pool exhausted. |
+
+Query a metric over HTTPS with a valid access token:
+
+```powershell
+curl -H "Authorization: Bearer <access_token>" `
+  https://<service>.onrender.com/actuator/metrics/mira.chat.requests
+```
+
+### 4.4 Alerts
+
+Configure alerts at three layers:
+
+1. **Render notifications** — deploy failures, health-check failures, and service unavailability. Enable email or Slack notifications on the service.
+2. **Uptime monitor** — poll `https://<service>.onrender.com/actuator/health` and `/actuator/health/readiness` every minute from an external monitor (for example UptimeRobot or Better Stack).
+3. **Log-based alerts** — alert on `internal_error`, `ERROR` level events, repeated `invalid_credentials`, and `rate_limited` spikes.
+
+Recommended thresholds:
+
+| Condition | Warn | Page |
+| :--- | :--- | :--- |
+| Readiness failing | 2 consecutive checks | 5 consecutive checks |
+| Chat `failed + unknown` ratio | > 5% for 5 min | > 20% for 5 min |
+| HTTP 5xx rate | > 1% for 5 min | > 5% for 5 min |
+| p95 latency | > 1 s for 5 min | > 3 s for 5 min |
+| Extraction `FAILED` | > 0 in 15 min | > 10 in 15 min |
+| Login rate limits | 3× baseline for 10 min | 10× baseline for 10 min |
 
 ---
 
@@ -251,6 +295,35 @@ If a sensitive secret (e.g., `DEEPSEEK_API_KEY` or `MIRA_JWT_SECRET_BASE64`) is 
 3. Trigger a graceful restart of the backend service.
 4. Revoke the compromised key in the provider portal.
 5. Invalidate all active user sessions to force re-authentication if `MIRA_JWT_SECRET_BASE64` was compromised.
+
+### 5.2 Backup & Restore Drill
+
+Neon provides point-in-time recovery and branching. Perform this drill quarterly and after any plan change:
+
+1. Record the current time and a row count for `user_account`, `conversation`, `message`, and `user_style_profile`.
+2. Create a Neon branch from a timestamp 10 minutes in the past.
+3. Validate the branch: run `SELECT COUNT(*)` on the same tables and compare.
+4. Point a staging backend at the branch using its pooled JDBC URL.
+5. Verify `/actuator/health/readiness`, login, conversation listing, and memory retrieval.
+6. Record recovery time and data-loss window in the operations log.
+7. Delete the branch after the drill.
+
+> [!WARNING]
+> Flyway migrations are forward-only. A Render rollback restores the previous application version, not the previous schema. Use expand-and-contract migrations so the older application remains compatible with the current schema.
+
+### 5.3 Rollback Drill
+
+1. In Render, open the service and select the previous healthy deploy.
+2. Choose **Rollback** and wait for the health check to pass.
+3. Verify `/actuator/health` and `/actuator/health/readiness`.
+4. Run a login and a read-only conversation request.
+5. Record the rollback duration and any schema compatibility issues.
+
+| Drill | Frequency | Last Run | Recovery Target |
+| :--- | :--- | :--- | :--- |
+| Neon branch restore | Quarterly | _Not yet run_ | RPO ≤ 10 minutes; RTO ≤ 30 minutes |
+| Render rollback | Each release | _Not yet run_ | ≤ 5 minutes |
+| Secret rotation | On incident or annually | _Not yet run_ | ≤ 15 minutes |
 
 ---
 

@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 2.0.0 |
+| **Version** | 2.2.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 1 — End-to-End Text Chat |
@@ -28,6 +28,7 @@
 | 1.9.0 | 2026-10-29 | Bryan | Recorded the current suite at 89 tests after Phase 2 retry/recovery and race-suite coverage; Phase 1 closed with 68. |
 | 2.0.0 | 2026-11-13 | Bryan | Recorded current test inventory at 104 passing backend tests (and 4 Android unit tests) following Phase 2 memory integration and privacy audit test suite delivery; Phase 1 closed with 68. |
 | 2.1.0 | 2026-11-13 | Bryan | Closed the log-sanitization and refresh-replay follow-ups during Phase 3 security hardening (116 backend tests; account-wide replay revocation). |
+| 2.2.0 | 2026-11-14 | Bryan | Recorded Phase 3 observability metrics; current suite is 124 backend tests. |
 
 ---
 
@@ -121,7 +122,7 @@ Phase 1 objectives:
 | Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min per user) |
 | Request-ID propagation and enriched error envelope | Implemented (Backend & Android) |
 | Schema `V1`–`V9` at closure (V10 added in Phase 2) | Implemented |
-| Backend test suite | 116 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
+| Backend test suite | 124 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
 | Android application | Full UI delivered (Login, Register, session gate, encrypted token store, auto-refresh authenticator, Conversations list, Chat with retry; compiles via `assembleDebug`, passes `testDebugUnitTest`, lint-clean) |
 | CI workflows | Configured (GitHub Actions for backend verification and Android build/test/lint) |
 | Android debug APK verification | Verified (build passes cleanly) |

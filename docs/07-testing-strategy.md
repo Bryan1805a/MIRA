@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.4.0 |
+| **Version** | 2.5.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
@@ -32,6 +32,7 @@
 | 2.2.0 | 2026-11-13 | Bryan | Reconciled memory integration and privacy audit test suites (15 tests across `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`, `MemoryInjectionFailureTest`, `MemoryInjectionSafetyTest`, `MemoryPrivacyAuditTest`; inventory now 104 passing backend tests, 0 failures). |
 | 2.3.0 | 2026-11-13 | Bryan | Added Phase 3 security hardening suites: `AuthRateLimiterTests`, `AuthSecurityTest`, and `LogSanitizationTest` (12 tests; inventory now 116 passing backend tests). |
 | 2.4.0 | 2026-11-14 | Bryan | Added the backend container-image build to CI and documented the signed Android release workflow. |
+| 2.5.0 | 2026-11-14 | Bryan | Added observability coverage: `MiraMetricsTests`, `ObservabilityTest`, and custom metrics documentation (inventory now 124 backend tests). |
 
 ---
 
@@ -128,6 +129,8 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `AuthRateLimiterTests` | Unit | 6 | Auth sliding-window limits: login per email/IP, register per IP, refresh per IP, email normalization, window refill, and IP isolation. |
 | `AuthSecurityTest` | Spring Boot + Testcontainers + MockMvc | 3 | Account-wide refresh-token replay revocation, cross-account replay isolation, and `429 rate_limited` on repeated failed logins. |
 | `LogSanitizationTest` | Spring Boot + Testcontainers + MockMvc | 3 | Log audit: login credentials, tokens, chat prompts, and completions never appear in application logs. |
+| `MiraMetricsTests` | Unit | 4 | Custom Micrometer counters for chat outcomes, provider errors, retries, extraction jobs, auth throttling, purges, and candidate review. |
+| `ObservabilityTest` | Spring Boot + Testcontainers + MockMvc | 4 | End-to-end metric increments for successful chat/extraction, provider failure/retry, rate-limited login, and memory purge. |
 | `MessageRateLimiterTests` | Unit | 4 | In-memory sliding-window rate limiter accounting, quota enforcement (10 req/min), multi-user isolation, and window expiration. |
 | `DeepSeekAIProviderTests` | Unit + MockRestServiceServer | 6 | OpenAI-compatible request serialization, Bearer authorization, response parsing, and HTTP status/error mapping (timeout, 429 rate limit, 5xx unavailable, 4xx provider error, invalid/blank output). |
 | `MockAIProviderTests` | Unit | 5 | Deterministic simulation of instant success, timeout, HTTP 429 rate limiting, HTTP 5xx error, and malformed response scenarios. |
@@ -136,7 +139,7 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `MemoryOptionsTest` (Android) | Unit | 3 | Style options indexing, unspecified value mapping, allow-list enum selection, and invalid value rejection. |
 | `ExampleUnitTest` (Android) | Unit | 1 | Android unit testing baseline. |
 
-The backend suite (116 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (4 tests total) executes via `.\gradlew.bat testDebugUnitTest`. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 116 backend tests pass offline without failures or errors.
+The backend suite (124 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (4 tests total) executes via `.\gradlew.bat testDebugUnitTest`. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 124 backend tests pass offline without failures or errors.
 
 ---
 

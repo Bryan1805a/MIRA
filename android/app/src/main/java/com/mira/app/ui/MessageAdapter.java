@@ -1,8 +1,11 @@
 package com.mira.app.ui;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.text.TextUtils;
 import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
@@ -171,6 +174,15 @@ public class MessageAdapter extends ListAdapter<
         }
     }
 
+    @Override
+    public void onViewRecycled(@NonNull RecyclerView.ViewHolder holder) {
+        super.onViewRecycled(holder);
+
+        if (holder instanceof ThinkingHolder) {
+            ((ThinkingHolder) holder).stop();
+        }
+    }
+
     private static boolean sameResponse(
             MessageResponse.ResponseMetadata oldResponse,
             MessageResponse.ResponseMetadata newResponse
@@ -203,6 +215,48 @@ public class MessageAdapter extends ListAdapter<
         view.setVisibility(View.VISIBLE);
     }
 
+    private static void copy(View view, String content) {
+        if (TextUtils.isEmpty(content)) {
+            return;
+        }
+
+        Context context = view.getContext();
+        ClipboardManager clipboard = (ClipboardManager) context
+                .getSystemService(Context.CLIPBOARD_SERVICE);
+
+        if (clipboard == null) {
+            return;
+        }
+
+        clipboard.setPrimaryClip(
+                ClipData.newPlainText(context.getString(R.string.app_name), content)
+        );
+        Toast.makeText(
+                context,
+                R.string.message_copied,
+                Toast.LENGTH_SHORT
+        ).show();
+    }
+
+    private static void share(View view, String content) {
+        if (TextUtils.isEmpty(content)) {
+            return;
+        }
+
+        Context context = view.getContext();
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TEXT, content);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        context.startActivity(
+                Intent.createChooser(
+                        intent,
+                        context.getString(R.string.share_message)
+                )
+        );
+    }
+
     private static void enableCopyOnLongPress(View anchor, String content) {
         if (TextUtils.isEmpty(content)) {
             anchor.setOnLongClickListener(null);
@@ -210,24 +264,8 @@ public class MessageAdapter extends ListAdapter<
         }
 
         anchor.setOnLongClickListener(view -> {
-            Context context = view.getContext();
-            ClipboardManager clipboard = (ClipboardManager) context
-                    .getSystemService(Context.CLIPBOARD_SERVICE);
-
-            if (clipboard == null) {
-                return false;
-            }
-
-            clipboard.setPrimaryClip(
-                    ClipData.newPlainText(context.getString(R.string.app_name), content)
-            );
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-            Toast.makeText(
-                    context,
-                    R.string.message_copied,
-                    Toast.LENGTH_SHORT
-            ).show();
-
+            copy(view, content);
             return true;
         });
     }
@@ -312,12 +350,20 @@ public class MessageAdapter extends ListAdapter<
             );
             bindTimestamp(binding.timestampText, message.getCreatedAt());
             enableCopyOnLongPress(binding.messageText, message.getContent());
+
+            binding.copyButton.setOnClickListener(
+                    view -> copy(view, message.getContent())
+            );
+            binding.shareButton.setOnClickListener(
+                    view -> share(view, message.getContent())
+            );
         }
     }
 
     static class ThinkingHolder extends RecyclerView.ViewHolder {
 
         private final ItemMessageThinkingBinding binding;
+        private ObjectAnimator pulse;
 
         ThinkingHolder(ItemMessageThinkingBinding binding) {
             super(binding.getRoot());
@@ -325,12 +371,32 @@ public class MessageAdapter extends ListAdapter<
         }
 
         void bind() {
-            /*
-             * The indeterminate progress indicator animates on its own while
-             * attached and visible, so no animation state has to be managed
-             * across view recycling.
-             */
             binding.thinkingText.setText(R.string.assistant_thinking);
+
+            /*
+             * "Ethereal" feedback: the spark breathes instead of showing a
+             * mechanical spinner. The animator is cancelled on recycle so a
+             * detached row never keeps animating.
+             */
+            pulse = ObjectAnimator.ofFloat(
+                    binding.getRoot(),
+                    View.ALPHA,
+                    0.45f,
+                    1f
+            );
+            pulse.setDuration(1100L);
+            pulse.setRepeatMode(ValueAnimator.REVERSE);
+            pulse.setRepeatCount(ValueAnimator.INFINITE);
+            pulse.start();
+        }
+
+        void stop() {
+            if (pulse != null) {
+                pulse.cancel();
+                pulse = null;
+            }
+
+            binding.getRoot().setAlpha(1f);
         }
     }
 }

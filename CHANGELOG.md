@@ -34,6 +34,21 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Chat adopts a Gemini-style "container-light" presentation: AI answers render
+  as editorial text on the bare surface with a gradient spark instead of a
+  bubble, user prompts sit in a soft pill, and each answer carries a
+  copy / share / timestamp footer.
+- Empty threads show a "Hello, [name]" greeting with starter-prompt cards that
+  send with one tap; the prompt bar is now a floating rounded pill with a
+  circular send action.
+- The prompt appears immediately as an optimistic pill, so a slow provider no
+  longer looks like the message was swallowed; it is replaced by the server
+  message on success and removed on failure.
+- "Thinking" state is a pulsing gradient spark plus label rather than a
+  mechanical spinner.
+- Palette moved to neutral surfaces (white / soft blue-grey in light, deep
+  charcoal in dark) with the blue-violet-coral gradient reserved for brand
+  moments; the launcher icon uses the same gradient.
 - Cold-start resilience: the Android HTTP client read timeout is now 90 s and
   the production health monitor allows 120 s per probe. A sleeping managed
   instance took ~59 s to answer its first request, which previously exceeded

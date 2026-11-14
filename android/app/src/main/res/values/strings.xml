@@ -47,6 +47,17 @@
     <string name="send">Send</string>
     <string name="no_messages">No messages yet</string>
     <string name="no_messages_subtitle">Send the first message to start the conversation.</string>
+    <string name="greeting_default">Hello</string>
+    <string name="greeting_named">Hello, %1$s</string>
+    <string name="greeting_subtitle">What should we explore?</string>
+    <string name="suggestion_explain_label">Explain a concept simply</string>
+    <string name="suggestion_explain_prompt">Explain a concept simply, with a concrete example.</string>
+    <string name="suggestion_summarize_label">Summarize a long text</string>
+    <string name="suggestion_summarize_prompt">Summarize the key points of a long text.</string>
+    <string name="suggestion_debug_label">Help me debug Java code</string>
+    <string name="suggestion_debug_prompt">Help me debug a piece of Java code.</string>
+    <string name="copy_message">Copy message</string>
+    <string name="share_message">Share message</string>
     <string name="message_status_pending">Waiting for response…</string>
     <string name="assistant_thinking">MIRA is thinking…</string>
     <string name="message_status_failed">Response failed.</string>

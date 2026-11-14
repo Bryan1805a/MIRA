@@ -55,6 +55,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private String pendingSendKey;
     private String pendingSendContent;
+    private String optimisticPromptId;
 
     private String pendingRetryKey;
     private String pendingRetryResponseId;
@@ -88,6 +89,8 @@ public class ChatActivity extends AppCompatActivity {
 
         setUpToolbar();
         setUpList();
+        setUpGreeting();
+        setUpSuggestions();
         binding.sendButton.setOnClickListener(
                 view -> sendMessage()
         );
@@ -111,6 +114,68 @@ public class ChatActivity extends AppCompatActivity {
                             : title
             );
         }
+    }
+
+    private void setUpGreeting() {
+        String name = displayName(tokenStore.email());
+
+        binding.greetingText.setText(
+                name.isEmpty()
+                        ? getString(R.string.greeting_default)
+                        : getString(R.string.greeting_named, name)
+        );
+    }
+
+    private void setUpSuggestions() {
+        binding.suggestionExplain.setOnClickListener(
+                view -> sendSuggested(R.string.suggestion_explain_prompt)
+        );
+        binding.suggestionSummarize.setOnClickListener(
+                view -> sendSuggested(R.string.suggestion_summarize_prompt)
+        );
+        binding.suggestionDebug.setOnClickListener(
+                view -> sendSuggested(R.string.suggestion_debug_prompt)
+        );
+    }
+
+    private void sendSuggested(int promptResource) {
+        if (sending) {
+            return;
+        }
+
+        binding.messageInput.setText(getString(promptResource));
+
+        if (binding.messageInput.getText() != null) {
+            binding.messageInput.setSelection(
+                    binding.messageInput.getText().length()
+            );
+        }
+
+        hideKeyboard();
+        sendMessage();
+    }
+
+    /**
+     * Uses the first segment of the email local part so the greeting reads like
+     * a name ("bryan.tran@..." becomes "Bryan") without pretending to know it.
+     */
+    private static String displayName(String email) {
+        if (email == null || email.isBlank()) {
+            return "";
+        }
+
+        int at = email.indexOf('@');
+        String local = at > 0 ? email.substring(0, at) : email;
+        String[] segments = local.split("[._\\-]+");
+
+        for (String segment : segments) {
+            if (!segment.isEmpty()) {
+                return Character.toUpperCase(segment.charAt(0))
+                        + segment.substring(1);
+            }
+        }
+
+        return "";
     }
 
     private void setUpList() {
@@ -237,6 +302,7 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         binding.errorText.setVisibility(View.GONE);
+        addOptimisticPrompt(content);
         setSending(true);
 
         repository.send(
@@ -256,6 +322,8 @@ public class ChatActivity extends AppCompatActivity {
 
                         binding.messageInput.setText("");
                         hideKeyboard();
+
+                        removeOptimisticPrompt();
 
                         if (response.getUserMessage() != null) {
                             messages.add(response.getUserMessage());
@@ -455,7 +523,46 @@ public class ChatActivity extends AppCompatActivity {
             showThinking();
         } else {
             hideThinking();
+            removeOptimisticPrompt();
         }
+    }
+
+    /**
+     * Shows the prompt immediately so a slow provider never leaves the thread
+     * looking like the message was swallowed. Replaced by the server message on
+     * success and removed on failure.
+     */
+    private void addOptimisticPrompt(String content) {
+        String localId = "local-prompt-" + UUID.randomUUID();
+
+        optimisticPromptId = localId;
+        messages.add(
+                new MessageResponse(
+                        localId,
+                        MessageRole.USER,
+                        content,
+                        null,
+                        null
+                )
+        );
+
+        renderMessages(true);
+        updateEmptyState();
+    }
+
+    private void removeOptimisticPrompt() {
+        if (optimisticPromptId == null) {
+            return;
+        }
+
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            if (optimisticPromptId.equals(messages.get(index).getId())) {
+                messages.remove(index);
+                break;
+            }
+        }
+
+        optimisticPromptId = null;
     }
 
     /**

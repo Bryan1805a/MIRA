@@ -1,50 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        MIRA brand palette (light theme values).
-        Dark-theme values live in values-night/colors.xml under the same names,
-        so the theme maps each Material role to a single @color reference.
+        MIRA light palette: neutral, low-contrast surfaces for reading comfort,
+        with the three gradient hues reserved for brand and active moments.
     -->
 
-    <!-- Ink / neutral surfaces -->
-    <color name="brand_bg">#FBFAFF</color>
+    <!-- Neutral canvas -->
+    <color name="brand_bg">#FFFFFF</color>
     <color name="brand_surface">#FFFFFF</color>
-    <color name="brand_soft_surface">#F4F1FF</color>
-    <color name="brand_soft_surface_high">#EAE5FA</color>
-    <color name="brand_surface_variant">#EDEBFA</color>
-    <color name="brand_ink">#1B1B21</color>
-    <color name="brand_ink_muted">#474555</color>
+    <color name="brand_soft_surface">#F8FAFD</color>
+    <color name="brand_soft_surface_high">#F0F4F9</color>
+    <color name="brand_surface_variant">#F0F4F9</color>
+    <color name="brand_ink">#1F1F1F</color>
+    <color name="brand_ink_muted">#444746</color>
 
-    <!-- Primary: MIRA violet -->
-    <color name="brand_primary">#5B45D6</color>
+    <!-- Primary: Gemini blue -->
+    <color name="brand_primary">#3F6CF4</color>
     <color name="brand_on_primary">#FFFFFF</color>
-    <color name="brand_primary_container">#E5DEFF</color>
-    <color name="brand_on_primary_container">#190066</color>
+    <color name="brand_primary_container">#D9E2FF</color>
+    <color name="brand_on_primary_container">#00164E</color>
 
-    <!-- Secondary: memory teal -->
-    <color name="brand_secondary">#0F766E</color>
+    <!-- Secondary: gradient violet -->
+    <color name="brand_secondary">#8455C8</color>
     <color name="brand_on_secondary">#FFFFFF</color>
-    <color name="brand_secondary_container">#CCFBF1</color>
-    <color name="brand_on_secondary_container">#042F2E</color>
+    <color name="brand_secondary_container">#EEDBFF</color>
+    <color name="brand_on_secondary_container">#2B0B52</color>
 
-    <!-- Tertiary: attention amber -->
-    <color name="brand_tertiary">#8A5A00</color>
+    <!-- Tertiary: gradient coral -->
+    <color name="brand_tertiary">#B5385A</color>
     <color name="brand_on_tertiary">#FFFFFF</color>
-    <color name="brand_tertiary_container">#FFDEA6</color>
-    <color name="brand_on_tertiary_container">#2B1700</color>
+    <color name="brand_tertiary_container">#FFD9DF</color>
+    <color name="brand_on_tertiary_container">#3F0018</color>
 
     <!-- Outlines and error -->
-    <color name="brand_outline">#777587</color>
-    <color name="brand_outline_variant">#C9C5D6</color>
+    <color name="brand_outline">#C4C7C5</color>
+    <color name="brand_outline_variant">#E1E3E1</color>
     <color name="brand_error">#BA1A1A</color>
     <color name="brand_on_error">#FFFFFF</color>
     <color name="brand_error_container">#FFDAD6</color>
     <color name="brand_on_error_container">#410002</color>
 
     <!-- Launch surface used by the Android 12+ splash screen -->
-    <color name="brand_splash">#FBFAFF</color>
+    <color name="brand_splash">#FFFFFF</color>
 
-    <!-- Foreground colours on the brand gradient hero (always light) -->
+    <!-- Signature gradient stops shared by the icon, hero, and spark mark -->
+    <color name="brand_gradient_start">#4285F4</color>
+    <color name="brand_gradient_mid">#9B72CB</color>
+    <color name="brand_gradient_end">#D96570</color>
+
+    <!-- Foreground colours on the gradient hero (always light) -->
     <color name="brand_hero_text">#FFFFFF</color>
-    <color name="brand_hero_text_muted">#DCD4FF</color>
+    <color name="brand_hero_text_muted">#EDE7FF</color>
 </resources>

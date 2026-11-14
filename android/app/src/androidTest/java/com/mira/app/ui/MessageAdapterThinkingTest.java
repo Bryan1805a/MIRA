@@ -104,7 +104,7 @@ public class MessageAdapterThinkingTest {
 
         assertNotNull(binding);
         assertNotNull(binding.thinkingText);
-        assertNotNull(binding.thinkingProgress);
+        assertNotNull(binding.thinkingSpark);
         assertEquals(
                 context.getString(R.string.assistant_thinking),
                 binding.thinkingText.getText().toString()

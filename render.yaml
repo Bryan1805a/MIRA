@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: mira-backend
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /actuator/health/readiness
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: MIRA_JWT_SECRET_BASE64
+        sync: false
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: MIRA_TRUST_FORWARDED_HEADERS
+        value: "true"
+      - key: JAVA_OPTS
+        value: "-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"

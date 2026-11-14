@@ -9,7 +9,7 @@ activityKtx = "1.13.0"
 constraintlayout = "2.2.2"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
-gson = "2.11.0"
+gson = "2.15.0"
 securityCrypto = "1.1.0"
 recyclerview = "1.4.0"
 

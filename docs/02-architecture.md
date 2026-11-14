@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.3.0 |
+| **Version** | 2.4.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
@@ -31,6 +31,7 @@
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites and security verification: privacy audit, injection safety, non-fatal lookup failure, and hybrid conflict resolution tests (104 passing backend tests). |
 | 2.2.0 | 2026-11-13 | Bryan | Added Phase 3 security hardening: authentication rate limiting, account-wide replay revocation, and log-sanitization coverage. |
 | 2.3.0 | 2026-11-14 | Bryan | Added Phase 3 observability: ECS structured logging, custom Micrometer metrics, and authenticated metrics exposure. |
+| 2.4.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests and the instrumented API smoke test. |
 
 ---
 

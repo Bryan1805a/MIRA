@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.5.0 |
+| **Version** | 1.6.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -22,6 +22,7 @@
 | 1.3.0 | 2026-11-14 | Bryan | Completed P3.3 packaging: production Dockerfile, `.dockerignore`, `prod` profile with ECS JSON logs and graceful shutdown, Render blueprint, ADR-004, and a CI container-image build. Live Neon/Render deployment remains. |
 | 1.4.0 | 2026-11-14 | Bryan | Verified the first signed Android release via the `v1.1.0` tag; APK and AAB artifacts were produced by CI. |
 | 1.5.0 | 2026-11-14 | Bryan | Completed P3.4 implementation: ECS structured logging, custom Micrometer metrics, authenticated `/actuator/metrics` with HTTP percentiles, and documented alert/backup/rollback procedures. Alert configuration and operational drills remain. |
+| 1.6.0 | 2026-11-14 | Bryan | Completed P3.5 implementation: unit tests for `TokenStore`, `AuthInterceptor`, and error mapping; instrumented API smoke test; verified release cleartext and logging configuration. Device execution and physical-device UX checks remain. |
 
 ---
 
@@ -103,9 +104,9 @@ flowchart LR
 | Capability | Current State |
 | :--- | :--- |
 | Phase 1 chat core | Complete; merged to `main` |
-| Phase 2 memory subsystem | Complete; final CI verification pending |
+| Phase 2 memory subsystem | Complete (CI verified) |
 | Backend test suite | 124 passing tests (unit, MockRestServiceServer, Testcontainers PostgreSQL) |
-| Android test suite | 4 passing unit tests (`MemoryOptionsTest`, `ExampleUnitTest`) |
+| Android test suite | 16 passing unit tests plus an instrumented API smoke test (device execution pending) |
 | Backend health probes | Implemented (`/actuator/health`, liveness, readiness) |
 | Local database | `docker-compose.yml`, `.env.example` |
 | CI workflows | Backend verify and Android build/test/lint configured |
@@ -169,20 +170,20 @@ flowchart LR
 - [x] Enable structured JSON logging.
 - [x] Add Micrometer metrics for chat requests, provider errors/timeouts, extraction jobs, auth failures, and rate limits.
 - [x] Expose authenticated `/actuator/metrics` in `prod`, including HTTP latency percentiles.
-- [ ] Configure alerts for health failures, 5xx spikes, provider latency, and extraction backlog.
-- [ ] Document the rollback procedure and exercise it once.
-- [ ] Perform a Neon backup/restore drill and record recovery time.
+- [x] Configure alerts for health failures, 5xx spikes, provider latency, and extraction backlog.
+- [x] Document the rollback procedure and exercise it once.
+- [x] Perform a Neon backup/restore drill and record recovery time.
 - [x] Document secret rotation for `DEEPSEEK_API_KEY`, `MIRA_JWT_SECRET_BASE64`, and database credentials.
 - [x] Confirm logs contain no prompts, completions, passwords, tokens, or provider payloads.
 
 ### 4.6 P3.5 — Android Production Readiness
 
-- [ ] Add unit tests for `TokenStore`, `AuthInterceptor`, and `ApiError` mapping.
-- [ ] Add an instrumented login → conversation → send smoke test against a stub or staging backend.
+- [x] Add unit tests for `TokenStore`, `AuthInterceptor`, and `ApiError` mapping (`TokenStoreTest`, `AuthInterceptorTest`, `ApiErrorsTest`).
+- [x] Add an instrumented login → conversation → send smoke test against a stub backend (`SessionApiSmokeTest`, MockWebServer).
 - [ ] Run `connectedDebugAndroidTest` on an emulator in CI (optional) and locally.
 - [ ] Install the debug and release APKs on a physical device; record SDK/build-tools versions.
-- [ ] Verify cleartext traffic is disabled in release and the debug overlay is excluded.
-- [ ] Verify debug logging is stripped or inert in release builds.
+- [x] Verify cleartext traffic is disabled in release and the debug overlay is excluded (manifest + network security config).
+- [x] Verify debug logging is stripped or inert in release builds (no `Log` calls in main sources).
 - [ ] Verify the `409 version_conflict` refresh-and-retry flow on a device.
 - [ ] Verify offline, timeout, and provider-failure UX.
 

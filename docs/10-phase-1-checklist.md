@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 2.2.0 |
+| **Version** | 2.3.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 1 — End-to-End Text Chat |
@@ -29,6 +29,7 @@
 | 2.0.0 | 2026-11-13 | Bryan | Recorded current test inventory at 104 passing backend tests (and 4 Android unit tests) following Phase 2 memory integration and privacy audit test suite delivery; Phase 1 closed with 68. |
 | 2.1.0 | 2026-11-13 | Bryan | Closed the log-sanitization and refresh-replay follow-ups during Phase 3 security hardening (116 backend tests; account-wide replay revocation). |
 | 2.2.0 | 2026-11-14 | Bryan | Recorded Phase 3 observability metrics; current suite is 124 backend tests. |
+| 2.3.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests (16 Android unit tests plus an instrumented API smoke test). |
 
 ---
 
@@ -362,7 +363,7 @@ These items do not block the Phase 1 chat core, but remain unchecked and are tra
 - [ ] Record the Android SDK/build-tools versions used for the verified build.
 - [x] Complete the log-sanitization audit (no prompts, tokens, or completions).
 - [x] Decide the refresh-token replay policy: account-wide revocation implemented.
-- [ ] Add Android unit tests for token storage, the authorization interceptor, and API error mapping.
+- [x] Add Android unit tests for token storage, the authorization interceptor, and API error mapping.
 - [ ] Add an instrumented smoke test for login → conversation → send.
 - [ ] Split the consolidated `MiraBackendApplicationTests` class by domain as the surface grows.
 

@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.5.0 |
+| **Version** | 2.6.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
@@ -33,6 +33,7 @@
 | 2.3.0 | 2026-11-13 | Bryan | Added Phase 3 security hardening suites: `AuthRateLimiterTests`, `AuthSecurityTest`, and `LogSanitizationTest` (12 tests; inventory now 116 passing backend tests). |
 | 2.4.0 | 2026-11-14 | Bryan | Added the backend container-image build to CI and documented the signed Android release workflow. |
 | 2.5.0 | 2026-11-14 | Bryan | Added observability coverage: `MiraMetricsTests`, `ObservabilityTest`, and custom metrics documentation (inventory now 124 backend tests). |
+| 2.6.0 | 2026-11-14 | Bryan | Added Android production-readiness tests: `TokenStoreTest`, `AuthInterceptorTest`, `ApiErrorsTest`, and the instrumented `SessionApiSmokeTest` (16 Android unit tests; instrumented run pending a device). |
 
 ---
 
@@ -137,9 +138,13 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `TokenServiceTests` | Unit | 5 | JWT claims and expiry, refresh-token uniqueness/URL safety, deterministic SHA-256 hashing. |
 | `JwtConfigurationTests` | Unit | 1 | Secret validation and decoder configuration. |
 | `MemoryOptionsTest` (Android) | Unit | 3 | Style options indexing, unspecified value mapping, allow-list enum selection, and invalid value rejection. |
+| `TokenStoreTest` (Android) | Unit | 4 | Session persistence, clearing, refresh-token presence, and absent-session behavior. |
+| `AuthInterceptorTest` (Android) | Unit | 4 | Bearer header injection, no-token behavior, existing-header preservation, and blank-token handling. |
+| `ApiErrorsTest` (Android) | Unit | 4 | Error-envelope message extraction and fallbacks for malformed, blank, and absent bodies. |
+| `SessionApiSmokeTest` (Android) | Instrumented (MockWebServer) | 1 | Login → list conversations → create conversation → send message, including bearer and idempotency headers. |
 | `ExampleUnitTest` (Android) | Unit | 1 | Android unit testing baseline. |
 
-The backend suite (124 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (4 tests total) executes via `.\gradlew.bat testDebugUnitTest`. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 124 backend tests pass offline without failures or errors.
+The backend suite (124 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (16 unit tests) executes via `.\gradlew.bat testDebugUnitTest`; the instrumented `SessionApiSmokeTest` compiles with `assembleDebugAndroidTest` and runs via `connectedDebugAndroidTest` when an emulator or device is attached. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 124 backend tests pass offline without failures or errors.
 
 ---
 

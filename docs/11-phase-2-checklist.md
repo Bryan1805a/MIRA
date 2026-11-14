@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-002 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Complete Execution Baseline |
-| **Version** | 1.9.0 |
+| **Version** | 2.0.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 2 — Communication-Style Memory Subsystem |
@@ -26,6 +26,7 @@
 | 1.7.0 | 2026-11-13 | Bryan | Started Phase 3 security hardening: auth rate limiting, account-wide replay revocation, and log-sanitization tests (116 backend tests). Closed the Phase 1 log-sanitization and refresh-replay follow-ups. |
 | 1.8.0 | 2026-11-13 | Bryan | Closed Phase 2: fixed the Android CI SDK/JDK setup, verified `mvnw clean verify` and the Android build/test/lint workflow green, and marked the exit gate complete. |
 | 1.9.0 | 2026-11-14 | Bryan | Recorded Phase 3 observability metrics and the 124-test backend suite. |
+| 2.0.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests (16 Android unit tests plus an instrumented API smoke test). |
 
 ---
 
@@ -122,7 +123,7 @@ These are tracked here because Phase 1 closed with them still open:
 - [ ] Install the debug APK on a device/emulator and record the SDK/build-tools versions.
 - [x] Complete the log-sanitization audit (`LogSanitizationTest`; `ApiExceptionHandler` logs only the exception class and request ID).
 - [x] Decide the refresh-token replay policy (account-wide revocation implemented and tested).
-- [ ] Add Android unit tests for token storage, the auth interceptor, and error mapping.
+- [x] Add Android unit tests for token storage, the auth interceptor, and error mapping.
 - [ ] Add an instrumented login → conversation → send smoke test.
 - [ ] Split `MiraBackendApplicationTests` by domain.
 
@@ -241,7 +242,7 @@ These are tracked here because Phase 1 closed with them still open:
 | Injection | Enabled profile injected, disabled/empty/unspecified profile omitted, current instruction wins | Implemented (`MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`) |
 | Privacy | No biographical extraction, no prompt/token leakage in logs or audit rows | Implemented (`MemoryPrivacyAuditTest`) |
 | Android | Memory screen CRUD, conflict handling, toggle/purge, candidate confirmation, options mapping | Implemented (`MemoryActivity`, `MemoryOptionsTest`) |
-| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Complete: local verification green (124 backend, 4 Android unit tests) and both GitHub Actions workflows pass |
+| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Complete: local verification green (124 backend, 16 Android unit tests) and both GitHub Actions workflows pass |
 
 All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQL.
 

@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-PRS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.5.0 |
+| **Version** | 2.6.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, Product, Quality Assurance |
@@ -33,6 +33,7 @@
 | 2.3.0 | 2026-11-14 | Bryan | Reconciled Phase 3 observability (NFR-003, NFR-004): custom Micrometer metrics and authenticated metrics endpoint; 124 passing backend tests. |
 | 2.4.0 | 2026-11-14 | Bryan | Reconciled Android production-readiness tests: 16 unit tests and an instrumented API smoke test. |
 | 2.5.0 | 2026-11-14 | Bryan | Split the backend suite by domain and added the NFR-004 latency smoke test (125 backend tests). |
+| 2.6.0 | 2026-11-14 | Bryan | Closed Phase 3: v1.2.1 release, physical-device verification, health monitoring, and restore/rollback drills. |
 
 ---
 
@@ -254,4 +255,4 @@ flowchart TD
 | **NFR-006** | Testability | [`07-testing-strategy.md#2`](./07-testing-strategy.md#2-multi-tier-testing-pyramid) | Maven Build Verification | `CI Pipeline / Testcontainers` | Implemented (Testcontainers, 125 backend tests, Android testDebugUnitTest) |
 
 > [!NOTE]
-> Phase 1 (the end-to-end text chat loop) is complete and merged to `main`. Phase 2 is complete: backend style-memory governance, OCC/generation controls, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review, the `MEM-TEST` race scenarios, the Android memory UI (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`) are implemented. Phase 3 is active: authentication rate limiting, account-wide replay revocation, log-sanitization tests, release signing, backend packaging, observability metrics, Android session/error tests, and the domain-split backend suite are implemented and verified with 125 passing backend tests and 16 passing Android unit tests. See [12-phase-3-checklist.md](./12-phase-3-checklist.md).
+> Phase 1 (the end-to-end text chat loop) is complete and merged to `main`. Phase 2 is complete: backend style-memory governance, OCC/generation controls, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review, the `MEM-TEST` race scenarios, the Android memory UI (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`) are implemented. Phase 3 is complete: authentication rate limiting, account-wide replay revocation, log-sanitization tests, release signing, backend packaging, observability metrics, Android session/error tests, and the domain-split backend suite are delivered and verified with 125 passing backend tests and 16 passing Android unit tests; v1.2.1 is released. See [12-phase-3-checklist.md](./12-phase-3-checklist.md).

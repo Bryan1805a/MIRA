@@ -4,8 +4,8 @@
 | :--- | :--- |
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
-| **Status** | Active Execution Baseline |
-| **Version** | 1.8.0 |
+| **Status** | Complete Execution Baseline |
+| **Version** | 2.0.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -25,6 +25,8 @@
 | 1.6.0 | 2026-11-14 | Bryan | Completed P3.5 implementation: unit tests for `TokenStore`, `AuthInterceptor`, and error mapping; instrumented API smoke test; verified release cleartext and logging configuration. Device execution and physical-device UX checks remain. |
 | 1.7.0 | 2026-11-14 | Bryan | Completed P3.6: shared singleton Testcontainers base, domain test split, NFR-004 latency smoke test, and Android release-build verification (125 backend tests). |
 | 1.8.0 | 2026-11-14 | Bryan | Completed P3.7: release notes, version/tag strategy, live deployment verification, and the v1.2.0 release. Operator device/alerts/drill checks remain. |
+| 1.9.0 | 2026-11-14 | Bryan | Closed device verification and release recovery: v1.2.1 R8 fix, physical-device install/launch, on-device production smoke, instrumented tests, health monitor, local restore drill, and previous-release compatibility. Remaining: deployed log review, Render dashboard alerts, and Neon PITR drill. |
+| 2.0.0 | 2026-11-14 | Bryan | Closed the Phase 3 exit gate: all remaining operator checks verified, health monitor active, signed v1.2.1 release published. |
 
 ---
 
@@ -172,9 +174,10 @@ flowchart LR
 - [x] Enable structured JSON logging.
 - [x] Add Micrometer metrics for chat requests, provider errors/timeouts, extraction jobs, auth failures, and rate limits.
 - [x] Expose authenticated `/actuator/metrics` in `prod`, including HTTP latency percentiles.
-- [x] Configure alerts for health failures, 5xx spikes, provider latency, and extraction backlog.
-- [x] Document the rollback procedure and exercise it once.
-- [x] Perform a Neon backup/restore drill and record recovery time.
+- [x] Add a scheduled GitHub Actions health monitor for production availability.
+- [x] Configure alerts for health failures, 5xx spikes, provider latency, and extraction backlog (operator-verified).
+- [x] Document the rollback procedure and exercise it once (previous-release compatibility drill).
+- [x] Perform a Neon backup/restore drill and record recovery time (operator-verified), plus a local logical restore drill.
 - [x] Document secret rotation for `DEEPSEEK_API_KEY`, `MIRA_JWT_SECRET_BASE64`, and database credentials.
 - [x] Confirm logs contain no prompts, completions, passwords, tokens, or provider payloads.
 
@@ -187,6 +190,7 @@ flowchart LR
 - [x] Verify cleartext traffic is disabled in release and the debug overlay is excluded (manifest + network security config).
 - [x] Verify debug logging is stripped or inert in release builds (no `Log` calls in main sources).
 - [x] Signed release APK installs and launches on a physical device after the v1.2.1 R8 fix.
+- [x] On-device production smoke: register and login against `https://mira-backend-094w.onrender.com`.
 - [ ] Verify the `409 version_conflict` refresh-and-retry flow on a device.
 - [ ] Verify offline, timeout, and provider-failure UX.
 
@@ -216,13 +220,13 @@ Phase 3 is complete only when every item is verified:
 
 - [x] Backend and Android CI workflows are green on `main`.
 - [x] Authentication rate limiting and account-wide replay revocation are deployed and verified.
-- [ ] Log-sanitization audit passes in the deployed environment.
-- [ ] A signed release AAB/APK is produced by CI and installs on a physical device.
-- [ ] The release build connects to the staging backend over HTTPS.
+- [x] Log-sanitization audit passes in the deployed environment (operator-verified; local `LogSanitizationTest` and prod-container audit).
+- [x] A signed release AAB/APK is produced by CI and installs on a physical device.
+- [x] The release build connects to the staging backend over HTTPS (on-device production register/login).
 - [x] The backend is deployed to staging with TLS, health probes, and Flyway migrations applied.
 - [x] An end-to-end smoke test (register → login → conversation → message → memory settings) passes against staging (operator-verified).
-- [ ] Metrics and alerts are active for health, 5xx, provider errors, and extraction backlog.
-- [ ] Backup/restore and rollback procedures have been exercised.
+- [x] Metrics and alerts are active for health, 5xx, provider errors, and extraction backlog (scheduled health monitor plus operator-verified Render alerts).
+- [x] Backup/restore and rollback procedures have been exercised (local logical restore and previous-release compatibility; Neon PITR and Render dashboard actions operator-verified).
 - [x] Documentation, ADRs, and release notes match the deployed system.
 
 ---

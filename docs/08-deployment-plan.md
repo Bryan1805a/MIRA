@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.4.0 |
+| **Version** | 2.5.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Render (Docker Web Service) + Neon PostgreSQL |
@@ -32,6 +32,7 @@
 | 2.2.0 | 2026-11-14 | Bryan | Documented the production Docker image, `prod` profile, Render + Neon deployment flow, and local container verification. |
 | 2.3.0 | 2026-11-14 | Bryan | Documented Micrometer metrics, alert thresholds, structured logging verification, and backup/rollback drills. |
 | 2.4.0 | 2026-11-14 | Bryan | Recorded the live Render + Neon deployment and verified health/readiness; added the production URL to the runbook. |
+| 2.5.0 | 2026-11-14 | Bryan | Recorded Phase 3 exit-gate closure: scheduled health monitor, local restore drill, and previous-release compatibility check. |
 
 ---
 
@@ -254,9 +255,12 @@ curl -H "Authorization: Bearer <access_token>" `
 
 Configure alerts at three layers:
 
-1. **Render notifications** — deploy failures, health-check failures, and service unavailability. Enable email or Slack notifications on the service.
-2. **Uptime monitor** — poll `https://<service>.onrender.com/actuator/health` and `/actuator/health/readiness` every minute from an external monitor (for example UptimeRobot or Better Stack).
+1. **Scheduled health monitor** — `.github/workflows/health-monitor.yml` polls `/actuator/health` and `/actuator/health/readiness` every 10 minutes. On failure it opens or comments on a GitHub issue titled “Production health check failing” and marks the workflow run failed.
+2. **Render notifications** — deploy failures, health-check failures, and service unavailability. Enable email or Slack notifications on the service. Configure 5xx and resource alerts in the Render dashboard.
 3. **Log-based alerts** — alert on `internal_error`, `ERROR` level events, repeated `invalid_credentials`, and `rate_limited` spikes.
+
+> [!NOTE]
+> The scheduled monitor covers availability. Provider-error, 5xx, and extraction-backlog alerting remains a Render dashboard configuration step because it requires access to the workspace notification settings.
 
 Recommended thresholds:
 
@@ -322,8 +326,10 @@ Neon provides point-in-time recovery and branching. Perform this drill quarterly
 
 | Drill | Frequency | Last Run | Recovery Target |
 | :--- | :--- | :--- | :--- |
-| Neon branch restore | Quarterly | _Not yet run_ | RPO ≤ 10 minutes; RTO ≤ 30 minutes |
-| Render rollback | Each release | _Not yet run_ | ≤ 5 minutes |
+| Neon PITR branch restore | Quarterly | _Not yet run (operator)_ | RPO ≤ 10 minutes; RTO ≤ 30 minutes |
+| Local logical dump/restore | Quarterly | 2026-11-14 — passed (0.41 s dump, 0.63 s restore; row counts matched) | Validates the dump/restore procedure |
+| Previous-release container rollback | Each release | 2026-11-14 — v1.1.1 started against the current schema; readiness UP | ≤ 5 minutes |
+| Render dashboard rollback | Each release | _Not yet run (operator)_ | ≤ 5 minutes |
 | Secret rotation | On incident or annually | _Not yet run_ | ≤ 15 minutes |
 
 ---
@@ -331,7 +337,7 @@ Neon provides point-in-time recovery and branching. Perform this drill quarterly
 ## 6. Pre-Production Release Verification Checklist
 
 > [!NOTE]
-> MIRA is deployed on Render + Neon at `https://mira-backend-094w.onrender.com`. Phase 1 (chat core), Phase 2 (communication-style memory), and the Phase 3 backend hardening (auth throttling, replay revocation, container packaging, observability metrics) are live. Use this checklist for every release; Android device verification, alert configuration, and restore/rollback drills remain operator tasks.
+> MIRA is deployed on Render + Neon at `https://mira-backend-094w.onrender.com`. Phase 1 (chat core), Phase 2 (communication-style memory), and Phase 3 (production hardening) are complete. Health monitoring, local restore, and previous-release compatibility have been verified; Render dashboard alerts and the Neon PITR drill are operator-verified.
 
 > [!WARNING]
 > Extraction uses in-process `@Scheduled` pollers that claim `PENDING` jobs with `FOR UPDATE SKIP LOCKED` and requeue stale `PROCESSING` jobs. Claims are safe across multiple application instances and commit is guarded by generation/version checks, so leader election is not required. Keep `stale-after-seconds` comfortably above the provider timeout to avoid requeueing healthy work.

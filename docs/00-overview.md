@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-DOC-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.6.0 |
+| **Version** | 2.7.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, QA, Project Stakeholders |
@@ -34,6 +34,7 @@
 | 2.4.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests: 16 unit tests and an instrumented API smoke test. |
 | 2.5.0 | 2026-11-14 | Bryan | Split the backend suite by domain, introduced a shared singleton Testcontainers base, and added an NFR-004 latency smoke test (125 backend tests). |
 | 2.6.0 | 2026-11-14 | Bryan | Recorded Phase 3 release engineering: release notes, version/tag strategy, live deployment verification, and the v1.2.0 release. |
+| 2.7.0 | 2026-11-14 | Bryan | Closed Phase 3: v1.2.1 R8 fix, physical-device verification, on-device production smoke, health monitor, restore/rollback drills, and exit-gate completion. |
 
 ---
 
@@ -142,9 +143,9 @@ The MIRA platform adopts an enterprise **Modular Monolith** architecture, balanc
 | **Phase 0** | Complete (Android APK install verification carried into Phase 1) | Repository, toolchain, backend/Android skeletons, Flyway baseline |
 | **Phase 1** | **Complete** (merged to `main`) | Conversation API, message orchestration, AI provider abstraction, Android auth/chat client, hardening, CI |
 | **Phase 2** | **Complete** (CI verified) | Communication-style memory governance, prompt injection, extraction + retry/recovery, candidate review, OCC/generation concurrency, memory UI |
-| **Phase 3** | **Active** (v1.2.0 tagged; operator verification pending) | Production hardening: security hardening, release signing, backend deployment, observability, operational readiness |
+| **Phase 3** | **Complete** (v1.2.1 released) | Production hardening: security hardening, release signing, backend deployment, observability, operational readiness |
 
-Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 delivered backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), the `MEM-TEST-01`..`MEM-TEST-07` race scenarios, the Android memory client (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). Phase 3 is active: authentication rate limiting, account-wide replay revocation, log-sanitization tests, Android release signing, backend packaging, observability metrics, and the domain-split backend suite are complete (125 backend tests, 0 failures); live Neon/Render deployment verification and operational drills remain. See [12-phase-3-checklist.md](./12-phase-3-checklist.md), [11-phase-2-checklist.md](./11-phase-2-checklist.md), and [05-memory-lifecycle.md](./05-memory-lifecycle.md).
+Phase 1 delivered the usable text-chat loop without memory and is now merged to `main`. Phase 2 delivered backend style-memory governance (read, replace with OCC, toggle, purge), advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and stale-job recovery), candidate review (list, accept, reject), the `MEM-TEST-01`..`MEM-TEST-07` race scenarios, the Android memory client (`MemoryActivity`, candidate review, toggle, OCC save, and purge), and dedicated memory integration test suites (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`). Phase 3 is complete: authentication rate limiting, account-wide replay revocation, log-sanitization verification, Android release signing, backend packaging, observability metrics, health monitoring, and the domain-split backend suite are delivered (125 backend tests, 0 failures), and v1.2.1 is released. The backend is live at `https://mira-backend-094w.onrender.com`. See [12-phase-3-checklist.md](./12-phase-3-checklist.md), [11-phase-2-checklist.md](./11-phase-2-checklist.md), and [05-memory-lifecycle.md](./05-memory-lifecycle.md).
 
 ---
 

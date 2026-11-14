@@ -149,6 +149,7 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `AuthInterceptorTest` (Android) | Unit | 4 | Bearer header injection, no-token behavior, existing-header preservation, and blank-token handling. |
 | `ApiErrorsTest` (Android) | Unit | 4 | Error-envelope message extraction and fallbacks for malformed, blank, and absent bodies. |
 | `SessionApiSmokeTest` (Android) | Instrumented (MockWebServer) | 1 | Login → list conversations → create conversation → send message, including bearer and idempotency headers. |
+| `ProductionSmokeTest` (Android) | Instrumented (manual) | 1 | Opt-in on-device register/login against the production backend (`miraProductionSmoke=true`). |
 | `ExampleUnitTest` (Android) | Unit | 1 | Android unit testing baseline. |
 
 The backend suite (125 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (16 unit tests) executes via `.\gradlew.bat testDebugUnitTest`; the instrumented `SessionApiSmokeTest` compiles with `assembleDebugAndroidTest` and runs via `connectedDebugAndroidTest` when an emulator or device is attached. No test contacts DeepSeek. The integration suite shares one singleton container and one Spring context across domain classes. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 125 backend tests pass offline without failures or errors.

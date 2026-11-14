@@ -274,5 +274,5 @@ Before opening the deployed service to physical Android client connections, veri
 - [ ] End-to-end smoke test creates an account, starts a conversation, and receives an AI response.
 - [ ] Cloud application logs confirm that raw user prompts, passwords, and tokens are completely absent.
 - [ ] Android release APK connects successfully to the public HTTPS domain.
-- [ ] A `v*` tag produces a signed APK and AAB through the Android Release workflow.
+- [x] A `v*` tag produces a signed APK and AAB through the Android Release workflow.
 - [ ] The signed APK installs on a physical device and completes the smoke flow.

@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.3.0 |
+| **Version** | 1.4.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -20,6 +20,7 @@
 | 1.1.0 | 2026-11-13 | Bryan | Completed P3.0 (CI green, Phase 2 closed) and P3.1 (auth rate limiting, account-wide replay revocation, log-sanitization audit). |
 | 1.2.0 | 2026-11-14 | Bryan | Completed P3.2 implementation: release signing config, R8 rules, configurable API URL/versioning, local signed APK/AAB verification, tag-based release workflow, and ADR-005. |
 | 1.3.0 | 2026-11-14 | Bryan | Completed P3.3 packaging: production Dockerfile, `.dockerignore`, `prod` profile with ECS JSON logs and graceful shutdown, Render blueprint, ADR-004, and a CI container-image build. Live Neon/Render deployment remains. |
+| 1.4.0 | 2026-11-14 | Bryan | Verified the first signed Android release via the `v1.1.0` tag; APK and AAB artifacts were produced by CI. |
 
 ---
 
@@ -139,13 +140,14 @@ flowchart LR
 
 ### 4.3 P3.2 — Android Release Engineering
 
-- [ ] Create a release keystore outside the repository and back it up securely.
+- [x] Create a release keystore outside the repository and back it up securely.
 - [x] Add a `release` signing config sourced from environment variables or an untracked `keystore.properties`.
 - [x] Add `proguard-rules.pro` / R8 rules for Retrofit, Gson, OkHttp, and AndroidX.
 - [x] Replace the hardcoded `https://api.example.com/` release URL with a Gradle property or environment-provided value.
 - [x] Add a version-code/version-name strategy and document it.
 - [x] Build `assembleRelease` and `bundleRelease` locally (verified with a temporary keystore).
 - [x] Add a tag-triggered release workflow that uploads the signed AAB/APK as an artifact.
+- [x] Produce the first signed release via the `v1.1.0` tag (`mira-release-apk-1.1.0`, `mira-release-aab-1.1.0`).
 - [ ] Verify the release artifact installs on a device and reaches staging.
 
 ### 4.4 P3.3 — Backend Packaging & Deployment

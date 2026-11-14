@@ -28,8 +28,11 @@ jobs:
 
           for endpoint in health health/readiness; do
             file="/tmp/${endpoint//\//_}.json"
+            # The timeout must exceed a cold start (observed ~60 s); otherwise
+            # the probe times out while the instance is waking, which both
+            # fails the check and lets the service fall back asleep.
             status=$(curl -sS -o "$file" -w '%{http_code}' \
-              --max-time 20 --retry 2 --retry-delay 3 \
+              --max-time 120 --retry 1 --retry-delay 5 \
               "$base/actuator/$endpoint" || true)
 
             echo "$endpoint: HTTP $status"

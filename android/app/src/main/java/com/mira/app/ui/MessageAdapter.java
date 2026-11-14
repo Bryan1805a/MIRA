@@ -1,8 +1,15 @@
 package com.mira.app.ui;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.text.TextUtils;
+import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
@@ -16,6 +23,7 @@ import com.mira.app.data.model.ResponseStatus;
 import com.mira.app.databinding.ItemMessageAssistantBinding;
 import com.mira.app.databinding.ItemMessageThinkingBinding;
 import com.mira.app.databinding.ItemMessageUserBinding;
+import com.mira.app.util.DateFormats;
 
 import java.util.Objects;
 
@@ -183,6 +191,47 @@ public class MessageAdapter extends ListAdapter<
                 == newResponse.getAttemptCount();
     }
 
+    private static void bindTimestamp(TextView view, String createdAt) {
+        String label = DateFormats.shortDateTime(createdAt);
+
+        if (label.isEmpty()) {
+            view.setVisibility(View.GONE);
+            return;
+        }
+
+        view.setText(label);
+        view.setVisibility(View.VISIBLE);
+    }
+
+    private static void enableCopyOnLongPress(View anchor, String content) {
+        if (TextUtils.isEmpty(content)) {
+            anchor.setOnLongClickListener(null);
+            return;
+        }
+
+        anchor.setOnLongClickListener(view -> {
+            Context context = view.getContext();
+            ClipboardManager clipboard = (ClipboardManager) context
+                    .getSystemService(Context.CLIPBOARD_SERVICE);
+
+            if (clipboard == null) {
+                return false;
+            }
+
+            clipboard.setPrimaryClip(
+                    ClipData.newPlainText(context.getString(R.string.app_name), content)
+            );
+            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            Toast.makeText(
+                    context,
+                    R.string.message_copied,
+                    Toast.LENGTH_SHORT
+            ).show();
+
+            return true;
+        });
+    }
+
     class UserHolder extends RecyclerView.ViewHolder {
 
         private final ItemMessageUserBinding binding;
@@ -194,6 +243,8 @@ public class MessageAdapter extends ListAdapter<
 
         void bind(MessageResponse message) {
             binding.messageText.setText(message.getContent());
+            bindTimestamp(binding.timestampText, message.getCreatedAt());
+            enableCopyOnLongPress(binding.messageText, message.getContent());
 
             MessageResponse.ResponseMetadata response =
                     message.getResponse();
@@ -259,6 +310,8 @@ public class MessageAdapter extends ListAdapter<
             binding.messageText.setText(
                     MarkdownText.toPlainText(message.getContent())
             );
+            bindTimestamp(binding.timestampText, message.getCreatedAt());
+            enableCopyOnLongPress(binding.messageText, message.getContent());
         }
     }
 

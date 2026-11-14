@@ -40,9 +40,7 @@ public class MainActivity extends AppCompatActivity {
         String email = tokenStore.email();
 
         if (email != null && !email.isBlank()) {
-            binding.emailText.setText(
-                    getString(R.string.signed_in_as, email)
-            );
+            binding.emailText.setText(email);
         }
 
         binding.statusText.setText(R.string.checking_session);
@@ -60,12 +58,7 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (value.getEmail() != null) {
-                    binding.emailText.setText(
-                            getString(
-                                    R.string.signed_in_as,
-                                    value.getEmail()
-                            )
-                    );
+                    binding.emailText.setText(value.getEmail());
                 }
 
                 binding.statusText.setText(R.string.session_active);

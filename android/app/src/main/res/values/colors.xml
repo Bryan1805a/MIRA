@@ -43,4 +43,8 @@
 
     <!-- Launch surface used by the Android 12+ splash screen -->
     <color name="brand_splash">#FBFAFF</color>
+
+    <!-- Foreground colours on the brand gradient hero (always light) -->
+    <color name="brand_hero_text">#FFFFFF</color>
+    <color name="brand_hero_text_muted">#DCD4FF</color>
 </resources>

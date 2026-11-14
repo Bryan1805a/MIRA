@@ -20,7 +20,9 @@
     <string name="error_password_mismatch">Passwords do not match.</string>
 
     <string name="loading">Loading</string>
-    <string name="signed_in_as">Signed in as %1$s</string>
+    <string name="session_label">Signed in as</string>
+    <string name="home_explainer_title">How memory works</string>
+    <string name="home_explainer_body">MIRA learns your communication style — explanation depth, tone, examples, and formatting — from your conversations and applies it to new ones. You can review, edit, or delete it at any time.</string>
     <string name="checking_session">Checking your session…</string>
     <string name="session_active">Session active.</string>
     <string name="session_offline">Offline. Showing your saved session.</string>
@@ -50,6 +52,7 @@
     <string name="message_status_failed">Response failed.</string>
     <string name="message_status_unknown">Outcome unknown.</string>
     <string name="retry">Retry</string>
+    <string name="message_copied">Message copied</string>
     <string name="chat_title">Chat</string>
 
     <!-- Communication-style memory -->

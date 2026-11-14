@@ -80,9 +80,15 @@ public final class ApiClient {
 
     private static OkHttpClient createHttpClient() {
         return new OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(45, TimeUnit.SECONDS)
-                .writeTimeout(15, TimeUnit.SECONDS)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                /*
+                 * A sleeping managed instance can take close to a minute to
+                 * accept its first request after wake-up. A shorter read
+                 * timeout turns that cold start into a visible failure, so the
+                 * budget is deliberately above the observed wake-up time.
+                 */
+                .readTimeout(90, TimeUnit.SECONDS)
+                .writeTimeout(20, TimeUnit.SECONDS)
                 .build();
     }
 }

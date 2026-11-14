@@ -18,6 +18,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Message bubbles show a local timestamp and support long-press to copy the
+  original message text (with haptic feedback and a confirmation toast).
+- Home screen rebuilt as a branded hero card, a session card ("Signed in as"
+  plus status), a primary conversation action, a Memory/Sign-out row, and a
+  short "How memory works" explainer instead of three stacked buttons.
 - Assistant replies are rendered as readable plain text (`MarkdownText`): bold,
   italic, heading, inline-code, and display-math markers are stripped, list
   bullets normalized, links turned into `text (url)`, and arithmetic such as
@@ -29,6 +34,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Cold-start resilience: the Android HTTP client read timeout is now 90 s and
+  the production health monitor allows 120 s per probe. A sleeping managed
+  instance took ~59 s to answer its first request, which previously exceeded
+  both budgets and turned a cold sign-in into a failure.
 - Brand identity: replaced the stock Android robot launcher icon with a MIRA
   adaptive icon (violet-to-indigo gradient with a speech bubble holding three
   memory nodes, monochrome-safe for themed icons), and branded the Android 12+

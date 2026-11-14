@@ -182,10 +182,11 @@ flowchart LR
 
 - [x] Add unit tests for `TokenStore`, `AuthInterceptor`, and `ApiError` mapping (`TokenStoreTest`, `AuthInterceptorTest`, `ApiErrorsTest`).
 - [x] Add an instrumented login → conversation → send smoke test against a stub backend (`SessionApiSmokeTest`, MockWebServer).
-- [ ] Run `connectedDebugAndroidTest` on an emulator in CI (optional) and locally.
-- [ ] Install the debug and release APKs on a physical device; record SDK/build-tools versions.
+- [x] Run `connectedDebugAndroidTest` on a physical device (`TECNO LI7`, Android 15 / SDK 35; 2 instrumented tests passed).
+- [x] Install the debug and release APKs on a physical device; record SDK/build-tools versions (SDK 35, build-tools 36.0.0).
 - [x] Verify cleartext traffic is disabled in release and the debug overlay is excluded (manifest + network security config).
 - [x] Verify debug logging is stripped or inert in release builds (no `Log` calls in main sources).
+- [x] Signed release APK installs and launches on a physical device after the v1.2.1 R8 fix.
 - [ ] Verify the `409 version_conflict` refresh-and-retry flow on a device.
 - [ ] Verify offline, timeout, and provider-failure UX.
 

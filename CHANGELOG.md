@@ -6,6 +6,14 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-14
+
+### Fixed
+
+- Release-only startup crash caused by R8 obfuscating Kotlin classes used by
+  OkHttp. Added keep rules for `okhttp3`, `okio`, `kotlin`, and `kotlinx`.
+- v1.2.0 release artifacts are affected by this crash; use v1.2.1 instead.
+
 ## [1.2.0] - 2026-11-14
 
 ### Added
@@ -61,7 +69,8 @@ project uses [Semantic Versioning](https://semver.org/).
   (`MemoryActivity`).
 - Release signing configuration and tag-based signed artifacts.
 
-[Unreleased]: https://github.com/Bryan1805a/MIRA/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Bryan1805a/MIRA/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Bryan1805a/MIRA/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Bryan1805a/MIRA/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/Bryan1805a/MIRA/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Bryan1805a/MIRA/releases/tag/v1.1.0

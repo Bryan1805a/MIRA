@@ -5,10 +5,18 @@
 -keepclassmembers,allowshrinking,allowobfuscation interface * {
     @retrofit2.http.* <methods>;
 }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -dontwarn retrofit2.**
 -dontwarn javax.annotation.**
+
+# Kotlin runtime used by OkHttp/Okio
+-keep class kotlin.** { *; }
+-keep class kotlinx.** { *; }
+-dontwarn kotlin.**
+-dontwarn kotlinx.**
 
 # Gson models and generic type tokens
 -keep class com.mira.app.data.model.** { *; }

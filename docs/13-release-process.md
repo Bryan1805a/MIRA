@@ -116,4 +116,5 @@ The `Android Release` workflow:
 | :--- | :--- | :--- | :--- |
 | `v1.1.0` | 2026-11-14 | Memory client and release signing | Signed APK/AAB |
 | `v1.1.1` | 2026-11-14 | Container packaging and Render deployment | Signed APK/AAB |
-| `v1.2.0` | 2026-11-14 | Phase 3 hardening, observability, release process | Signed APK/AAB |
+| `v1.2.0` | 2026-11-14 | Phase 3 hardening, observability, release process (broken release build; use v1.2.1) | Signed APK/AAB |
+| `v1.2.1` | 2026-11-14 | R8 keep-rule fix for the release startup crash | Signed APK/AAB |

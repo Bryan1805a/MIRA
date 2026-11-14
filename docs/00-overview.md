@@ -163,3 +163,4 @@ The complete engineering specification is partitioned into modular, version-cont
 * [ADR-001-backend-stack.md](./decisions/ADR-001-backend-stack.md) — Architectural Decision Record: Backend Technology Selection.
 * [ADR-002-memory-model.md](./decisions/ADR-002-memory-model.md) — Architectural Decision Record: Memory Lifecycle & Concurrency Model.
 * [ADR-003-file-processing.md](./decisions/ADR-003-file-processing.md) — Architectural Decision Record: Multimodal Processing Phasing.
+* [ADR-005-release-signing.md](./decisions/ADR-005-release-signing.md) — Architectural Decision Record: Android Release Signing & Artifact Strategy.

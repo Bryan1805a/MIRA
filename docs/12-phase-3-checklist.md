@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.1.0 |
+| **Version** | 1.2.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -18,6 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | 1.0.0 | 2026-11-13 | Bryan | Initial Phase 3 baseline: security hardening, release signing, backend deployment, observability, Android production readiness, test hardening, and documentation/release. |
 | 1.1.0 | 2026-11-13 | Bryan | Completed P3.0 (CI green, Phase 2 closed) and P3.1 (auth rate limiting, account-wide replay revocation, log-sanitization audit). |
+| 1.2.0 | 2026-11-14 | Bryan | Completed P3.2 implementation: release signing config, R8 rules, configurable API URL/versioning, local signed APK/AAB verification, tag-based release workflow, and ADR-005. |
 
 ---
 
@@ -105,7 +106,7 @@ flowchart LR
 | Backend health probes | Implemented (`/actuator/health`, liveness, readiness) |
 | Local database | `docker-compose.yml`, `.env.example` |
 | CI workflows | Backend verify and Android build/test/lint configured |
-| Release signing | Not configured; release API URL is a placeholder |
+| Release signing | Configurable via environment variables / `keystore.properties`; R8 rules and a tag-based release workflow are in place. Keystore creation and GitHub Secrets remain operator steps. |
 | Backend container image | Not configured (no `Dockerfile`) |
 | Deployment | Not deployed |
 | Observability | Request IDs and health probes only; no metrics or alerts |
@@ -138,12 +139,12 @@ flowchart LR
 ### 4.3 P3.2 — Android Release Engineering
 
 - [ ] Create a release keystore outside the repository and back it up securely.
-- [ ] Add a `release` signing config sourced from environment variables or an untracked `keystore.properties`.
-- [ ] Add `consumer-rules.pro` / R8 rules for Retrofit, Gson, OkHttp, and AndroidX.
-- [ ] Replace the hardcoded `https://api.example.com/` release URL with a Gradle property or environment-provided value.
-- [ ] Add a version-code/version-name strategy and document it.
-- [ ] Build `assembleRelease` and `bundleRelease` locally.
-- [ ] Add a tag-triggered release workflow that uploads the signed AAB/APK as an artifact.
+- [x] Add a `release` signing config sourced from environment variables or an untracked `keystore.properties`.
+- [x] Add `proguard-rules.pro` / R8 rules for Retrofit, Gson, OkHttp, and AndroidX.
+- [x] Replace the hardcoded `https://api.example.com/` release URL with a Gradle property or environment-provided value.
+- [x] Add a version-code/version-name strategy and document it.
+- [x] Build `assembleRelease` and `bundleRelease` locally (verified with a temporary keystore).
+- [x] Add a tag-triggered release workflow that uploads the signed AAB/APK as an artifact.
 - [ ] Verify the release artifact installs on a device and reaches staging.
 
 ### 4.4 P3.3 — Backend Packaging & Deployment
@@ -191,7 +192,8 @@ flowchart LR
 ### 4.8 P3.7 — Documentation & Release
 
 - [ ] Keep this checklist current as workstreams complete.
-- [ ] Add ADR-004 (hosting platform) and ADR-005 (release signing).
+- [x] Add ADR-005 (release signing).
+- [ ] Add ADR-004 (hosting platform).
 - [ ] Update [08-deployment-plan.md](./08-deployment-plan.md) with the chosen provider, domains, and runbook.
 - [ ] Update the README with deployment, release, and operational instructions.
 - [ ] Write release notes and choose the version/tag strategy.

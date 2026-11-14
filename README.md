@@ -145,7 +145,30 @@ cd android
 
 Open the `android/` directory in Android Studio to run on an emulator or physical device. Authentication, conversation management (`ConversationsActivity`), chat with bounded retry (`ChatActivity`), and style memory settings with candidate review (`MemoryActivity`) are fully implemented.
 
-## Implemented API (as of 2026-11-13)
+### Release Build
+
+Release signing is configured but the keystore is never committed. Provide the values through environment variables or an untracked `android/keystore.properties`:
+
+```properties
+storeFile=mira-release.jks
+storePassword=your-store-password
+keyAlias=mira
+keyPassword=your-key-password
+```
+
+Then build a signed APK and AAB:
+
+```powershell
+cd android
+$env:MIRA_API_BASE_URL = "https://api.yourdomain.com/"
+$env:MIRA_VERSION_CODE = "2"
+$env:MIRA_VERSION_NAME = "1.1.0"
+.\gradlew.bat clean assembleRelease bundleRelease
+```
+
+The `Android Release` GitHub Actions workflow does the same on a `v*` tag, using `MIRA_KEYSTORE_BASE64`, `MIRA_KEYSTORE_PASSWORD`, `MIRA_KEY_ALIAS`, and `MIRA_KEY_PASSWORD` secrets. See [`docs/decisions/ADR-005-release-signing.md`](docs/decisions/ADR-005-release-signing.md).
+
+## Implemented API (as of 2026-11-14)
 
 | Method | Endpoint | Status |
 | :--- | :--- | :--- |
@@ -178,7 +201,9 @@ Open the `android/` directory in Android Studio to run on an emulator or physica
 - [`docs/08-deployment-plan.md`](docs/08-deployment-plan.md) — Deployment topology and runbook
 - [`docs/09-phase-0-checklist.md`](docs/09-phase-0-checklist.md) — Completed foundation checklist
 - [`docs/10-phase-1-checklist.md`](docs/10-phase-1-checklist.md) — Closed conversation and chat milestone
-- [`docs/11-phase-2-checklist.md`](docs/11-phase-2-checklist.md) — Active communication-style memory milestone
+- [`docs/11-phase-2-checklist.md`](docs/11-phase-2-checklist.md) — Completed communication-style memory milestone
+- [`docs/12-phase-3-checklist.md`](docs/12-phase-3-checklist.md) — Active production hardening, deployment, and operational readiness
+- [`docs/decisions/ADR-005-release-signing.md`](docs/decisions/ADR-005-release-signing.md) — Android release signing and artifact strategy
 
 ## Security Notes
 

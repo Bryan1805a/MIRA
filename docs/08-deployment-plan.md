@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-OPS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.9.0 |
+| **Version** | 2.1.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA DevOps & Infrastructure Team |
 | **Hosting Platform** | Cloud PaaS (e.g., Render / Fly.io / AWS ECS) + Neon PostgreSQL |
@@ -28,6 +28,7 @@
 | 1.8.0 | 2026-10-29 | Bryan | Documented extraction retry/recovery settings and skip-locked claiming. Deployment remains a Phase 3 activity. |
 | 1.9.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery; deployment remains a Phase 3 activity. |
 | 2.0.0 | 2026-11-13 | Bryan | Recorded Phase 3 security hardening: authentication rate-limit configuration and account-wide replay revocation. Deployment remains a Phase 3 activity. |
+| 2.1.0 | 2026-11-14 | Bryan | Documented Android release signing, configurable version/API values, and the tag-based release workflow. |
 
 ---
 
@@ -96,6 +97,22 @@ Configuration is strictly divided between non-secret environment properties and 
 
 > [!IMPORTANT]
 > `backend/src/main/resources/application.properties` does not contain a default datasource. `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` must be supplied in every environment, including local development. Integration tests provide them dynamically through Testcontainers.
+
+### 2.2 Android Release Signing
+
+Release builds are signed only when all signing values are supplied. The build reads either environment variables or an untracked `android/keystore.properties`.
+
+| Variable | Required | Purpose |
+| :--- | :--- | :--- |
+| `MIRA_KEYSTORE_FILE` | Yes (release) | Absolute path to the release keystore, or a path relative to `android/`. |
+| `MIRA_KEYSTORE_PASSWORD` | Yes (release) | Keystore password. |
+| `MIRA_KEY_ALIAS` | Yes (release) | Release key alias. |
+| `MIRA_KEY_PASSWORD` | Yes (release) | Key password. |
+| `MIRA_API_BASE_URL` | Yes (release) | Public backend base URL baked into `BuildConfig.API_BASE_URL`. |
+| `MIRA_VERSION_CODE` | No | Integer version code; defaults to `1` locally and the workflow run number in CI. |
+| `MIRA_VERSION_NAME` | No | Version name; defaults to `1.0` locally and the `v*` tag in CI. |
+
+The `Android Release` workflow (`.github/workflows/android-release.yml`) runs on `v*` tags or manual dispatch. It decodes `MIRA_KEYSTORE_BASE64` into `$RUNNER_TEMP`, builds a signed APK and AAB, verifies the APK with `apksigner`, and uploads both artifacts. Configure the four signing secrets and either a `MIRA_API_BASE_URL` repository variable or the manual-dispatch input before tagging a release.
 
 ---
 
@@ -203,3 +220,5 @@ Before opening the deployed service to physical Android client connections, veri
 - [ ] End-to-end smoke test creates an account, starts a conversation, and receives an AI response.
 - [ ] Cloud application logs confirm that raw user prompts, passwords, and tokens are completely absent.
 - [ ] Android release APK connects successfully to the public HTTPS domain.
+- [ ] A `v*` tag produces a signed APK and AAB through the Android Release workflow.
+- [ ] The signed APK installs on a physical device and completes the smoke flow.

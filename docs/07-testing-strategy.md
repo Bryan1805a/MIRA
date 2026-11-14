@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.7.0 |
+| **Version** | 2.8.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
@@ -35,6 +35,7 @@
 | 2.5.0 | 2026-11-14 | Bryan | Added observability coverage: `MiraMetricsTests`, `ObservabilityTest`, and custom metrics documentation (inventory now 124 backend tests). |
 | 2.6.0 | 2026-11-14 | Bryan | Added Android production-readiness tests: `TokenStoreTest`, `AuthInterceptorTest`, `ApiErrorsTest`, and the instrumented `SessionApiSmokeTest` (16 Android unit tests; instrumented run pending a device). |
 | 2.7.0 | 2026-11-14 | Bryan | Split the monolithic backend suite by domain, introduced a shared singleton Testcontainers base, added `LatencySmokeTest`, and enabled Android release-build verification (inventory now 125 backend tests). |
+| 2.8.0 | 2026-11-14 | Bryan | Added gitleaks and Dependabot coverage, plus the opt-in production Android smoke test. |
 
 ---
 
@@ -238,7 +239,7 @@ flowchart TD
 ```
 
 > [!NOTE]
-> GitHub Actions workflows are configured in `.github/workflows/backend.yml` (Maven verify with Testcontainers plus a production container-image build) and `.github/workflows/android.yml` (Gradle build, testDebugUnitTest, instrumented-test compilation, lintDebug, and APK artifact upload). The `Android Release` workflow builds and signs an APK/AAB on `v*` tags. Both verification pipelines run on push, pull request, and manual dispatch.
+> GitHub Actions workflows are configured in `.github/workflows/backend.yml` (Maven verify with Testcontainers plus a production container-image build), `.github/workflows/android.yml` (Gradle build, unit tests, instrumented-test compilation, release build, lint, and APK artifact upload), and `.github/workflows/security.yml` (gitleaks secret scan). The `Android Release` workflow builds and signs an APK/AAB on `v*` tags, and the `Production Health Monitor` polls production every 10 minutes. Dependabot checks Maven, Gradle, and GitHub Actions dependencies weekly.
 
 ---
 

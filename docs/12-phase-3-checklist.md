@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Complete Execution Baseline |
-| **Version** | 2.0.0 |
+| **Version** | 2.1.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -27,6 +27,7 @@
 | 1.8.0 | 2026-11-14 | Bryan | Completed P3.7: release notes, version/tag strategy, live deployment verification, and the v1.2.0 release. Operator device/alerts/drill checks remain. |
 | 1.9.0 | 2026-11-14 | Bryan | Closed device verification and release recovery: v1.2.1 R8 fix, physical-device install/launch, on-device production smoke, instrumented tests, health monitor, local restore drill, and previous-release compatibility. Remaining: deployed log review, Render dashboard alerts, and Neon PITR drill. |
 | 2.0.0 | 2026-11-14 | Bryan | Closed the Phase 3 exit gate: all remaining operator checks verified, health monitor active, signed v1.2.1 release published. |
+| 2.1.0 | 2026-11-14 | Bryan | Added Dependabot and gitleaks CI, recorded physical-device release verification, and moved the remaining Android UX checks to post-Phase-3 manual QA. |
 
 ---
 
@@ -140,9 +141,9 @@ flowchart LR
 - [x] Revoke every active session for the account on refresh-token replay.
 - [x] Add `AuthRateLimiterTests`, `AuthSecurityTest`, and `LogSanitizationTest`.
 - [x] Verify `ApiExceptionHandler` logs only the request ID and exception class.
-- [ ] Add dependency scanning (Dependabot or OWASP Dependency-Check).
-- [ ] Add secret scanning to CI (e.g. `gitleaks`).
-- [ ] Document the per-email lockout tradeoff and the trusted-proxy requirement for `X-Forwarded-For`.
+- [x] Add dependency scanning (Dependabot).
+- [x] Add secret scanning to CI (`gitleaks`).
+- [x] Document the per-email lockout tradeoff and the trusted-proxy requirement for `X-Forwarded-For`.
 
 ### 4.3 P3.2 — Android Release Engineering
 
@@ -154,7 +155,7 @@ flowchart LR
 - [x] Build `assembleRelease` and `bundleRelease` locally (verified with a temporary keystore).
 - [x] Add a tag-triggered release workflow that uploads the signed AAB/APK as an artifact.
 - [x] Produce the first signed release via the `v1.1.0` tag (`mira-release-apk-1.1.0`, `mira-release-aab-1.1.0`).
-- [ ] Verify the release artifact installs on a device and reaches staging.
+- [x] Verify the release artifact installs on a device and reaches staging (v1.2.1 installed/launched; on-device production register/login).
 
 ### 4.4 P3.3 — Backend Packaging & Deployment
 
@@ -193,6 +194,9 @@ flowchart LR
 - [x] On-device production smoke: register and login against `https://mira-backend-094w.onrender.com`.
 - [ ] Verify the `409 version_conflict` refresh-and-retry flow on a device.
 - [ ] Verify offline, timeout, and provider-failure UX.
+
+> [!NOTE]
+> The two remaining Android UX checks are post-Phase-3 manual QA items. They do not block the Phase 3 exit gate.
 
 ### 4.7 P3.6 — Test & Quality Hardening
 

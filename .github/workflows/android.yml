@@ -47,7 +47,7 @@ jobs:
           chmod +x gradlew
 
       - name: Build, test, and lint
-        run: ./gradlew --no-daemon clean assembleDebug testDebugUnitTest assembleDebugAndroidTest lintDebug
+        run: ./gradlew --no-daemon clean assembleDebug assembleRelease testDebugUnitTest assembleDebugAndroidTest lintDebug
 
       - name: Upload debug APK
         if: always()

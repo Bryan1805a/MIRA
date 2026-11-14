@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.8.0 |
-| **Last Updated** | 2026-11-13 |
+| **Version** | 2.10.0 |
+| **Last Updated** | 2026-11-14 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
 
@@ -36,6 +36,8 @@
 | 2.6.0 | 2026-11-14 | Bryan | Added Android production-readiness tests: `TokenStoreTest`, `AuthInterceptorTest`, `ApiErrorsTest`, and the instrumented `SessionApiSmokeTest` (16 Android unit tests; instrumented run pending a device). |
 | 2.7.0 | 2026-11-14 | Bryan | Split the monolithic backend suite by domain, introduced a shared singleton Testcontainers base, added `LatencySmokeTest`, and enabled Android release-build verification (inventory now 125 backend tests). |
 | 2.8.0 | 2026-11-14 | Bryan | Added gitleaks and Dependabot coverage, plus the opt-in production Android smoke test. |
+| 2.9.0 | 2026-11-14 | Bryan | Correction: removed the stale claim that refresh rotation/replay tests were an open Phase 1 follow-up; they are covered by `AuthSecurityTest`. |
+| 2.10.0 | 2026-11-14 | Bryan | Added the chat in-flight placeholder instrumented suite (`MessageAdapterThinkingTest`, 4 tests) and refreshed the Android instrumented inventory and execution status. |
 
 ---
 
@@ -91,7 +93,7 @@ flowchart TD
 ### 3.3 API Contract & Security Testing
 * **Framework:** Spring MockMvc / WebTestClient with Spring Security context.
 * **Verification Scope:**
-  * **Authentication:** Verify registration, login, token rotation, and invalid credential rejections. Registration, login, refresh, logout, and `/me` are implemented and covered; dedicated rotation/replay tests remain an open Phase 1 follow-up.
+  * **Authentication:** Verify registration, login, token rotation, and invalid credential rejections. Registration, login, refresh, logout, and `/me` are implemented and covered, including rotation and replay rejection (`AuthSecurityTest`).
   * **Session Revocation & Reuse:** Verify that using an already-rotated refresh token revokes every active session for the account and rejects further use of the token. Covered by `AuthSecurityTest` (account-wide revocation and cross-account isolation).
   * **Object-Level Authorization (IDOR):** Verify that User A attempting to read, modify, or delete User B's conversation receives `404 Not Found`.
   * **Uniform Error Formatting:** Verify that invalid inputs return the standard JSON error schema with appropriate error codes.
@@ -150,10 +152,11 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `AuthInterceptorTest` (Android) | Unit | 4 | Bearer header injection, no-token behavior, existing-header preservation, and blank-token handling. |
 | `ApiErrorsTest` (Android) | Unit | 4 | Error-envelope message extraction and fallbacks for malformed, blank, and absent bodies. |
 | `SessionApiSmokeTest` (Android) | Instrumented (MockWebServer) | 1 | Login → list conversations → create conversation → send message, including bearer and idempotency headers. |
+| `MessageAdapterThinkingTest` (Android) | Instrumented | 4 | Chat in-flight placeholder: sentinel detection, themed layout inflation on the main thread, adapter dispatch to the dedicated thinking holder, and regular user messages still binding the user holder. |
 | `ProductionSmokeTest` (Android) | Instrumented (manual) | 1 | Opt-in on-device register/login against the production backend (`miraProductionSmoke=true`). |
 | `ExampleUnitTest` (Android) | Unit | 1 | Android unit testing baseline. |
 
-The backend suite (125 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (16 unit tests) executes via `.\gradlew.bat testDebugUnitTest`; the instrumented `SessionApiSmokeTest` compiles with `assembleDebugAndroidTest` and runs via `connectedDebugAndroidTest` when an emulator or device is attached. No test contacts DeepSeek. The integration suite shares one singleton container and one Spring context across domain classes. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 125 backend tests pass offline without failures or errors.
+The backend suite (125 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android unit suite (16 tests) executes via `.\gradlew.bat testDebugUnitTest`. The instrumented suite (7 tests) runs via `.\gradlew.bat connectedDebugAndroidTest` on a physical device (TECNO LI7, Android 15) and covers the API smoke flow, the chat in-flight placeholder, and the opt-in production smoke test (skipped unless `miraProductionSmoke=true`). No test contacts DeepSeek. The integration suite shares one singleton container and one Spring context across domain classes. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 125 backend tests pass offline without failures or errors.
 
 ---
 

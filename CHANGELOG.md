@@ -6,6 +6,27 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Chat renders an in-flight "MIRA is thinking…" assistant bubble while the
+  backend waits on the AI provider, so a synchronous generation that can take
+  up to 30 seconds no longer looks like a frozen screen. The placeholder is
+  local to the UI: it is never persisted or sent to the backend, and the input
+  is disabled until the request completes or fails.
+- Instrumented test covering the thinking placeholder (detection, layout
+  inflation, and adapter view-type dispatch).
+
+### Fixed
+
+- Removed a duplicate `Intent` import in `MainActivity`.
+- Documentation corrections: Phase 3 security hardening is no longer listed as
+  "in progress" in the architecture status table; refresh-token rotation and
+  replay tests are no longer described as an open Phase 1 follow-up; the Phase 3
+  decision rows are closed against ADR-004/ADR-005; purge is documented as
+  clearing the profile JSONB and incrementing `version` rather than deleting
+  the `user_style_profile` row; `LICENSE` was removed from the Phase 0 target
+  tree; NFR-005.1 records the delivered layer-first package layout.
+
 ## [1.2.1] - 2026-11-14
 
 ### Fixed

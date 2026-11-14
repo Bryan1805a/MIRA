@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-DAT-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.8.0 |
-| **Last Updated** | 2026-11-13 |
+| **Version** | 2.0.0 |
+| **Last Updated** | 2026-11-14 |
 | **Author / Lead** | Bryan / MIRA Data Engineering Team |
 | **Database Engine** | PostgreSQL 15+ (Neon Managed Database; PostgreSQL 18 in Testcontainers) |
 | **Migration Tool** | Flyway |
@@ -28,6 +28,7 @@
 | 1.7.0 | 2026-10-29 | Bryan | Recorded retry/recovery behavior for extraction jobs (`attempts`, stale `PROCESSING` requeue, skip-locked claiming). No schema changes; migrations remain V1–V10. |
 | 1.8.0 | 2026-11-13 | Bryan | Recorded Android client integration for candidate review and style profile governance (`MemoryActivity`). |
 | 1.9.0 | 2026-11-13 | Bryan | Recorded account-wide refresh-token replay revocation. No schema changes; migrations remain V1–V10. |
+| 2.0.0 | 2026-11-14 | Bryan | Correction: purge clears the stored JSONB profile and increments its `version`; the `user_style_profile` row is retained, not deleted. Reconciled the header version with the revision history (the header had drifted to 1.8.0 while the history was at 1.9.0). No schema changes; migrations remain V1–V10. |
 
 ---
 
@@ -435,7 +436,7 @@ CREATE TABLE user_style_profile (
   * `user_id` is both the primary key and a foreign key, enforcing a strict 1-to-1 relationship with `user_account`.
   * OCC updates use `WHERE user_id = :userId AND version = :expectedVersion`; on match, `version` is incremented by 1.
   * The `profile` document must be a JSON object. Application-level validation restricts keys and enum values to the allow-list in [05-memory-lifecycle.md](./05-memory-lifecycle.md#31-allowed-fields--enum-values).
-  * The profile table deliberately has **no** `generation` column. Generation state lives in `USER_MEMORY_CONTROL` so that it survives physical deletion of the profile row.
+  * The profile table deliberately has **no** `generation` column. Generation state lives in `USER_MEMORY_CONTROL` so that it is independent of the profile row's lifecycle.
   * **Implementation status (Phase 2):** `StyleProfileService` provisions a profile row on first access (`version = 1`, `enabled = true`, empty JSONB object), validates replacement payloads against the allow-list, and applies OCC updates via the version precondition. Reads and mutations are exposed through `/api/v1/memory/style`. Chat context assembly reads the enabled profile (without provisioning) and injects its allow-listed values as an advisory system message.
 
 ---
@@ -456,10 +457,10 @@ CREATE TABLE user_memory_control (
 ```
 * **Integrity Rules:**
   * Exactly one control row exists per user. It is created before or alongside the first memory operation.
-  * Purging memory increments `generation` under `SELECT ... FOR UPDATE` and deletes the profile row in the same transaction.
+  * Purging memory increments `generation` under `SELECT ... FOR UPDATE`, clears the profile's JSONB payload, and increments the profile `version` in the same transaction. The `user_style_profile` row itself is retained and never physically deleted, so the one-row-per-user invariant and its foreign key stay intact.
   * Background extraction jobs capture an immutable `expected_generation`; a commit is rejected if the current generation differs.
-  * A control row is preserved even when the profile is deleted, so a delayed worker cannot resurrect purged preferences.
-  * **Implementation status (Phase 2):** The purge endpoint locks the control row with `SELECT ... FOR UPDATE`, increments `generation`, clears the profile, and deletes `PENDING` staged candidates in the same transaction. Background extraction jobs capture `expected_generation` at scheduling time and abort with `SKIPPED` if it no longer matches at commit. See sections 3.8, 3.9, and [11-phase-2-checklist.md](./11-phase-2-checklist.md).
+  * Both the control row and the profile row survive a purge (the profile is emptied rather than deleted), so a delayed worker cannot resurrect purged preferences.
+  * **Implementation status (Phase 2):** The purge endpoint locks the control row with `SELECT ... FOR UPDATE`, increments `generation`, clears the profile and increments its `version`, and deletes `PENDING` staged candidates in the same transaction. Background extraction jobs capture `expected_generation` at scheduling time and abort with `SKIPPED` if it no longer matches at commit. See sections 3.8, 3.9, and [11-phase-2-checklist.md](./11-phase-2-checklist.md).
 
 ---
 

@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.5.0 |
-| **Last Updated** | 2026-11-13 |
+| **Version** | 2.6.0 |
+| **Last Updated** | 2026-11-14 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
 
@@ -33,6 +33,7 @@
 | 2.3.0 | 2026-11-14 | Bryan | Added Phase 3 observability: ECS structured logging, custom Micrometer metrics, and authenticated metrics exposure. |
 | 2.4.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests and the instrumented API smoke test. |
 | 2.5.0 | 2026-11-14 | Bryan | Recorded the domain-split backend suite, shared Testcontainers base, and NFR-004 latency smoke test. |
+| 2.6.0 | 2026-11-14 | Bryan | Correction: marked Phase 3 security hardening complete in the status table (it was still listed as in progress after the Phase 3 exit gate closed) and pointed the work-breakdown references at the closed checklists and the release process. |
 
 ---
 
@@ -278,7 +279,7 @@ The following formal decisions govern MIRA's architecture:
 
 ---
 
-## 7. Current Implementation Status (2026-11-13)
+## 7. Current Implementation Status (2026-11-14)
 
 | Capability | Status |
 | :--- | :--- |
@@ -305,6 +306,6 @@ The following formal decisions govern MIRA's architecture:
 | Android memory UI (`MemoryActivity`, candidate review, toggle, OCC save, purge) | Implemented (Android Views/XML) |
 | Extraction privacy audit | Implemented (`MemoryPrivacyAuditTest`) |
 | Log-sanitization audit | Implemented (`LogSanitizationTest`; no prompts, passwords, or tokens logged) |
-| Phase 3 security hardening | In progress (auth throttling and replay revocation complete) |
+| Phase 3 security hardening | Complete (auth throttling, account-wide replay revocation, log-sanitization audit, observability) |
 
-The active work breakdown is maintained in [11-phase-2-checklist.md](./11-phase-2-checklist.md). The closed Phase 1 checklist remains at [10-phase-1-checklist.md](./10-phase-1-checklist.md).
+Phase 1, Phase 2, and Phase 3 are all closed. The release runbook is maintained in [13-release-process.md](./13-release-process.md); the closed checklists remain at [10-phase-1-checklist.md](./10-phase-1-checklist.md), [11-phase-2-checklist.md](./11-phase-2-checklist.md), and [12-phase-3-checklist.md](./12-phase-3-checklist.md).

@@ -14,6 +14,7 @@ import com.mira.app.data.model.MessageResponse;
 import com.mira.app.data.model.MessageRole;
 import com.mira.app.data.model.ResponseStatus;
 import com.mira.app.databinding.ItemMessageAssistantBinding;
+import com.mira.app.databinding.ItemMessageThinkingBinding;
 import com.mira.app.databinding.ItemMessageUserBinding;
 
 import java.util.Objects;
@@ -23,13 +24,37 @@ public class MessageAdapter extends ListAdapter<
         RecyclerView.ViewHolder
         > {
 
+    /**
+     * Stable identifier for the local, UI-only placeholder that is rendered
+     * while a response is in flight. It is never persisted or sent to the
+     * backend; {@link ChatActivity} appends it before the provider call and
+     * removes it when the request finishes.
+     */
+    public static final String THINKING_ID = "mira-pending-assistant";
+
     public interface Listener {
         void onRetry(MessageResponse.ResponseMetadata response);
     }
 
     private static final int TYPE_USER = 0;
     private static final int TYPE_ASSISTANT = 1;
+    private static final int TYPE_THINKING = 2;
     private static final int MAX_ATTEMPTS = 3;
+
+    public static MessageResponse thinking() {
+        return new MessageResponse(
+                THINKING_ID,
+                MessageRole.ASSISTANT,
+                "",
+                null,
+                null
+        );
+    }
+
+    public static boolean isThinking(MessageResponse message) {
+        return message != null
+                && THINKING_ID.equals(message.getId());
+    }
 
     private static final DiffUtil.ItemCallback<MessageResponse> DIFF =
             new DiffUtil.ItemCallback<>() {
@@ -74,6 +99,10 @@ public class MessageAdapter extends ListAdapter<
     public int getItemViewType(int position) {
         MessageResponse message = getItem(position);
 
+        if (isThinking(message)) {
+            return TYPE_THINKING;
+        }
+
         return message.getRole() == MessageRole.USER
                 ? TYPE_USER
                 : TYPE_ASSISTANT;
@@ -99,6 +128,16 @@ public class MessageAdapter extends ListAdapter<
             );
         }
 
+        if (viewType == TYPE_THINKING) {
+            return new ThinkingHolder(
+                    ItemMessageThinkingBinding.inflate(
+                            inflater,
+                            parent,
+                            false
+                    )
+            );
+        }
+
         return new AssistantHolder(
                 ItemMessageAssistantBinding.inflate(
                         inflater,
@@ -117,6 +156,8 @@ public class MessageAdapter extends ListAdapter<
 
         if (holder instanceof UserHolder) {
             ((UserHolder) holder).bind(message);
+        } else if (holder instanceof ThinkingHolder) {
+            ((ThinkingHolder) holder).bind();
         } else if (holder instanceof AssistantHolder) {
             ((AssistantHolder) holder).bind(message);
         }
@@ -216,6 +257,25 @@ public class MessageAdapter extends ListAdapter<
 
         void bind(MessageResponse message) {
             binding.messageText.setText(message.getContent());
+        }
+    }
+
+    static class ThinkingHolder extends RecyclerView.ViewHolder {
+
+        private final ItemMessageThinkingBinding binding;
+
+        ThinkingHolder(ItemMessageThinkingBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
+        }
+
+        void bind() {
+            /*
+             * The indeterminate progress indicator animates on its own while
+             * attached and visible, so no animation state has to be managed
+             * across view recycling.
+             */
+            binding.thinkingText.setText(R.string.assistant_thinking);
         }
     }
 }

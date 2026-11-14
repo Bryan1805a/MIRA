@@ -217,7 +217,7 @@ flowchart TD
 * **NFR-004.2:** External AI generation requests shall apply a strict connection timeout of 5 seconds and read timeout of 30 seconds to prevent thread starvation.
 
 ### NFR-005: Maintainability & Modularity
-* **NFR-005.1:** The backend must be organized as a modular monolith with strictly isolated domain packages (`auth`, `chat`, `memory`, `ai`, `common`).
+* **NFR-005.1:** The backend must be organized as a modular monolith with strictly isolated domain packages (`auth`, `chat`, `memory`, `ai`, `common`). *Delivery note: the implemented layout is layer-first (`config`, `controller`, `dto`, `entity`, `exception`, `repository`, `security`, `service`, plus `ai`), with domain isolation enforced by service boundaries and ownership queries; see the ADR-001 amendment.*
 * **NFR-005.2:** Provider integration must depend on an abstracted interface (`AIProvider`) to permit drop-in provider replacement or mock testing without modifying core chat logic.
 
 ### NFR-006: Verifiability & Testability

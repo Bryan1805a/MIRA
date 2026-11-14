@@ -459,6 +459,55 @@ public class ChatActivity extends AppCompatActivity {
     private void setSending(boolean value) {
         sending = value;
         binding.sendButton.setEnabled(!value);
+        binding.messageInput.setEnabled(!value);
+
+        if (value) {
+            showThinking();
+        } else {
+            hideThinking();
+        }
+    }
+
+    /**
+     * Appends the local "MIRA is thinking…" placeholder so a provider call
+     * that can take up to 30 seconds is never rendered as a frozen screen.
+     */
+    private void showThinking() {
+        if (isFinishing() || isDestroyed() || hasThinking()) {
+            return;
+        }
+
+        messages.add(MessageAdapter.thinking());
+
+        adapter.submitList(new ArrayList<>(messages));
+        updateEmptyState();
+        scrollToBottom();
+    }
+
+    private void hideThinking() {
+        if (!hasThinking()) {
+            return;
+        }
+
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            if (MessageAdapter.isThinking(messages.get(index))) {
+                messages.remove(index);
+                break;
+            }
+        }
+
+        adapter.submitList(new ArrayList<>(messages));
+        updateEmptyState();
+    }
+
+    private boolean hasThinking() {
+        for (MessageResponse message : messages) {
+            if (MessageAdapter.isThinking(message)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void updateEmptyState() {

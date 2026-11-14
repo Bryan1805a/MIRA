@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-000 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-10-27 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-11-14 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 0 — Reproducible Project Foundation (complete; Android APK verification carried into Phase 1) |
 
@@ -21,6 +21,7 @@
 | 1.1.0 | 2026-10-21 | Bryan | Marked Phase 0 complete, reconciled the actual stack (Java 21, Spring Boot 4.1.x), package layout, dependency list, migration range, and verified exit criteria. |
 | 1.2.0 | 2026-10-26 | Bryan | Corrected the migration baseline references from V1–V8 to V1–V9 and noted Phase 1 closure. |
 | 1.3.0 | 2026-10-27 | Bryan | Updated the baseline to V1–V10 after the Phase 2 extraction migration. |
+| 1.4.0 | 2026-11-14 | Bryan | Correction: removed `LICENSE` from the target repository tree. No license file exists in the repository; adding one remains an open decision for the project owner. |
 
 ---
 
@@ -61,7 +62,6 @@ flowchart TD
 mira/
 ├── .gitignore                      # Monorepo root ignore rules (builds, secrets, IDE state)
 ├── README.md                       # Comprehensive onboarding & developer setup guide
-├── LICENSE                         # Project license
 │
 ├── android/                        # Native Android Application (Java / Gradle)
 │   ├── app/

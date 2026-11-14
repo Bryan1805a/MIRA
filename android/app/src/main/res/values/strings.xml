@@ -47,6 +47,7 @@
     <string name="no_messages">No messages yet</string>
     <string name="no_messages_subtitle">Send the first message to start the conversation.</string>
     <string name="message_status_pending">Waiting for response…</string>
+    <string name="assistant_thinking">MIRA is thinking…</string>
     <string name="message_status_failed">Response failed.</string>
     <string name="message_status_unknown">Outcome unknown.</string>
     <string name="retry">Retry</string>

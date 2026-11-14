@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-MEM-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 1.9.0 |
-| **Last Updated** | 2026-11-13 |
+| **Version** | 2.0.0 |
+| **Last Updated** | 2026-11-14 |
 | **Author / Lead** | Bryan / MIRA Personalization & Memory Team |
 | **Scope** | Persistent Communication-Style Preferences |
 
@@ -27,6 +27,7 @@
 | 1.7.0 | 2026-10-29 | Bryan | Reconciled extraction retry/recovery (bounded attempts, stale-processing requeue, skip-locked claim) and marked the MEM-TEST race scenarios covered. Android UI and privacy audit remain pending. |
 | 1.8.0 | 2026-11-13 | Bryan | Reconciled Android memory management client delivery (`MemoryActivity`, candidate review, toggle, OCC save/reload, purge). |
 | 1.9.0 | 2026-11-13 | Bryan | Reconciled memory integration test suites: delivered `MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, and `MemoryEndpointSecurityTest` (104 backend tests passing). |
+| 2.0.0 | 2026-11-14 | Bryan | Correction: purge empties the stored profile and increments its `version` under the control-row lock; the `user_style_profile` row is retained rather than deleted, matching `StyleProfileService.purge` and `UserStyleProfile.purge`. |
 
 ---
 
@@ -219,7 +220,8 @@ sequenceDiagram
     API->>DB: BEGIN TRANSACTION;
     API->>DB: SELECT * FROM user_memory_control WHERE user_id = :id FOR UPDATE;
     API->>DB: UPDATE user_memory_control SET generation = generation + 1 (gen -> 2);
-    API->>DB: DELETE FROM user_style_profile WHERE user_id = :id;
+    API->>DB: UPDATE user_style_profile SET profile = empty, version = version + 1;
+    API->>DB: DELETE FROM user_memory_candidate WHERE status = 'PENDING';
     API->>DB: COMMIT TRANSACTION;
     API-->>User: 204 No Content (Memory Purged)
 
@@ -233,7 +235,7 @@ sequenceDiagram
 ```
 
 ### 5.1 Durable Generation Control (`USER_MEMORY_CONTROL`)
-To ensure that generational counters persist even when `USER_STYLE_PROFILE` rows are physically deleted, MIRA maintains a dedicated, durable control record per user:
+To keep the generational counter independent of the profile row's lifecycle, MIRA maintains a dedicated, durable control record per user:
 
 ```sql
 CREATE TABLE user_memory_control (
@@ -248,8 +250,12 @@ CREATE TABLE user_memory_control (
 Deleting a style profile must execute atomically within a single database transaction:
 1. Lock the user's `user_memory_control` row using `SELECT ... FOR UPDATE`.
 2. Increment its `generation` counter (`generation = generation + 1`).
-3. Delete the associated `user_style_profile` record (or reset its JSONB payload).
-4. Commit the transaction before reporting successful deletion (`204 No Content`) to the client.
+3. Lock the `user_style_profile` row, clear its JSONB payload, and increment its `version` (the row is retained).
+4. Delete the user's `PENDING` staged candidates.
+5. Commit the transaction before reporting successful deletion (`204 No Content`) to the client.
+
+> [!NOTE]
+> Purge **empties** the profile rather than deleting the row. `StyleProfileService.purge` calls `UserStyleProfile.purge`, which resets `profile` to an empty object and increments `version`; the row and its foreign key to `user_account` are preserved. Generation state therefore lives entirely in `user_memory_control`, which is what makes the tombstone durable.
 
 ### 5.3 Transactional Extraction Commit Protocol
 Before persisting an extracted profile, the worker must execute within an atomic transaction:

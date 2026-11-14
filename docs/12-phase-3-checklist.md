@@ -5,8 +5,8 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Complete Execution Baseline |
-| **Version** | 2.1.0 |
-| **Last Updated** | 2026-11-13 |
+| **Version** | 2.2.0 |
+| **Last Updated** | 2026-11-14 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
 
@@ -28,6 +28,7 @@
 | 1.9.0 | 2026-11-14 | Bryan | Closed device verification and release recovery: v1.2.1 R8 fix, physical-device install/launch, on-device production smoke, instrumented tests, health monitor, local restore drill, and previous-release compatibility. Remaining: deployed log review, Render dashboard alerts, and Neon PITR drill. |
 | 2.0.0 | 2026-11-14 | Bryan | Closed the Phase 3 exit gate: all remaining operator checks verified, health monitor active, signed v1.2.1 release published. |
 | 2.1.0 | 2026-11-14 | Bryan | Added Dependabot and gitleaks CI, recorded physical-device release verification, and moved the remaining Android UX checks to post-Phase-3 manual QA. |
+| 2.2.0 | 2026-11-14 | Bryan | Correction: closed the decisions table rows that ADR-004 and ADR-005 had already resolved (hosting platform, Android distribution, backend domain, release keystore storage). |
 
 ---
 
@@ -239,10 +240,10 @@ Phase 3 is complete only when every item is verified:
 
 | Decision | Options | Recommendation | Status |
 | :--- | :--- | :--- | :--- |
-| Hosting platform | Render, Fly.io, AWS ECS | Render for fastest managed HTTPS + secrets + health checks | Open |
-| Android distribution | Play Store AAB, direct APK | Play Store AAB; keep a signed APK for device testing | Open |
-| Backend domain | Custom domain vs platform domain | `api.<project-domain>` with managed TLS | Open |
-| Release keystore storage | Repo-excluded file + GitHub Secrets | Keystore in secure offline storage; CI secrets for passwords | Open |
+| Hosting platform | Render, Fly.io, AWS ECS | Render for fastest managed HTTPS + secrets + health checks | Resolved (ADR-004: Render Web Service + Neon) |
+| Android distribution | Play Store AAB, direct APK | Play Store AAB; keep a signed APK for device testing | Decided (ADR-005: signed AAB for Play, signed APK for device testing); store upload not yet performed |
+| Backend domain | Custom domain vs platform domain | `api.<project-domain>` with managed TLS | Decided for MVP: platform HTTPS domain `mira-backend-094w.onrender.com`; custom `api.<domain>` deferred |
+| Release keystore storage | Repo-excluded file + GitHub Secrets | Keystore in secure offline storage; CI secrets for passwords | Resolved (ADR-005: keystore outside the repo, GitHub Actions secrets for passwords) |
 | Replay revocation scope | Session-scoped, account-wide | Account-wide (implemented) | Resolved |
 | Auth throttling scope | Email-only, IP-only, both | Both (implemented; configurable) | Resolved |
 | X-Forwarded-For trust | Always, never, configurable | Configurable; enable behind a trusted proxy | Resolved |

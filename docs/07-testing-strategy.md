@@ -230,7 +230,7 @@ flowchart TD
 ```
 
 > [!NOTE]
-> GitHub Actions workflows are configured in `.github/workflows/backend.yml` (Maven verify with Testcontainers plus a production container-image build) and `.github/workflows/android.yml` (Gradle build, testDebugUnitTest, lintDebug, and APK artifact upload). The `Android Release` workflow builds and signs an APK/AAB on `v*` tags. Both verification pipelines run on push, pull request, and manual dispatch.
+> GitHub Actions workflows are configured in `.github/workflows/backend.yml` (Maven verify with Testcontainers plus a production container-image build) and `.github/workflows/android.yml` (Gradle build, testDebugUnitTest, instrumented-test compilation, lintDebug, and APK artifact upload). The `Android Release` workflow builds and signs an APK/AAB on `v*` tags. Both verification pipelines run on push, pull request, and manual dispatch.
 
 ---
 

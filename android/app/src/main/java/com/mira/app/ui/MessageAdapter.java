@@ -256,7 +256,9 @@ public class MessageAdapter extends ListAdapter<
         }
 
         void bind(MessageResponse message) {
-            binding.messageText.setText(message.getContent());
+            binding.messageText.setText(
+                    MarkdownText.toPlainText(message.getContent())
+            );
         }
     }
 

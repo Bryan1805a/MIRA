@@ -186,14 +186,8 @@ public class ChatActivity extends AppCompatActivity {
 
                         nextCursor = page.getNextCursor();
 
-                        adapter.submitList(
-                                new ArrayList<>(messages)
-                        );
+                        renderMessages(cursor == null);
                         updateEmptyState();
-
-                        if (cursor == null) {
-                            scrollToBottom();
-                        }
                     }
 
                     @Override
@@ -279,11 +273,8 @@ public class ChatActivity extends AppCompatActivity {
                             );
                         }
 
-                        adapter.submitList(
-                                new ArrayList<>(messages)
-                        );
+                        renderMessages(true);
                         updateEmptyState();
-                        scrollToBottom();
                     }
 
                     @Override
@@ -439,9 +430,8 @@ public class ChatActivity extends AppCompatActivity {
             );
         }
 
-        adapter.submitList(new ArrayList<>(messages));
+        renderMessagesAt(userIndex + 1);
         updateEmptyState();
-        scrollToPosition(userIndex + 1);
     }
 
     private MessageResponse buildAssistantMessage(
@@ -479,9 +469,8 @@ public class ChatActivity extends AppCompatActivity {
 
         messages.add(MessageAdapter.thinking());
 
-        adapter.submitList(new ArrayList<>(messages));
+        renderMessages(true);
         updateEmptyState();
-        scrollToBottom();
     }
 
     private void hideThinking() {
@@ -496,7 +485,7 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
 
-        adapter.submitList(new ArrayList<>(messages));
+        renderMessages(false);
         updateEmptyState();
     }
 
@@ -508,6 +497,29 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         return false;
+    }
+
+    /**
+     * Submits the current list and, when requested, scrolls to the newest item
+     * only after the diff has been committed. Scrolling from the submit call
+     * itself races the asynchronous diff and targets a stale item count, which
+     * leaves a freshly added message below the fold.
+     */
+    private void renderMessages(boolean followBottom) {
+        List<MessageResponse> snapshot = new ArrayList<>(messages);
+
+        if (followBottom) {
+            adapter.submitList(snapshot, this::scrollToBottom);
+        } else {
+            adapter.submitList(snapshot);
+        }
+    }
+
+    private void renderMessagesAt(int position) {
+        adapter.submitList(
+                new ArrayList<>(messages),
+                () -> scrollToPosition(position)
+        );
     }
 
     private void updateEmptyState() {

@@ -25,7 +25,7 @@
     <string name="session_active">Session active.</string>
     <string name="session_offline">Offline. Showing your saved session.</string>
     <string name="signing_out">Signing out…</string>
-    <string name="conversations_placeholder">Conversations and chat arrive in the next checkpoint.</string>
+    <string name="home_tagline">Your communication style carries across every conversation.</string>
     <string name="logout">Sign out</string>
 
     <string name="open_conversations">Open conversations</string>
@@ -40,7 +40,6 @@
     <string name="no_conversations_subtitle">Create one to start chatting with MIRA.</string>
     <string name="conversation_title_hint">Conversation title</string>
     <string name="create">Create</string>
-    <string name="chat_placeholder">Chat will be implemented in the next checkpoint.</string>
 
     <string name="message_hint">Message</string>
     <string name="send">Send</string>

@@ -16,6 +16,22 @@ project uses [Semantic Versioning](https://semver.org/).
 - Instrumented test covering the thinking placeholder (detection, layout
   inflation, and adapter view-type dispatch).
 
+### Added
+
+- Assistant replies are rendered as readable plain text (`MarkdownText`): bold,
+  italic, heading, inline-code, and display-math markers are stripped, list
+  bullets normalized, links turned into `text (url)`, and arithmetic such as
+  `2 * 3` or identifiers such as `snake_case` left untouched (12 unit tests).
+- Chat now follows to the newest message after the list diff commits, so a
+  freshly sent message or a long reply is no longer left below the fold.
+- Home screen shows a real tagline instead of the stale "Conversations and chat
+  arrive in the next checkpoint." placeholder.
+
+### Changed
+
+- The chat system prompt asks the model for plain mobile-friendly text and no
+  LaTeX or dollar-delimited math, since the client renders plain text.
+
 ### Fixed
 
 - Removed a duplicate `Intent` import in `MainActivity`.

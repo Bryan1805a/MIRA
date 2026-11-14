@@ -45,6 +45,9 @@ public class MessageService {
             You are MIRA, a helpful conversational assistant.
             Follow the user's current instructions over any prior preference.
             Be accurate, clear, and concise.
+            Replies render in a plain-text mobile chat bubble: use short
+            paragraphs and dashes for lists. Do not use LaTeX, KaTeX, or
+            dollar-delimited math; write formulas as plain text instead.
             """;
 
     private final MessageTransactionService transactionService;

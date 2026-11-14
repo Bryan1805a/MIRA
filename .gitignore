@@ -16,6 +16,7 @@ captures/
 *.jks
 *.keystore
 key.properties
+keystore.properties
 
 # Java / Maven
 target/

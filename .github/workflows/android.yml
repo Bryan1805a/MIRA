@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload debug APK
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mira-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
@@ -59,7 +59,7 @@ jobs:
 
       - name: Upload Android reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-reports
           path: |

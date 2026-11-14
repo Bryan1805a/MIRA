@@ -35,3 +35,4 @@ application-local.properties
 *.log
 
 secret.txt
+.android_keys

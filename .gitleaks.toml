@@ -1,0 +1,11 @@
+title = "MIRA gitleaks configuration"
+
+[allowlist]
+description = "Documentation examples and test-only fixtures"
+paths = [
+  '''docs/.*''',
+  '''README\.md''',
+  '''CHANGELOG\.md''',
+  '''backend/src/test/resources/application\.properties''',
+  '''\.env\.example''',
+]

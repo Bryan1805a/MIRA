@@ -345,17 +345,17 @@ public class MessageAdapter extends ListAdapter<
         }
 
         void bind(MessageResponse message) {
-            binding.messageText.setText(
-                    MarkdownText.toPlainText(message.getContent())
-            );
+            String displayed = MarkdownText.toPlainText(message.getContent());
+
+            binding.messageText.setText(displayed);
             bindTimestamp(binding.timestampText, message.getCreatedAt());
-            enableCopyOnLongPress(binding.messageText, message.getContent());
+            enableCopyOnLongPress(binding.messageText, displayed);
 
             binding.copyButton.setOnClickListener(
-                    view -> copy(view, message.getContent())
+                    view -> copy(view, displayed)
             );
             binding.shareButton.setOnClickListener(
-                    view -> share(view, message.getContent())
+                    view -> share(view, displayed)
             );
         }
     }

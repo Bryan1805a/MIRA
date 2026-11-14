@@ -1,0 +1,68 @@
+name: Production Health Monitor
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: production-health-monitor
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: Check production health
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check health and readiness
+        id: check
+        shell: bash
+        run: |
+          base="https://mira-backend-094w.onrender.com"
+          failed="false"
+
+          for endpoint in health health/readiness; do
+            file="/tmp/${endpoint//\//_}.json"
+            status=$(curl -sS -o "$file" -w '%{http_code}' \
+              --max-time 20 --retry 2 --retry-delay 3 \
+              "$base/actuator/$endpoint" || true)
+
+            echo "$endpoint: HTTP $status"
+            cat "$file" 2>/dev/null || true
+
+            if [ "$status" != "200" ] || ! grep -q '"status":"UP"' "$file"; then
+              failed="true"
+            fi
+          done
+
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update incident issue
+        if: steps.check.outputs.failed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Production health check failing"
+          body="The scheduled health monitor failed at $(date -u +'%Y-%m-%dT%H:%M:%SZ'). Endpoint: https://mira-backend-094w.onrender.com/actuator/health"
+
+          existing=$(gh issue list \
+            --state open \
+            --search "$title in:title" \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
+
+      - name: Fail the monitor when unhealthy
+        if: steps.check.outputs.failed == 'true'
+        run: exit 1

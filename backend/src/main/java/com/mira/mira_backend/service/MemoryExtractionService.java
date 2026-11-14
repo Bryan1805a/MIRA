@@ -6,6 +6,7 @@ import com.mira.mira_backend.entity.MemoryExtractionJob;
 import com.mira.mira_backend.entity.MemoryJobStatus;
 import com.mira.mira_backend.entity.UserMemoryControl;
 import com.mira.mira_backend.entity.UserStyleProfile;
+import com.mira.mira_backend.metrics.MiraMetrics;
 import com.mira.mira_backend.repository.AiResponseRepository;
 import com.mira.mira_backend.repository.MemoryExtractionJobRepository;
 import com.mira.mira_backend.repository.UserMemoryControlRepository;
@@ -27,17 +28,20 @@ public class MemoryExtractionService {
     private final UserMemoryControlRepository controlRepository;
     private final UserStyleProfileRepository profileRepository;
     private final AiResponseRepository aiResponseRepository;
+    private final MiraMetrics metrics;
 
     public MemoryExtractionService(
             MemoryExtractionJobRepository jobRepository,
             UserMemoryControlRepository controlRepository,
             UserStyleProfileRepository profileRepository,
-            AiResponseRepository aiResponseRepository
+            AiResponseRepository aiResponseRepository,
+            MiraMetrics metrics
     ) {
         this.jobRepository = jobRepository;
         this.controlRepository = controlRepository;
         this.profileRepository = profileRepository;
         this.aiResponseRepository = aiResponseRepository;
+        this.metrics = metrics;
     }
 
     public record JobWork(
@@ -137,6 +141,7 @@ public class MemoryExtractionService {
         jobRepository.findByIdForUpdate(jobId).ifPresent(job -> {
             job.markSkipped();
             jobRepository.saveAndFlush(job);
+            metrics.extractionJob("SKIPPED");
         });
     }
 
@@ -149,6 +154,11 @@ public class MemoryExtractionService {
         jobRepository.findByIdForUpdate(jobId).ifPresent(job -> {
             job.retryOrFail(maxAttempts, errorCategory);
             jobRepository.saveAndFlush(job);
+            metrics.extractionJob(
+                    job.getStatus() == MemoryJobStatus.FAILED
+                            ? "FAILED"
+                            : "RETRY"
+            );
         });
     }
 
@@ -179,6 +189,7 @@ public class MemoryExtractionService {
         jobRepository.findByIdForUpdate(jobId).ifPresent(job -> {
             job.markFailed(errorCategory);
             jobRepository.saveAndFlush(job);
+            metrics.extractionJob("FAILED");
         });
     }
 

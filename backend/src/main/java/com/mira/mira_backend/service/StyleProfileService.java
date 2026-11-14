@@ -5,6 +5,7 @@ import com.mira.mira_backend.dto.StyleProfileResponse;
 import com.mira.mira_backend.entity.UserMemoryControl;
 import com.mira.mira_backend.entity.UserStyleProfile;
 import com.mira.mira_backend.entity.MemoryCandidateStatus;
+import com.mira.mira_backend.metrics.MiraMetrics;
 
 import com.mira.mira_backend.repository.UserMemoryControlRepository;
 import com.mira.mira_backend.repository.UserStyleProfileRepository;
@@ -55,6 +56,7 @@ public class StyleProfileService {
     private final UserMemoryControlRepository controlRepository;
     private final UserStyleProfileRepository profileRepository;
     private final UserMemoryCandidateRepository candidateRepository;
+    private final MiraMetrics metrics;
 
     private static final List<String> PROFILE_FIELD_ORDER = List.of(
             "explanation_depth",
@@ -73,10 +75,12 @@ public class StyleProfileService {
     public StyleProfileService(
             UserMemoryControlRepository controlRepository,
             UserStyleProfileRepository profileRepository,
-            UserMemoryCandidateRepository candidateRepository) {
+            UserMemoryCandidateRepository candidateRepository,
+            MiraMetrics metrics) {
         this.controlRepository = controlRepository;
         this.profileRepository = profileRepository;
         this.candidateRepository = candidateRepository;
+        this.metrics = metrics;
     }
 
     @Transactional
@@ -171,6 +175,8 @@ public class StyleProfileService {
                 userId,
                 MemoryCandidateStatus.PENDING
         );
+
+        metrics.memoryPurged();
     }
 
     private LockedProfile provisionAndLock(UUID userId) {

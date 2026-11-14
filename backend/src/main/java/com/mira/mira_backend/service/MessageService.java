@@ -12,6 +12,8 @@ import com.mira.mira_backend.dto.MessagePageResponse;
 import com.mira.mira_backend.dto.MessageResponse;
 import com.mira.mira_backend.dto.SendMessageResponse;
 
+import com.mira.mira_backend.metrics.MiraMetrics;
+
 import com.mira.mira_backend.entity.AiResponse;
 import com.mira.mira_backend.entity.Message;
 import com.mira.mira_backend.entity.MessageRole;
@@ -53,6 +55,7 @@ public class MessageService {
     private final AIProvider aiProvider;
     private final StyleProfileService styleProfileService;
     private final MemoryExtractionService memoryExtractionService;
+    private final MiraMetrics metrics;
 
     public MessageService(
             MessageTransactionService transactionService,
@@ -62,7 +65,8 @@ public class MessageService {
             ConversationRepository conversationRepository,
             AIProvider aiProvider,
             StyleProfileService styleProfileService,
-            MemoryExtractionService memoryExtractionService
+            MemoryExtractionService memoryExtractionService,
+            MiraMetrics metrics
     ) {
         this.transactionService = transactionService;
         this.messageRepository = messageRepository;
@@ -72,6 +76,7 @@ public class MessageService {
         this.aiProvider = aiProvider;
         this.styleProfileService = styleProfileService;
         this.memoryExtractionService = memoryExtractionService;
+        this.metrics = metrics;
     }
 
     public SendMessageResponse send(
@@ -200,6 +205,8 @@ public class MessageService {
             throw exception;
         }
     
+        metrics.chatRetry();
+
         return generateAndFinish(
                 pending,
                 userId,
@@ -300,7 +307,10 @@ public class MessageService {
         try {
             completion = aiProvider.generate(request);
         } catch (AIProviderException exception) {
+            metrics.chatProviderError(exception.category().name());
+
             if (exception.category() == AIErrorCategory.TIMEOUT) {
+                metrics.chatOutcome("unknown");
                 return transactionService.unknown(
                         pending,
                         userId,
@@ -309,6 +319,7 @@ public class MessageService {
                 );
             }
 
+            metrics.chatOutcome("failed");
             return transactionService.fail(
                     pending,
                     userId,
@@ -316,6 +327,7 @@ public class MessageService {
                     exception.category().name()
             );
         } catch (RuntimeException exception) {
+            metrics.chatOutcome("unknown");
             return transactionService.unknown(
                     pending,
                     userId,
@@ -330,6 +342,8 @@ public class MessageService {
             conversationId,
             completion.content()
         );
+
+        metrics.chatOutcome("completed");
 
         try {
             memoryExtractionService.scheduleAfterCompletion(

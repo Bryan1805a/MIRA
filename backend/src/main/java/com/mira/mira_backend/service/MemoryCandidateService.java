@@ -7,6 +7,7 @@ import com.mira.mira_backend.entity.MemoryCandidateStatus;
 import com.mira.mira_backend.entity.UserMemoryCandidate;
 import com.mira.mira_backend.entity.UserMemoryControl;
 import com.mira.mira_backend.entity.UserStyleProfile;
+import com.mira.mira_backend.metrics.MiraMetrics;
 import com.mira.mira_backend.repository.UserMemoryCandidateRepository;
 import com.mira.mira_backend.repository.UserMemoryControlRepository;
 import com.mira.mira_backend.repository.UserStyleProfileRepository;
@@ -25,15 +26,18 @@ public class MemoryCandidateService {
     private final UserMemoryCandidateRepository candidateRepository;
     private final UserMemoryControlRepository controlRepository;
     private final UserStyleProfileRepository profileRepository;
+    private final MiraMetrics metrics;
 
     public MemoryCandidateService(
             UserMemoryCandidateRepository candidateRepository,
             UserMemoryControlRepository controlRepository,
-            UserStyleProfileRepository profileRepository
+            UserStyleProfileRepository profileRepository,
+            MiraMetrics metrics
     ) {
         this.candidateRepository = candidateRepository;
         this.controlRepository = controlRepository;
         this.profileRepository = profileRepository;
+        this.metrics = metrics;
     }
 
     @Transactional(readOnly = true)
@@ -109,6 +113,8 @@ public class MemoryCandidateService {
         candidate.accept();
         candidateRepository.saveAndFlush(candidate);
 
+        metrics.candidateReviewed("accept");
+
         return new StyleProfileResponse(
                 profile.isEnabled(),
                 profile.getVersion(),
@@ -135,5 +141,7 @@ public class MemoryCandidateService {
 
         candidate.reject();
         candidateRepository.saveAndFlush(candidate);
+
+        metrics.candidateReviewed("reject");
     }
 }

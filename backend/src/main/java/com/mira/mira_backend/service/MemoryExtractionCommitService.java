@@ -7,6 +7,7 @@ import com.mira.mira_backend.entity.MemoryJobStatus;
 import com.mira.mira_backend.entity.UserMemoryCandidate;
 import com.mira.mira_backend.entity.UserMemoryControl;
 import com.mira.mira_backend.entity.UserStyleProfile;
+import com.mira.mira_backend.metrics.MiraMetrics;
 import com.mira.mira_backend.repository.MemoryExtractionJobRepository;
 import com.mira.mira_backend.repository.UserMemoryCandidateRepository;
 import com.mira.mira_backend.repository.UserMemoryControlRepository;
@@ -29,17 +30,20 @@ public class MemoryExtractionCommitService {
     private final UserStyleProfileRepository profileRepository;
     private final UserMemoryCandidateRepository candidateRepository;
     private final MemoryExtractionJobRepository jobRepository;
+    private final MiraMetrics metrics;
 
     public MemoryExtractionCommitService(
             UserMemoryControlRepository controlRepository,
             UserStyleProfileRepository profileRepository,
             UserMemoryCandidateRepository candidateRepository,
-            MemoryExtractionJobRepository jobRepository
+            MemoryExtractionJobRepository jobRepository,
+            MiraMetrics metrics
     ) {
         this.controlRepository = controlRepository;
         this.profileRepository = profileRepository;
         this.candidateRepository = candidateRepository;
         this.jobRepository = jobRepository;
+        this.metrics = metrics;
     }
 
     @Transactional
@@ -79,6 +83,7 @@ public class MemoryExtractionCommitService {
                 || profile.getVersion() != job.expectedVersion()) {
             entity.markSkipped();
             jobRepository.saveAndFlush(entity);
+            metrics.extractionJob("SKIPPED");
             return;
         }
 
@@ -165,6 +170,7 @@ public class MemoryExtractionCommitService {
 
         entity.markCompleted();
         jobRepository.saveAndFlush(entity);
+        metrics.extractionJob("COMPLETED");
     }
 
     private Map<String, String> explicitUpdates(

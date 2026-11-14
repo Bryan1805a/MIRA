@@ -2,6 +2,8 @@ package com.mira.mira_backend.service;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import com.mira.mira_backend.metrics.MiraMetrics;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,6 +25,7 @@ public class AuthRateLimiter {
     private final Duration window;
     private final boolean trustForwardedHeaders;
     private final Clock clock;
+    private final MiraMetrics metrics;
 
     private final ConcurrentHashMap<String, Window> windows =
             new ConcurrentHashMap<>();
@@ -40,7 +43,8 @@ public class AuthRateLimiter {
             @Value("${mira.auth.rate-limit.window-seconds:60}")
             long windowSeconds,
             @Value("${mira.auth.rate-limit.trust-forwarded-headers:false}")
-            boolean trustForwardedHeaders
+            boolean trustForwardedHeaders,
+            MiraMetrics metrics
     ) {
         this(
                 loginEmailLimit,
@@ -49,7 +53,8 @@ public class AuthRateLimiter {
                 refreshIpLimit,
                 Duration.ofSeconds(windowSeconds),
                 trustForwardedHeaders,
-                Clock.systemUTC()
+                Clock.systemUTC(),
+                metrics
         );
     }
 
@@ -60,7 +65,8 @@ public class AuthRateLimiter {
             int refreshIpLimit,
             Duration window,
             boolean trustForwardedHeaders,
-            Clock clock
+            Clock clock,
+            MiraMetrics metrics
     ) {
         this.loginEmailLimit = loginEmailLimit;
         this.loginIpLimit = loginIpLimit;
@@ -69,22 +75,35 @@ public class AuthRateLimiter {
         this.window = window;
         this.trustForwardedHeaders = trustForwardedHeaders;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     public void checkLogin(String email, String clientIp) {
         if (email != null && !email.isBlank()) {
-            acquire("login:email:" + normalizeEmail(email), loginEmailLimit);
+            acquire(
+                    "login:email:" + normalizeEmail(email),
+                    loginEmailLimit,
+                    "login-email"
+            );
         }
 
-        acquire("login:ip:" + safe(clientIp), loginIpLimit);
+        acquire("login:ip:" + safe(clientIp), loginIpLimit, "login-ip");
     }
 
     public void checkRegister(String clientIp) {
-        acquire("register:ip:" + safe(clientIp), registerIpLimit);
+        acquire(
+                "register:ip:" + safe(clientIp),
+                registerIpLimit,
+                "register-ip"
+        );
     }
 
     public void checkRefresh(String clientIp) {
-        acquire("refresh:ip:" + safe(clientIp), refreshIpLimit);
+        acquire(
+                "refresh:ip:" + safe(clientIp),
+                refreshIpLimit,
+                "refresh-ip"
+        );
     }
 
     public String clientIp(HttpServletRequest request) {
@@ -111,7 +130,7 @@ public class AuthRateLimiter {
         );
     }
 
-    private void acquire(String key, int limit) {
+    private void acquire(String key, int limit, String scope) {
         if (limit <= 0) {
             return;
         }
@@ -124,6 +143,7 @@ public class AuthRateLimiter {
         );
 
         if (!window.tryAcquire(now, limit, this.window)) {
+            metrics.rateLimited(scope);
             throw new RateLimitExceededException();
         }
     }

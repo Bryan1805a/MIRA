@@ -146,6 +146,8 @@ dependencies {
     implementation(libs.recyclerview)
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockwebserver)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.ext.junit)
+    androidTestImplementation(libs.mockwebserver)
 }

@@ -8,6 +8,8 @@ import androidx.security.crypto.MasterKey;
 
 import com.mira.app.data.model.SessionResponse;
 
+import java.util.Objects;
+
 public final class TokenStore {
 
     private static final String PREFS_NAME = "mira_session";
@@ -42,6 +44,13 @@ public final class TokenStore {
                     exception
             );
         }
+    }
+
+    TokenStore(SharedPreferences preferences) {
+        this.preferences = Objects.requireNonNull(
+                preferences,
+                "preferences must not be null"
+        );
     }
 
     public static TokenStore get(Context context) {

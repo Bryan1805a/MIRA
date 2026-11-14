@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 2.3.0 |
+| **Version** | 2.4.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 1 — End-to-End Text Chat |
@@ -30,6 +30,7 @@
 | 2.1.0 | 2026-11-13 | Bryan | Closed the log-sanitization and refresh-replay follow-ups during Phase 3 security hardening (116 backend tests; account-wide replay revocation). |
 | 2.2.0 | 2026-11-14 | Bryan | Recorded Phase 3 observability metrics; current suite is 124 backend tests. |
 | 2.3.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests (16 Android unit tests plus an instrumented API smoke test). |
+| 2.4.0 | 2026-11-14 | Bryan | Recorded the domain-split backend suite and NFR-004 latency smoke test (125 backend tests). |
 
 ---
 
@@ -123,7 +124,7 @@ Phase 1 objectives:
 | Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min per user) |
 | Request-ID propagation and enriched error envelope | Implemented (Backend & Android) |
 | Schema `V1`–`V9` at closure (V10 added in Phase 2) | Implemented |
-| Backend test suite | 124 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
+| Backend test suite | 125 passing tests in local Testcontainers and unit suites (68 at Phase 1 closure) |
 | Android application | Full UI delivered (Login, Register, session gate, encrypted token store, auto-refresh authenticator, Conversations list, Chat with retry; compiles via `assembleDebug`, passes `testDebugUnitTest`, lint-clean) |
 | CI workflows | Configured (GitHub Actions for backend verification and Android build/test/lint) |
 | Android debug APK verification | Verified (build passes cleanly) |
@@ -365,7 +366,7 @@ These items do not block the Phase 1 chat core, but remain unchecked and are tra
 - [x] Decide the refresh-token replay policy: account-wide revocation implemented.
 - [x] Add Android unit tests for token storage, the authorization interceptor, and API error mapping.
 - [ ] Add an instrumented smoke test for login → conversation → send.
-- [ ] Split the consolidated `MiraBackendApplicationTests` class by domain as the surface grows.
+- [x] Split the consolidated `MiraBackendApplicationTests` class by domain as the surface grows.
 
 ---
 

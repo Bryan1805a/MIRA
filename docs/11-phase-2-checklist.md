@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-002 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Complete Execution Baseline |
-| **Version** | 2.0.0 |
+| **Version** | 2.1.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 2 — Communication-Style Memory Subsystem |
@@ -27,6 +27,7 @@
 | 1.8.0 | 2026-11-13 | Bryan | Closed Phase 2: fixed the Android CI SDK/JDK setup, verified `mvnw clean verify` and the Android build/test/lint workflow green, and marked the exit gate complete. |
 | 1.9.0 | 2026-11-14 | Bryan | Recorded Phase 3 observability metrics and the 124-test backend suite. |
 | 2.0.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests (16 Android unit tests plus an instrumented API smoke test). |
+| 2.1.0 | 2026-11-14 | Bryan | Recorded the domain-split backend suite and NFR-004 latency smoke test (125 backend tests). |
 
 ---
 
@@ -111,7 +112,7 @@ Phase 2 objectives:
 | Advisory prompt injection | Implemented (backend; enabled, non-empty profiles only) |
 | Extraction pipeline (jobs, hybrid policy, commit guards, retries, recovery) | Implemented (backend; Flyway V10) |
 | Candidate review (list/accept/reject) | Implemented (backend & Android `MemoryActivity`) |
-| Backend test suite | 124 passing tests (including all 5 dedicated memory test suites and the Phase 3 auth/log/observability suites; 0 failures) |
+| Backend test suite | 125 passing tests (including the domain-split suites and the Phase 3 auth/log/observability tests; 0 failures) |
 | Android test suite | 4 passing unit tests (`MemoryOptionsTest`, `ExampleUnitTest`) |
 | Privacy audit and memory test suites | Complete (`MemoryPrivacyAuditTest`, `MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`, `MemoryConflictResolutionTest`, `MemoryEndpointSecurityTest`) |
 | Phase 1 open follow-ups | See section 3.1 |
@@ -125,7 +126,7 @@ These are tracked here because Phase 1 closed with them still open:
 - [x] Decide the refresh-token replay policy (account-wide revocation implemented and tested).
 - [x] Add Android unit tests for token storage, the auth interceptor, and error mapping.
 - [ ] Add an instrumented login → conversation → send smoke test.
-- [ ] Split `MiraBackendApplicationTests` by domain.
+- [x] Split `MiraBackendApplicationTests` by domain.
 
 ---
 
@@ -242,7 +243,7 @@ These are tracked here because Phase 1 closed with them still open:
 | Injection | Enabled profile injected, disabled/empty/unspecified profile omitted, current instruction wins | Implemented (`MemoryInjectionSafetyTest`, `MemoryInjectionFailureTest`) |
 | Privacy | No biographical extraction, no prompt/token leakage in logs or audit rows | Implemented (`MemoryPrivacyAuditTest`) |
 | Android | Memory screen CRUD, conflict handling, toggle/purge, candidate confirmation, options mapping | Implemented (`MemoryActivity`, `MemoryOptionsTest`) |
-| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Complete: local verification green (124 backend, 16 Android unit tests) and both GitHub Actions workflows pass |
+| Build | `mvnw clean verify`, `gradlew assembleDebug`, CI green | Complete: local verification green (125 backend, 16 Android unit tests) and both GitHub Actions workflows pass |
 
 All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQL.
 
@@ -258,7 +259,7 @@ All tests must run offline against `MockAIProvider` and Testcontainers PostgreSQ
 | **FR-009** User Memory Governance | Read, replace, toggle, purge, and candidate review in backend & Android `MemoryActivity` *(implemented)* |
 | **NFR-002** Privacy & Data Minimization | Extraction prompt guardrails and privacy audit tests (`MemoryPrivacyAuditTest`) *(implemented)* |
 | **NFR-005** Maintainability | Memory module isolation behind service boundaries |
-| **NFR-006** Testability | Deterministic extraction doubles and concurrency suites (124 offline backend tests) |
+| **NFR-006** Testability | Deterministic extraction doubles, domain-split suites, and a latency smoke test (125 offline backend tests) |
 
 ---
 

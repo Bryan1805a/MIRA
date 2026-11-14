@@ -12,7 +12,7 @@
 
 ## Development Status
 
-**Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (production hardening) is active: authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, backend container packaging, observability metrics, and Android session/error tests are implemented, with 124 passing backend tests, 16 passing Android unit tests, and a compiled instrumented API smoke test. Live Neon/Render deployment verification, alert configuration, and physical-device verification remain. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
+**Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (production hardening) is active: authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, backend container packaging, observability metrics, and Android session/error tests are implemented, with 125 passing backend tests, 16 passing Android unit tests, and a compiled instrumented API smoke test. Live Neon/Render deployment verification, alert configuration, and physical-device verification remain. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
 - Android client features full authentication flows (Login, Registration, session gate in `MainActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
@@ -23,7 +23,7 @@
 - Per-account message rate limiting (sliding window of 10 requests/minute returning HTTP `429 rate_limited`) and Actuator health/probe endpoints are active.
 - Local PostgreSQL environment is pre-configured via `docker-compose.yml` and `.env.example`.
 - GitHub Actions CI workflows are configured for backend verification (`.github/workflows/backend.yml`) and Android build, test, and lint (`.github/workflows/android.yml`).
-- The backend test suite passes with 124 automated tests across unit, mock server, and PostgreSQL Testcontainers suites (including `MiraMetricsTests`, `ObservabilityTest`, `AuthRateLimiterTests`, `AuthSecurityTest`, `LogSanitizationTest`, the memory suites, and `MiraBackendApplicationTests`).
+- The backend test suite passes with 125 automated tests across unit, mock server, and PostgreSQL Testcontainers suites (including the domain-split `PersistenceConstraintTests`, `AuthApiTests`, `ApiContractTests`, `ConversationApiTests`, `MessagingApiTests`, `MemoryLifecycleTests`, `LatencySmokeTest`, `MiraMetricsTests`, `ObservabilityTest`, and the security suites).
 - The Android test, build, and lint suites pass via `.\gradlew.bat clean assembleDebug testDebugUnitTest lintDebug` (16 unit tests), and the instrumented `SessionApiSmokeTest` compiles with `assembleDebugAndroidTest` (device execution pending).
 - Backend memory governance is implemented (`GET/PUT/PATCH/DELETE /api/v1/memory/style`) with allow-list validation, OCC `409 version_conflict`, and generation-guarded purge.
 - Enabled style profiles are injected into chat context as an advisory system message; disabled, empty, and all-unspecified profiles inject nothing, and lookup failures never block chat.
@@ -126,7 +126,7 @@ cd backend
 .\mvnw.cmd clean verify
 ```
 
-The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1–V10), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (124 automated tests pass).
+The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1-V10), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (125 automated tests pass).
 
 ### Run Locally
 

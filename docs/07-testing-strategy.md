@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.6.0 |
+| **Version** | 2.7.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
@@ -34,6 +34,7 @@
 | 2.4.0 | 2026-11-14 | Bryan | Added the backend container-image build to CI and documented the signed Android release workflow. |
 | 2.5.0 | 2026-11-14 | Bryan | Added observability coverage: `MiraMetricsTests`, `ObservabilityTest`, and custom metrics documentation (inventory now 124 backend tests). |
 | 2.6.0 | 2026-11-14 | Bryan | Added Android production-readiness tests: `TokenStoreTest`, `AuthInterceptorTest`, `ApiErrorsTest`, and the instrumented `SessionApiSmokeTest` (16 Android unit tests; instrumented run pending a device). |
+| 2.7.0 | 2026-11-14 | Bryan | Split the monolithic backend suite by domain, introduced a shared singleton Testcontainers base, added `LatencySmokeTest`, and enabled Android release-build verification (inventory now 125 backend tests). |
 
 ---
 
@@ -121,7 +122,13 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 
 | Suite | Type | Tests | Scope |
 | :--- | :--- | :--- | :--- |
-| `MiraBackendApplicationTests` | Spring Boot + Testcontainers + MockMvc | 68 | Registration, duplicate email, login/logout/refresh, `/me`, conversation CRUD, cursor pagination, message send, lifecycle transitions, idempotency replay, payload conflict, bounded retry, per-account rate limiting (`429 rate_limited`), cross-account isolation, style-memory governance, prompt injection, extraction (scheduling/eligibility, explicit merge, inferred staging, retry exhaustion, stale-processing recovery, malformed output), the `MEM-TEST-01`..`MEM-TEST-07` scenarios, and candidate review (list/accept, reject, purge cleanup, cross-account rejection). |
+| `PersistenceConstraintTests` | Spring Boot + Testcontainers | 9 | Account/session persistence, normalized-email and refresh-token uniqueness, registration service rules, and AI-response idempotency constraints. |
+| `AuthApiTests` | Spring Boot + Testcontainers + MockMvc | 11 | Registration endpoints, protected access, logout lifecycle, cross-account revocation, and `/me`. |
+| `ApiContractTests` | Spring Boot + Testcontainers + MockMvc | 3 | Request-ID propagation, error envelope shape, and validation details. |
+| `ConversationApiTests` | Spring Boot + Testcontainers + MockMvc | 6 | Conversation ownership, ordering, cursor pagination, create/list/delete, and invalid pagination input. |
+| `MessagingApiTests` | Spring Boot + Testcontainers + MockMvc | 13 | Message lifecycle, persistence ordering, idempotent replay/conflict, timeout mapping, bounded retry, cross-account isolation, and rate limiting. |
+| `MemoryLifecycleTests` | Spring Boot + Testcontainers + MockMvc | 26 | Governance, injection, extraction, candidate review, purge cleanup, and the `MEM-TEST-01`..`MEM-TEST-07` scenarios. |
+| `LatencySmokeTest` | Spring Boot + Testcontainers + MockMvc | 1 | NFR-004 smoke: read-endpoint p95 below 200 ms after warm-up. |
 | `MemoryConflictResolutionTest` | Spring Boot + Testcontainers + MockMvc | 5 | Full hybrid persistence matrix: explicit durable auto-merge, inferred candidate staging with evidence counter accumulation, ephemeral instruction discard, and immediate user correction overwrite. |
 | `MemoryEndpointSecurityTest` | Spring Boot + Testcontainers + MockMvc | 2 | Multi-tenant authorization boundaries: profile mutations and candidate accept/reject are strictly scoped to the owner, rejecting cross-account IDOR attempts with 404/403. |
 | `MemoryInjectionFailureTest` | Spring Boot + Testcontainers + MockMvc | 1 | Fault tolerance: simulated style profile lookup failures during chat context assembly are caught non-fatally, allowing chat to proceed smoothly without memory. |
@@ -144,7 +151,7 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `SessionApiSmokeTest` (Android) | Instrumented (MockWebServer) | 1 | Login → list conversations → create conversation → send message, including bearer and idempotency headers. |
 | `ExampleUnitTest` (Android) | Unit | 1 | Android unit testing baseline. |
 
-The backend suite (124 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (16 unit tests) executes via `.\gradlew.bat testDebugUnitTest`; the instrumented `SessionApiSmokeTest` compiles with `assembleDebugAndroidTest` and runs via `connectedDebugAndroidTest` when an emulator or device is attached. No test contacts DeepSeek. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 124 backend tests pass offline without failures or errors.
+The backend suite (125 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android suite (16 unit tests) executes via `.\gradlew.bat testDebugUnitTest`; the instrumented `SessionApiSmokeTest` compiles with `assembleDebugAndroidTest` and runs via `connectedDebugAndroidTest` when an emulator or device is attached. No test contacts DeepSeek. The integration suite shares one singleton container and one Spring context across domain classes. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 125 backend tests pass offline without failures or errors.
 
 ---
 

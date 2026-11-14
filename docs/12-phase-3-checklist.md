@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-CHK-003 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Active Execution Baseline |
-| **Version** | 1.6.0 |
+| **Version** | 1.7.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Core Engineering Team |
 | **Phase Milestone** | Phase 3 — Production Hardening, Deployment, and Operational Readiness |
@@ -23,6 +23,7 @@
 | 1.4.0 | 2026-11-14 | Bryan | Verified the first signed Android release via the `v1.1.0` tag; APK and AAB artifacts were produced by CI. |
 | 1.5.0 | 2026-11-14 | Bryan | Completed P3.4 implementation: ECS structured logging, custom Micrometer metrics, authenticated `/actuator/metrics` with HTTP percentiles, and documented alert/backup/rollback procedures. Alert configuration and operational drills remain. |
 | 1.6.0 | 2026-11-14 | Bryan | Completed P3.5 implementation: unit tests for `TokenStore`, `AuthInterceptor`, and error mapping; instrumented API smoke test; verified release cleartext and logging configuration. Device execution and physical-device UX checks remain. |
+| 1.7.0 | 2026-11-14 | Bryan | Completed P3.6: shared singleton Testcontainers base, domain test split, NFR-004 latency smoke test, and Android release-build verification (125 backend tests). |
 
 ---
 
@@ -105,7 +106,7 @@ flowchart LR
 | :--- | :--- |
 | Phase 1 chat core | Complete; merged to `main` |
 | Phase 2 memory subsystem | Complete (CI verified) |
-| Backend test suite | 124 passing tests (unit, MockRestServiceServer, Testcontainers PostgreSQL) |
+| Backend test suite | 125 passing tests (unit, MockRestServiceServer, Testcontainers PostgreSQL) |
 | Android test suite | 16 passing unit tests plus an instrumented API smoke test (device execution pending) |
 | Backend health probes | Implemented (`/actuator/health`, liveness, readiness) |
 | Local database | `docker-compose.yml`, `.env.example` |
@@ -189,11 +190,11 @@ flowchart LR
 
 ### 4.7 P3.6 — Test & Quality Hardening
 
-- [ ] Move `MiraBackendApplicationTests` onto `MemoryIntegrationTestSupport` or a shared base to reuse the PostgreSQL container.
-- [ ] Split the consolidated test class by domain (auth, conversations, messaging, memory).
-- [ ] Add an NFR-004 latency smoke test for local endpoints (p95 target ≤ 200 ms under nominal load).
-- [ ] Keep the full suite offline (`MockAIProvider`, Testcontainers) and fast enough for CI.
-- [ ] Add release-build verification to the Android workflow.
+- [x] Move `MiraBackendApplicationTests` onto a shared `ApiIntegrationTestSupport` base with one singleton PostgreSQL container.
+- [x] Split the consolidated test class by domain (`PersistenceConstraintTests`, `AuthApiTests`, `ApiContractTests`, `ConversationApiTests`, `MessagingApiTests`, `MemoryLifecycleTests`).
+- [x] Add an NFR-004 latency smoke test for local read endpoints (p95 < 200 ms).
+- [x] Keep the full suite offline (`MockAIProvider`, Testcontainers) and fast enough for CI (125 backend tests).
+- [x] Add release-build verification to the Android workflow (`assembleRelease`).
 
 ### 4.8 P3.7 — Documentation & Release
 

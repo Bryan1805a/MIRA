@@ -1,8 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!--
+        MIRA theme. Every Material colour role is mapped to a brand colour
+        resource; the dark values are supplied by values-night/colors.xml so the
+        role mapping is written once.
+    -->
     <style name="Base.Theme.MIRA" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorOnPrimary">@color/brand_on_primary</item>
+        <item name="colorPrimaryContainer">@color/brand_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/brand_on_primary_container</item>
+
+        <item name="colorSecondary">@color/brand_secondary</item>
+        <item name="colorOnSecondary">@color/brand_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/brand_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/brand_on_secondary_container</item>
+
+        <item name="colorTertiary">@color/brand_tertiary</item>
+        <item name="colorOnTertiary">@color/brand_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/brand_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/brand_on_tertiary_container</item>
+
+        <item name="android:colorBackground">@color/brand_bg</item>
+        <item name="colorOnBackground">@color/brand_ink</item>
+
+        <item name="colorSurface">@color/brand_surface</item>
+        <item name="colorOnSurface">@color/brand_ink</item>
+        <item name="colorSurfaceVariant">@color/brand_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/brand_ink_muted</item>
+        <item name="colorSurfaceContainerLowest">@color/brand_surface</item>
+        <item name="colorSurfaceContainerLow">@color/brand_soft_surface</item>
+        <item name="colorSurfaceContainer">@color/brand_soft_surface</item>
+        <item name="colorSurfaceContainerHigh">@color/brand_soft_surface_high</item>
+        <item name="colorSurfaceContainerHighest">@color/brand_soft_surface_high</item>
+
+        <item name="colorOutline">@color/brand_outline</item>
+        <item name="colorOutlineVariant">@color/brand_outline_variant</item>
+
+        <item name="colorError">@color/brand_error</item>
+        <item name="colorOnError">@color/brand_on_error</item>
+        <item name="colorErrorContainer">@color/brand_error_container</item>
+        <item name="colorOnErrorContainer">@color/brand_on_error_container</item>
+
+        <!-- Branded window chrome: no white flash before the first frame. -->
+        <item name="android:windowBackground">@color/brand_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">@bool/window_light_system_bars</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">
+            @bool/window_light_system_bars
+        </item>
+
+        <!-- Tighter headline tracking gives the wordmark a deliberate look. -->
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Mira.HeadlineMedium</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Mira.TitleMedium</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Mira.HeadlineSmall</item>
     </style>
 
     <style name="Theme.MIRA" parent="Base.Theme.MIRA" />

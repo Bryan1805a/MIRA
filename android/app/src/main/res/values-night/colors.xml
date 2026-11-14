@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MIRA brand palette (dark theme). Same names as values/colors.xml. -->
+
+    <!-- Ink / neutral surfaces -->
+    <color name="brand_bg">#0B0E14</color>
+    <color name="brand_surface">#11151D</color>
+    <color name="brand_soft_surface">#161B26</color>
+    <color name="brand_soft_surface_high">#1C2230</color>
+    <color name="brand_surface_variant">#1A2030</color>
+    <color name="brand_ink">#E6E9F2</color>
+    <color name="brand_ink_muted">#A8B0C2</color>
+
+    <!-- Primary: MIRA violet -->
+    <color name="brand_primary">#A99BFF</color>
+    <color name="brand_on_primary">#1B1148</color>
+    <color name="brand_primary_container">#2A2050</color>
+    <color name="brand_on_primary_container">#E4DEFF</color>
+
+    <!-- Secondary: memory teal -->
+    <color name="brand_secondary">#5EEAD4</color>
+    <color name="brand_on_secondary">#00322B</color>
+    <color name="brand_secondary_container">#0F3A34</color>
+    <color name="brand_on_secondary_container">#9FF2E4</color>
+
+    <!-- Tertiary: attention amber -->
+    <color name="brand_tertiary">#F5B544</color>
+    <color name="brand_on_tertiary">#3A2600</color>
+    <color name="brand_tertiary_container">#553B00</color>
+    <color name="brand_on_tertiary_container">#FFDEA6</color>
+
+    <!-- Outlines and error -->
+    <color name="brand_outline">#3A4356</color>
+    <color name="brand_outline_variant">#232A38</color>
+    <color name="brand_error">#FFB4AB</color>
+    <color name="brand_on_error">#690005</color>
+    <color name="brand_error_container">#93000A</color>
+    <color name="brand_on_error_container">#FFDAD6</color>
+
+    <!-- Launch surface used by the Android 12+ splash screen -->
+    <color name="brand_splash">#0B0E14</color>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Android 12+ splash screen. The background follows the brand surface so
+        the launch transition matches the app instead of flashing white.
+    -->
+    <style name="Theme.MIRA" parent="Base.Theme.MIRA">
+        <item name="android:windowSplashScreenBackground">@color/brand_splash</item>
+    </style>
+</resources>

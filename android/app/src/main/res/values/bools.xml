@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light theme: status/navigation bar icons are dark. -->
+    <bool name="window_light_system_bars">true</bool>
+</resources>

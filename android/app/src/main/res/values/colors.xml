@@ -1,5 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!--
+        MIRA brand palette (light theme values).
+        Dark-theme values live in values-night/colors.xml under the same names,
+        so the theme maps each Material role to a single @color reference.
+    -->
+
+    <!-- Ink / neutral surfaces -->
+    <color name="brand_bg">#FBFAFF</color>
+    <color name="brand_surface">#FFFFFF</color>
+    <color name="brand_soft_surface">#F4F1FF</color>
+    <color name="brand_soft_surface_high">#EAE5FA</color>
+    <color name="brand_surface_variant">#EDEBFA</color>
+    <color name="brand_ink">#1B1B21</color>
+    <color name="brand_ink_muted">#474555</color>
+
+    <!-- Primary: MIRA violet -->
+    <color name="brand_primary">#5B45D6</color>
+    <color name="brand_on_primary">#FFFFFF</color>
+    <color name="brand_primary_container">#E5DEFF</color>
+    <color name="brand_on_primary_container">#190066</color>
+
+    <!-- Secondary: memory teal -->
+    <color name="brand_secondary">#0F766E</color>
+    <color name="brand_on_secondary">#FFFFFF</color>
+    <color name="brand_secondary_container">#CCFBF1</color>
+    <color name="brand_on_secondary_container">#042F2E</color>
+
+    <!-- Tertiary: attention amber -->
+    <color name="brand_tertiary">#8A5A00</color>
+    <color name="brand_on_tertiary">#FFFFFF</color>
+    <color name="brand_tertiary_container">#FFDEA6</color>
+    <color name="brand_on_tertiary_container">#2B1700</color>
+
+    <!-- Outlines and error -->
+    <color name="brand_outline">#777587</color>
+    <color name="brand_outline_variant">#C9C5D6</color>
+    <color name="brand_error">#BA1A1A</color>
+    <color name="brand_on_error">#FFFFFF</color>
+    <color name="brand_error_container">#FFDAD6</color>
+    <color name="brand_on_error_container">#410002</color>
+
+    <!-- Launch surface used by the Android 12+ splash screen -->
+    <color name="brand_splash">#FBFAFF</color>
 </resources>

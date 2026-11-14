@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Brand typography. Material3 supplies the scale; MIRA only tightens the
+        tracking and weight of the display/title styles used for the wordmark,
+        screen titles, and dialog titles.
+    -->
+    <style name="TextAppearance.Mira.HeadlineMedium"
+        parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Mira.HeadlineSmall"
+        parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:letterSpacing">-0.015</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Mira.TitleMedium"
+        parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
+</resources>

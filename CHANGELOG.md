@@ -29,6 +29,15 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Brand identity: replaced the stock Android robot launcher icon with a MIRA
+  adaptive icon (violet-to-indigo gradient with a speech bubble holding three
+  memory nodes, monochrome-safe for themed icons), and branded the Android 12+
+  splash background.
+- Replaced the default Material purple with a MIRA palette (violet primary, teal
+  secondary, amber tertiary) mapped across every Material 3 colour role, with
+  light and dark values plus matching system-bar icon polarity.
+- Tightened headline/title tracking for a deliberate wordmark; set the window
+  background so the launch transition no longer flashes a default surface.
 - The chat system prompt asks the model for plain mobile-friendly text and no
   LaTeX or dollar-delimited math, since the client renders plain text.
 

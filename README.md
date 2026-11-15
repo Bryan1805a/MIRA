@@ -12,7 +12,7 @@
 
 ## Development Status
 
-**Phase 0, Phase 1, Phase 2, and Phase 3 are complete. Phase 3 (production hardening) delivered authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, backend container packaging, observability metrics, health monitoring, and Android session/error tests, with 125 passing backend tests, 16 passing Android unit tests, and a compiled instrumented API smoke test. The backend is live at `https://mira-backend-094w.onrender.com`, and v1.2.1 is the current release. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
+**Phase 0, Phase 1, Phase 2, and Phase 3 are complete. Phase 3 (production hardening) delivered authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, backend container packaging, observability metrics, health monitoring, and Android session/error tests, with 131 passing backend tests, 28 passing Android unit tests, and an instrumented suite that runs on a physical device. The backend is live at `https://mira-backend-094w.onrender.com`, and v1.2.1 is the current release. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
 - Android client features full authentication flows (Login, Registration, chat-first root with a session gate in `ChatActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
@@ -23,8 +23,9 @@
 - Per-account message rate limiting (sliding window of 10 requests/minute returning HTTP `429 rate_limited`) and Actuator health/probe endpoints are active.
 - Local PostgreSQL environment is pre-configured via `docker-compose.yml` and `.env.example`.
 - GitHub Actions CI workflows are configured for backend verification (`.github/workflows/backend.yml`) and Android build, test, and lint (`.github/workflows/android.yml`).
-- The backend test suite passes with 125 automated tests across unit, mock server, and PostgreSQL Testcontainers suites (including the domain-split `PersistenceConstraintTests`, `AuthApiTests`, `ApiContractTests`, `ConversationApiTests`, `MessagingApiTests`, `MemoryLifecycleTests`, `LatencySmokeTest`, `MiraMetricsTests`, `ObservabilityTest`, and the security suites).
-- The Android test, build, and lint suites pass via `.\gradlew.bat clean assembleDebug testDebugUnitTest lintDebug` (16 unit tests); the instrumented suite (7 tests) passes on a physical device via `connectedDebugAndroidTest`, covering the API smoke flow and the chat in-flight indicator.
+- The backend test suite passes with 131 automated tests across unit, mock server, and PostgreSQL Testcontainers suites (including the domain-split `PersistenceConstraintTests`, `AuthApiTests`, `ApiContractTests`, `ConversationApiTests`, `MessagingApiTests`, `MemoryLifecycleTests`, `LatencySmokeTest`, `MiraMetricsTests`, `ObservabilityTest`, and the security suites).
+- The Android test, build, and lint suites pass via `.\gradlew.bat clean assembleDebug testDebugUnitTest lintDebug` (28 unit tests); the instrumented suite (7 tests) passes on a physical device via `connectedDebugAndroidTest`, covering the API smoke flow, the chat in-flight indicator, and the adapter's thinking/reveal dispatch.
+- Unreleased on `main`: chat-first navigation with a history drawer, a Gemini-style UI refresh (purple brand, empty-state glow, screenshots in `docs/demo`), regenerate for completed answers, and a client-side typewriter reveal.
 - Backend memory governance is implemented (`GET/PUT/PATCH/DELETE /api/v1/memory/style`) with allow-list validation, OCC `409 version_conflict`, and generation-guarded purge.
 - Enabled style profiles are injected into chat context as an advisory system message; disabled, empty, and all-unspecified profiles inject nothing, and lookup failures never block chat.
 - Asynchronous memory extraction is implemented (Flyway `V10`): `COMPLETED`-only job scheduling, JSON extraction, explicit durable/correction merging, inferred candidate staging, ephemeral discard, generation/version commit guards, bounded retries, skip-locked claiming, and stale-processing recovery.
@@ -126,7 +127,7 @@ cd backend
 .\mvnw.cmd clean verify
 ```
 
-The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1-V10), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (125 automated tests pass).
+The integration suite starts a real PostgreSQL container, applies every Flyway migration (V1-V10), and exercises the HTTP contract through MockMvc. No live DeepSeek calls are made by the test suite (131 automated tests pass).
 
 ### Run Locally
 

@@ -74,7 +74,7 @@
     <string name="memory_conflict">Your memory changed elsewhere. Reloading the latest version.</string>
     <string name="memory_load_failed">Unable to load memory.</string>
 
-    <string name="memory_no_preference">No strong preference</string>
+    <string name="memory_no_preference">No preference</string>
     <string name="memory_field_depth">Explanation depth</string>
     <string name="memory_field_tone">Tone</string>
     <string name="memory_field_examples">Examples</string>

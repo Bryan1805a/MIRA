@@ -34,6 +34,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Memory screen rebuilt around single-select filter chips instead of five
+  dropdowns: one tap sets a preference, tapping the selected chip clears it back
+  to "no preference", and the whole screen now uses the same card language as
+  Settings. Reached from Settings → Communication memory.
 - Navigation now follows the Gemini mobile model: signing in lands directly on
   a chat, conversation history lives in a left navigation drawer with "New
   chat", and Memory moved under a new Settings screen. `MainActivity` and

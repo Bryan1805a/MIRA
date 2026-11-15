@@ -9,8 +9,9 @@ import android.widget.Toast;
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.mira.app.data.ApiCallback;
 import com.mira.app.data.MemoryRepository;
 import com.mira.app.data.model.MemoryCandidateListResponse;
@@ -37,9 +38,13 @@ public class MemoryActivity extends AppCompatActivity {
     private final Map<String, Integer> selections =
             new LinkedHashMap<>();
 
+    private final Map<String, ChipGroup> chipGroups =
+            new LinkedHashMap<>();
+
     private boolean busy;
     private boolean profileLoaded;
     private boolean suppressToggle;
+    private boolean suppressChips;
 
     private int profileVersion = 1;
     private boolean memoryEnabled;
@@ -66,46 +71,70 @@ public class MemoryActivity extends AppCompatActivity {
         repository = new MemoryRepository(this);
 
         setUpToolbar();
-        setUpDropdowns();
+        setUpChips();
         setUpActions();
         loadAll();
     }
 
     private void setUpToolbar() {
-        setSupportActionBar(binding.memoryToolbar);
+        binding.memoryToolbar.setNavigationOnClickListener(
+                view -> finish()
+        );
+    }
 
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle(R.string.memory_title);
+    /**
+     * Preferences are single-select chip groups: one tap sets a preference, and
+     * tapping the selected chip again clears it back to "no strong preference".
+     */
+    private void setUpChips() {
+        chipGroups.put(MemoryOptions.FIELD_DEPTH, binding.depthChips);
+        chipGroups.put(MemoryOptions.FIELD_TONE, binding.toneChips);
+        chipGroups.put(MemoryOptions.FIELD_EXAMPLES, binding.examplesChips);
+        chipGroups.put(MemoryOptions.FIELD_FORMATTING, binding.formattingChips);
+        chipGroups.put(MemoryOptions.FIELD_TEACHING, binding.teachingChips);
+
+        for (Map.Entry<String, ChipGroup> entry : chipGroups.entrySet()) {
+            populateChips(entry.getKey(), entry.getValue());
         }
     }
 
-    private void setUpDropdowns() {
-        bindDropdown(binding.depthInput, MemoryOptions.FIELD_DEPTH);
-        bindDropdown(binding.toneInput, MemoryOptions.FIELD_TONE);
-        bindDropdown(
-                binding.examplesInput,
-                MemoryOptions.FIELD_EXAMPLES
-        );
-        bindDropdown(
-                binding.formattingInput,
-                MemoryOptions.FIELD_FORMATTING
-        );
-        bindDropdown(
-                binding.teachingInput,
-                MemoryOptions.FIELD_TEACHING
-        );
-    }
+    private void populateChips(String field, ChipGroup group) {
+        group.removeAllViews();
 
-    private void bindDropdown(
-            MaterialAutoCompleteTextView view,
-            String field
-    ) {
-        view.setSimpleItems(MemoryOptions.labels(this, field));
-        view.setOnItemClickListener(
-                (parent, itemView, position, id) ->
-                        selections.put(field, position)
-        );
+        String[] labels = MemoryOptions.labels(this, field);
+
+        for (int index = 0; index < labels.length; index++) {
+            Chip chip = (Chip) getLayoutInflater().inflate(
+                    R.layout.item_memory_chip,
+                    group,
+                    false
+            );
+
+            chip.setText(labels[index]);
+            chip.setTag(index);
+            chip.setId(View.generateViewId());
+            chip.setCheckable(true);
+
+            group.addView(chip);
+        }
+
+        group.setOnCheckedStateChangeListener((changedGroup, checkedIds) -> {
+            if (suppressChips) {
+                return;
+            }
+
+            if (checkedIds.isEmpty()) {
+                selections.put(field, 0);
+                return;
+            }
+
+            View checked = changedGroup.findViewById(checkedIds.get(0));
+
+            if (checked != null && checked.getTag() instanceof Integer) {
+                selections.put(field, (Integer) checked.getTag());
+            }
+        });
+
         selections.put(field, 0);
     }
 
@@ -264,26 +293,18 @@ public class MemoryActivity extends AppCompatActivity {
     }
 
     private void renderPreferences() {
-        renderField(binding.depthInput, MemoryOptions.FIELD_DEPTH);
-        renderField(binding.toneInput, MemoryOptions.FIELD_TONE);
-        renderField(
-                binding.examplesInput,
-                MemoryOptions.FIELD_EXAMPLES
-        );
-        renderField(
-                binding.formattingInput,
-                MemoryOptions.FIELD_FORMATTING
-        );
-        renderField(
-                binding.teachingInput,
-                MemoryOptions.FIELD_TEACHING
-        );
+        for (String field : chipGroups.keySet()) {
+            renderField(field);
+        }
     }
 
-    private void renderField(
-            MaterialAutoCompleteTextView view,
-            String field
-    ) {
+    private void renderField(String field) {
+        ChipGroup group = chipGroups.get(field);
+
+        if (group == null) {
+            return;
+        }
+
         String value = profileValues.get(field);
         int index = MemoryOptions.indexOf(field, value);
 
@@ -292,10 +313,25 @@ public class MemoryActivity extends AppCompatActivity {
         }
 
         selections.put(field, index);
-        view.setText(
-                MemoryOptions.labels(this, field)[index],
-                false
-        );
+
+        suppressChips = true;
+        group.clearCheck();
+
+        if (index > 0) {
+            for (int childIndex = 0;
+                 childIndex < group.getChildCount();
+                 childIndex++) {
+                View child = group.getChildAt(childIndex);
+
+                if (child.getTag() instanceof Integer
+                        && (Integer) child.getTag() == index) {
+                    group.check(child.getId());
+                    break;
+                }
+            }
+        }
+
+        suppressChips = false;
     }
 
     private Map<String, String> selectedProfile() {
@@ -635,6 +671,12 @@ public class MemoryActivity extends AppCompatActivity {
         binding.purgeButton.setEnabled(controlsEnabled);
         binding.enabledSwitch.setEnabled(controlsEnabled);
         binding.retryButton.setEnabled(!value);
+
+        for (ChipGroup group : chipGroups.values()) {
+            for (int index = 0; index < group.getChildCount(); index++) {
+                group.getChildAt(index).setEnabled(controlsEnabled);
+            }
+        }
     }
 
     private void showError(String message) {
@@ -666,11 +708,5 @@ public class MemoryActivity extends AppCompatActivity {
         );
         startActivity(intent);
         finish();
-    }
-
-    @Override
-    public boolean onSupportNavigateUp() {
-        finish();
-        return true;
     }
 }

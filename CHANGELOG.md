@@ -34,6 +34,15 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Navigation now follows the Gemini mobile model: signing in lands directly on
+  a chat, conversation history lives in a left navigation drawer with "New
+  chat", and Memory moved under a new Settings screen. `MainActivity` and
+  `ConversationsActivity` were removed.
+- A new chat has no conversation until the first message; the conversation is
+  created from that prompt (title derived from it), so opening the app never
+  leaves empty threads in history.
+- Drawer lists recent chats and supports long-press to delete (with the existing
+  confirmation), showing "No chats yet" when empty.
 - Chat adopts a Gemini-style "container-light" presentation: AI answers render
   as editorial text on the bare surface with a gradient spark instead of a
   bubble, user prompts sit in a soft pill, and each answer carries a

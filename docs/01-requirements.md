@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-PRS-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.6.0 |
+| **Version** | 2.7.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Engineering, Product, Quality Assurance |
@@ -34,6 +34,7 @@
 | 2.4.0 | 2026-11-14 | Bryan | Reconciled Android production-readiness tests: 16 unit tests and an instrumented API smoke test. |
 | 2.5.0 | 2026-11-14 | Bryan | Split the backend suite by domain and added the NFR-004 latency smoke test (125 backend tests). |
 | 2.6.0 | 2026-11-14 | Bryan | Closed Phase 3: v1.2.1 release, physical-device verification, health monitoring, and restore/rollback drills. |
+| 2.7.0 | 2026-11-15 | Bryan | Reconciled the Android navigation restructure: conversation management is delivered through a navigation drawer with a chat-first root, and memory governance is reached via Settings. |
 
 ---
 
@@ -239,7 +240,7 @@ flowchart TD
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **FR-001** | Account Registration | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `POST /api/v1/auth/register` | `PersistenceConstraintTests`, `AuthApiTests` | Implemented (Backend & Android) |
 | **FR-002** | Auth & Session | [`02-architecture.md#4`](./02-architecture.md#4-authentication--session-security-architecture) | `POST /api/v1/auth/login`, `/refresh`, `/logout` | `PersistenceConstraintTests`, `AuthApiTests`, `TokenServiceTests`, `AuthSecurityTest`, `AuthRateLimiterTests` | Implemented (Backend & Android rotating authenticator; auth throttling and account-wide replay revocation) |
-| **FR-003** | Conversation Mgmt | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `GET`, `POST`, `DELETE /conversations` | `ConversationApiTests` | Implemented (Backend & Android `ConversationsActivity`) |
+| **FR-003** | Conversation Mgmt | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `GET`, `POST`, `DELETE /conversations` | `ConversationApiTests` | Implemented (Backend & Android navigation drawer) |
 | **FR-004** | Chat Orchestration | [`02-architecture.md#3`](./02-architecture.md#3-message-processing--failure-semantics) | `POST /conversations/{id}/messages` | `MessagingApiTests` | Implemented (Backend & Android `ChatActivity`) |
 | **FR-005** | Idempotent Retries | [`02-architecture.md#32`](./02-architecture.md#32-bounded-retry--idempotency-rules) | `POST /conversations/{id}/messages`, `POST .../retry` | `MessagingApiTests` | Implemented (Backend & Android `ChatActivity` bounded retry) |
 | **FR-006** | Profile Retrieval & Injection | [`02-architecture.md#2`](./02-architecture.md#2-core-subsystem-modules) | `GET /api/v1/memory/style` | `MemoryLifecycleTests`, `MemoryOptionsTest` | Implemented (Backend & Android `MemoryActivity`) |

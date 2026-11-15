@@ -126,9 +126,11 @@ public class ConversationAdapter extends ListAdapter<
                     view -> listener.onOpen(conversation)
             );
 
-            binding.deleteButton.setOnClickListener(
-                    view -> listener.onDelete(conversation)
-            );
+            /* Long-press deletes, keeping the row itself calm and text-first. */
+            binding.getRoot().setOnLongClickListener(view -> {
+                listener.onDelete(conversation);
+                return true;
+            });
         }
     }
 }

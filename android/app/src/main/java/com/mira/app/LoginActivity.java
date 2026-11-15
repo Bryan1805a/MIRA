@@ -81,7 +81,8 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void openMain() {
-        Intent intent = new Intent(this, MainActivity.class);
+        /* Chat is the root destination: sign-in lands directly on a new chat. */
+        Intent intent = new Intent(this, ChatActivity.class);
         intent.addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_CLEAR_TASK

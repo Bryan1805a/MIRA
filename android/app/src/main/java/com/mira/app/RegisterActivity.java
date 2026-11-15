@@ -86,7 +86,8 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     private void openMain() {
-        Intent intent = new Intent(this, MainActivity.class);
+        /* After registering, land on a fresh chat like a returning user would. */
+        Intent intent = new Intent(this, ChatActivity.class);
         intent.addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_CLEAR_TASK

@@ -15,8 +15,8 @@
 **Phase 0, Phase 1, Phase 2, and Phase 3 are complete. Phase 3 (production hardening) delivered authentication rate limiting, account-wide refresh-token replay revocation, log-sanitization verification, Android release signing, backend container packaging, observability metrics, health monitoring, and Android session/error tests, with 125 passing backend tests, 16 passing Android unit tests, and a compiled instrumented API smoke test. The backend is live at `https://mira-backend-094w.onrender.com`, and v1.2.1 is the current release. Phase 2 delivered backend style-memory governance, OCC versioning, generation-guarded purge, advisory prompt injection, the asynchronous extraction pipeline (with bounded retries and recovery), candidate review, the MEM-TEST race scenarios, the Android memory UI (`MemoryActivity`), and dedicated memory integration test suites (privacy audit, injection safety, lookup failure tolerance, and conflict resolution).**
 
 - Authentication, token rotation, logout, and the current-user endpoint are implemented across both backend and Android client.
-- Android client features full authentication flows (Login, Registration, session gate in `MainActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
-- Android client delivers full conversation management (`ConversationsActivity`) with cursor-based pagination, creation dialog, and deletion confirmation.
+- Android client features full authentication flows (Login, Registration, chat-first root with a session gate in `ChatActivity`, encrypted token storage via `EncryptedSharedPreferences`, auto-refresh `TokenAuthenticator`, and network security config).
+- Android client delivers conversation management through a navigation drawer (recent chats, new chat, long-press to delete) with the chat screen as the app root.
 - Android client delivers complete chat messaging (`ChatActivity`, `MessageAdapter`) with automatic client-side UUID idempotency key generation, response lifecycle visualization (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), and bounded retry controls (up to 3 attempts).
 - Backend conversation management (CRUD + cursor pagination) is implemented with strict ownership isolation.
 - Backend message sending, response lifecycle tracking, AI provider abstraction (`MockAIProvider`, `DeepSeekAIProvider`), idempotency key/payload verification, attempt tracking, and bounded retries are implemented.
@@ -163,7 +163,7 @@ cd android
 .\gradlew.bat assembleDebug testDebugUnitTest
 ```
 
-Open the `android/` directory in Android Studio to run on an emulator or physical device. Authentication, conversation management (`ConversationsActivity`), chat with bounded retry (`ChatActivity`), and style memory settings with candidate review (`MemoryActivity`) are fully implemented.
+Open the `android/` directory in Android Studio to run on an emulator or physical device. Authentication, a chat-first root with a navigation drawer for history, chat with bounded retry (`ChatActivity`), and Settings → Communication memory with candidate review (`MemoryActivity`) are fully implemented.
 
 ### Release Build
 

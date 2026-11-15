@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.1.0 |
+| **Version** | 2.2.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
@@ -31,6 +31,7 @@
 | 2.0.0 | 2026-11-13 | Bryan | Reconciled Android client delivery for style memory governance and candidate review (`MemoryActivity`, `MiraApi`, `MemoryRepository`). |
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration and privacy audit test verification (104 backend tests, 0 failures; sub-millisecond token consumption alignment and message ordering tie-breaker fixed). |
 | 2.2.0 | 2026-11-13 | Bryan | Documented authentication rate limiting (`429 rate_limited` on login/register/refresh) and account-wide refresh-token replay revocation. |
+| 2.3.0 | 2026-11-15 | Bryan | Reconciled the Android navigation restructure: history is consumed by the navigation drawer and chats are created on the first message, replacing the standalone conversation screen. |
 
 ---
 
@@ -58,7 +59,7 @@
 | :--- | :--- | :--- |
 | Registration, login, refresh, logout, `/me` | **Implemented (Backend & Android)** | Live on backend; Android authentication UI and session storage delivered. See sections 2.1–2.5. |
 | Standard error envelope | **Implemented (Backend & Android)** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler`/`RequestIdFilter` and mapped via `ApiError` in Android. |
-| Conversation endpoints | **Implemented (Backend & Android)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation; Android `ConversationsActivity` delivered. |
+| Conversation endpoints | **Implemented (Backend & Android)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation; the Android navigation drawer consumes the list and chats are created on the first message. |
 | Message send/list and retry | **Implemented (Backend & Android)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, bounded retries, and Android `ChatActivity` delivered. |
 | Style-memory governance and candidate review | **Implemented (Backend & Android)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, the internal extraction pipeline (bounded retries/recovery), and candidate list/accept/reject are live and covered by tests; integrated into Android via `MemoryActivity`. |
 
@@ -194,7 +195,7 @@ Endpoints marked Implemented are live and covered by automated test suites. Phas
 
 ## 3. Conversation Management Endpoints
 
-> **Delivery status:** Implemented on backend and in the Android client. `ConversationController`, `ConversationService`, DTOs, and cursor pagination are live; `ConversationsActivity` consumes the endpoints.
+> **Delivery status:** Implemented on backend and in the Android client. `ConversationController`, `ConversationService`, DTOs, and cursor pagination are live; the navigation drawer and chat screen consume the endpoints.
 
 ### 3.1 List Conversations
 * **Endpoint:** `GET /api/v1/conversations`

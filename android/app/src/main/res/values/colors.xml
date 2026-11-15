@@ -47,8 +47,4 @@
     <color name="brand_gradient_start">#4285F4</color>
     <color name="brand_gradient_mid">#9B72CB</color>
     <color name="brand_gradient_end">#D96570</color>
-
-    <!-- Foreground colours on the gradient hero (always light) -->
-    <color name="brand_hero_text">#FFFFFF</color>
-    <color name="brand_hero_text_muted">#EDE7FF</color>
 </resources>

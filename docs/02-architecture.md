@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-ARC-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.6.0 |
+| **Version** | 2.7.0 |
 | **Last Updated** | 2026-11-14 |
 | **Author / Lead** | Bryan / MIRA Architecture Team |
 | **Target Audience** | Software Engineers, Solution Architects, DevOps |
@@ -34,6 +34,7 @@
 | 2.4.0 | 2026-11-14 | Bryan | Recorded Android production-readiness tests and the instrumented API smoke test. |
 | 2.5.0 | 2026-11-14 | Bryan | Recorded the domain-split backend suite, shared Testcontainers base, and NFR-004 latency smoke test. |
 | 2.6.0 | 2026-11-14 | Bryan | Correction: marked Phase 3 security hardening complete in the status table (it was still listed as in progress after the Phase 3 exit gate closed) and pointed the work-breakdown references at the closed checklists and the release process. |
+| 2.7.0 | 2026-11-15 | Bryan | Recorded the Android navigation restructure: the chat screen is the app root, conversation history moved into a navigation drawer, and Memory moved under Settings. Removed MainActivity and ConversationsActivity. |
 
 ---
 
@@ -288,7 +289,7 @@ The following formal decisions govern MIRA's architecture:
 | Refresh-token rotation, history, replay rejection | Implemented (Backend & Android auto-refresh authenticator; account-wide revocation on replay) |
 | Logout, `/me` | Implemented (Backend & Android) |
 | Conversation entity, ownership query, cursor pagination query | Implemented |
-| Conversation HTTP endpoints | Implemented (Backend & Android `ConversationsActivity`) |
+| Conversation HTTP endpoints | Implemented (Backend & Android navigation drawer) |
 | Message persistence, response lifecycle, retries, idempotency | Implemented (Backend & Android `ChatActivity`) |
 | `AIProvider` abstraction, `MockAIProvider`, and `DeepSeekAIProvider` | Implemented (Backend) |
 | Per-account message rate limiting | Implemented (Backend in-memory sliding window, 10 req/min) |

@@ -8,14 +8,23 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.mira.app.data.ApiCallback;
+import com.mira.app.data.AuthCallback;
+import com.mira.app.data.AuthRepository;
+import com.mira.app.data.ConversationRepository;
 import com.mira.app.data.MessageRepository;
 import com.mira.app.data.model.AssistantResponseResponse;
+import com.mira.app.data.model.ConversationPageResponse;
+import com.mira.app.data.model.ConversationResponse;
 import com.mira.app.data.model.MessagePageResponse;
 import com.mira.app.data.model.MessageResponse;
 import com.mira.app.data.model.MessageRole;
@@ -24,6 +33,7 @@ import com.mira.app.data.model.RetryResponse;
 import com.mira.app.data.model.SendMessageResponse;
 import com.mira.app.data.session.TokenStore;
 import com.mira.app.databinding.ActivityChatBinding;
+import com.mira.app.ui.ConversationAdapter;
 import com.mira.app.ui.MessageAdapter;
 import com.mira.app.util.WindowInsetsHelper;
 
@@ -42,12 +52,21 @@ public class ChatActivity extends AppCompatActivity {
 
     private ActivityChatBinding binding;
     private MessageRepository repository;
+    private ConversationRepository conversationRepository;
+    private AuthRepository authRepository;
     private MessageAdapter adapter;
+    private ConversationAdapter drawerAdapter;
     private TokenStore tokenStore;
 
+    /**
+     * Null means "new chat": the conversation is created lazily on the first
+     * send, so simply opening the app never litters history with empty threads.
+     */
     private String conversationId;
 
     private final List<MessageResponse> messages = new ArrayList<>();
+    private final List<ConversationResponse> recentConversations =
+            new ArrayList<>();
 
     private String nextCursor;
     private boolean loading;
@@ -67,16 +86,16 @@ public class ChatActivity extends AppCompatActivity {
 
         binding = ActivityChatBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        WindowInsetsHelper.apply(binding.getRoot());
+
+        /*
+         * DrawerLayout consumes window insets itself and ignores padding set on
+         * the drawer, so the bars are applied to the wrapping container.
+         */
+        WindowInsetsHelper.apply(binding.rootContainer);
 
         conversationId = getIntent().getStringExtra(
                 EXTRA_CONVERSATION_ID
         );
-
-        if (conversationId == null) {
-            finish();
-            return;
-        }
 
         tokenStore = TokenStore.get(this);
 
@@ -86,8 +105,12 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         repository = new MessageRepository(this);
+        conversationRepository = new ConversationRepository(this);
+        authRepository = new AuthRepository(this);
 
         setUpToolbar();
+        setUpDrawer();
+        setUpBackHandling();
         setUpList();
         setUpGreeting();
         setUpSuggestions();
@@ -95,25 +118,212 @@ public class ChatActivity extends AppCompatActivity {
                 view -> sendMessage()
         );
 
-        loadMessages(null);
+        if (conversationId == null) {
+            updateEmptyState();
+        } else {
+            loadMessages(null);
+        }
     }
 
     private void setUpToolbar() {
-        setSupportActionBar(binding.chatToolbar);
+        binding.chatToolbar.setNavigationIcon(R.drawable.ic_menu);
+        binding.chatToolbar.setNavigationContentDescription(
+                R.string.open_navigation
+        );
+        binding.chatToolbar.setNavigationOnClickListener(
+                view -> binding.drawerLayout.openDrawer(
+                        GravityCompat.START
+                )
+        );
 
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        applyConversationTitle(
+                getIntent().getStringExtra(EXTRA_CONVERSATION_TITLE)
+        );
+    }
 
-            String title = getIntent().getStringExtra(
-                    EXTRA_CONVERSATION_TITLE
-            );
+    private void applyConversationTitle(String title) {
+        binding.chatToolbar.setTitle(
+                title == null || title.isBlank()
+                        ? getString(
+                                conversationId == null
+                                        ? R.string.new_chat
+                                        : R.string.chat_title
+                        )
+                        : title
+        );
+    }
 
-            getSupportActionBar().setTitle(
-                    title == null || title.isBlank()
-                            ? getString(R.string.chat_title)
-                            : title
-            );
+    private void setUpDrawer() {
+        drawerAdapter = new ConversationAdapter(
+                new ConversationAdapter.Listener() {
+                    @Override
+                    public void onOpen(ConversationResponse conversation) {
+                        openConversation(conversation);
+                    }
+
+                    @Override
+                    public void onDelete(ConversationResponse conversation) {
+                        confirmDeleteConversation(conversation);
+                    }
+                }
+        );
+
+        binding.drawerConversations.setLayoutManager(
+                new LinearLayoutManager(this)
+        );
+        binding.drawerConversations.setAdapter(drawerAdapter);
+
+        binding.drawerEmail.setText(tokenStore.email());
+
+        binding.newChatButton.setOnClickListener(
+                view -> startNewChat()
+        );
+
+        binding.drawerSettings.setOnClickListener(
+                view -> startActivity(
+                        new Intent(this, SettingsActivity.class)
+                )
+        );
+
+        binding.drawerSignOut.setOnClickListener(
+                view -> logout()
+        );
+
+        binding.drawerLayout.addDrawerListener(
+                new DrawerLayout.SimpleDrawerListener() {
+                    @Override
+                    public void onDrawerOpened(@NonNull View drawerView) {
+                        loadRecentConversations();
+                    }
+                }
+        );
+    }
+
+    private void loadRecentConversations() {
+        conversationRepository.list(
+                null,
+                new ApiCallback<ConversationPageResponse>() {
+                    @Override
+                    public void onSuccess(ConversationPageResponse page) {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
+
+                        recentConversations.clear();
+
+                        if (page.getItems() != null) {
+                            recentConversations.addAll(page.getItems());
+                        }
+
+                        drawerAdapter.submitList(
+                                new ArrayList<>(recentConversations)
+                        );
+                        binding.drawerEmpty.setVisibility(
+                                recentConversations.isEmpty()
+                                        ? View.VISIBLE
+                                        : View.GONE
+                        );
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
+
+                        if (statusCode == 401) {
+                            openLogin();
+                        }
+                    }
+                }
+        );
+    }
+
+    private void openConversation(ConversationResponse conversation) {
+        conversationId = conversation.getId();
+        applyConversationTitle(conversation.getTitle());
+        closeDrawer();
+
+        messages.clear();
+        nextCursor = null;
+        renderMessages(false);
+        updateEmptyState();
+        binding.errorText.setVisibility(View.GONE);
+
+        loadMessages(null);
+    }
+
+    private void startNewChat() {
+        conversationId = null;
+        applyConversationTitle(null);
+        closeDrawer();
+
+        messages.clear();
+        nextCursor = null;
+        binding.messageInput.setText("");
+        binding.errorText.setVisibility(View.GONE);
+        renderMessages(false);
+        updateEmptyState();
+    }
+
+    private void closeDrawer() {
+        if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
         }
+    }
+
+    private void confirmDeleteConversation(ConversationResponse conversation) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.delete_conversation)
+                .setMessage(R.string.delete_conversation_message)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(
+                        R.string.delete,
+                        (dialog, which) -> deleteConversation(conversation)
+                )
+                .show();
+    }
+
+    private void deleteConversation(ConversationResponse conversation) {
+        conversationRepository.delete(
+                conversation.getId(),
+                new ApiCallback<Void>() {
+                    @Override
+                    public void onSuccess(Void value) {
+                        if (conversation.getId().equals(conversationId)) {
+                            startNewChat();
+                        }
+
+                        loadRecentConversations();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        if (statusCode == 401) {
+                            openLogin();
+                            return;
+                        }
+
+                        showError(message);
+                    }
+                }
+        );
+    }
+
+    private void logout() {
+        closeDrawer();
+
+        authRepository.logout(new AuthCallback<Void>() {
+            @Override
+            public void onSuccess(Void value) {
+                openLogin();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                openLogin();
+            }
+        });
     }
 
     private void setUpGreeting() {
@@ -211,7 +421,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void loadMessages(String cursor) {
-        if (loading) {
+        if (loading || conversationId == null) {
             return;
         }
 
@@ -302,6 +512,12 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         binding.errorText.setVisibility(View.GONE);
+
+        if (conversationId == null) {
+            createConversationThenSend(content);
+            return;
+        }
+
         addOptimisticPrompt(content);
         setSending(true);
 
@@ -678,6 +894,84 @@ public class ChatActivity extends AppCompatActivity {
                 : view.getText().toString().trim();
     }
 
+    /**
+     * New-chat mode has no conversation yet: create one from the first prompt,
+     * then fall through to the normal send path so the user sees a single
+     * uninterrupted flow.
+     */
+    private void createConversationThenSend(final String content) {
+        sending = true;
+        binding.sendButton.setEnabled(false);
+
+        conversationRepository.create(
+                titleFrom(content),
+                new ApiCallback<ConversationResponse>() {
+                    @Override
+                    public void onSuccess(ConversationResponse conversation) {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
+
+                        sending = false;
+                        binding.sendButton.setEnabled(true);
+
+                        conversationId = conversation.getId();
+                        applyConversationTitle(conversation.getTitle());
+                        loadRecentConversations();
+
+                        sendMessage();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
+
+                        sending = false;
+                        binding.sendButton.setEnabled(true);
+
+                        if (statusCode == 401) {
+                            openLogin();
+                            return;
+                        }
+
+                        showError(message);
+                    }
+                }
+        );
+    }
+
+    /**
+     * Derives a short, readable thread title from the first prompt. Kept to a
+     * few words so the toolbar and drawer rows stay legible.
+     */
+    private String titleFrom(String content) {
+        String singleLine = content.replaceAll("\\s+", " ").trim();
+
+        if (singleLine.isEmpty()) {
+            return getString(R.string.untitled_conversation);
+        }
+
+        String[] words = singleLine.split(" ");
+        StringBuilder title = new StringBuilder();
+
+        for (String word : words) {
+            if (title.length() == 0) {
+                title.append(word);
+                continue;
+            }
+
+            if (title.length() + 1 + word.length() > 42) {
+                break;
+            }
+
+            title.append(' ').append(word);
+        }
+
+        return title.toString();
+    }
+
     private void openLogin() {
         tokenStore.clear();
 
@@ -690,9 +984,27 @@ public class ChatActivity extends AppCompatActivity {
         finish();
     }
 
-    @Override
-    public boolean onSupportNavigateUp() {
-        finish();
-        return true;
+    /**
+     * Predictive-back safe handling: the drawer closes before the activity does.
+     * Registering through the dispatcher keeps gesture back working on API 33+.
+     */
+    private void setUpBackHandling() {
+        getOnBackPressedDispatcher().addCallback(
+                this,
+                new OnBackPressedCallback(true) {
+                    @Override
+                    public void handleOnBackPressed() {
+                        if (binding.drawerLayout.isDrawerOpen(
+                                GravityCompat.START
+                        )) {
+                            closeDrawer();
+                            return;
+                        }
+
+                        setEnabled(false);
+                        getOnBackPressedDispatcher().onBackPressed();
+                    }
+                }
+        );
     }
 }

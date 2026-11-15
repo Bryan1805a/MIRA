@@ -25,6 +25,17 @@
     <string name="drawer_no_chats">No chats yet</string>
     <string name="settings">Settings</string>
     <string name="open_navigation">Open navigation</string>
+    <string name="close_navigation">Close navigation</string>
+    <string name="settings_preferences">Preferences</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="effort_button">Effort: %1$s</string>
+    <string name="effort_dialog_title">AI effort</string>
+    <string name="effort_option_low">Low</string>
+    <string name="effort_option_medium">Medium</string>
+    <string name="effort_option_high">High</string>
     <string name="account_label">Account</string>
     <string name="communication_memory">Communication memory</string>
     <string name="communication_memory_subtitle">Review, edit, or delete what MIRA remembers</string>

@@ -6,6 +6,7 @@ import android.os.Bundle;
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.mira.app.data.AuthCallback;
 import com.mira.app.data.AuthRepository;
 import com.mira.app.data.session.TokenStore;
@@ -21,6 +22,8 @@ public class SettingsActivity extends AppCompatActivity {
     private ActivitySettingsBinding binding;
     private TokenStore tokenStore;
     private AuthRepository authRepository;
+
+    private int themeMode = MiraApplication.THEME_SYSTEM;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,9 +60,65 @@ public class SettingsActivity extends AppCompatActivity {
                 )
         );
 
+        binding.appearanceRow.setOnClickListener(
+                view -> showAppearanceDialog()
+        );
+
         binding.signOutButton.setOnClickListener(
                 view -> logout()
         );
+
+        renderAppearance();
+    }
+
+    private void renderAppearance() {
+        themeMode = getSharedPreferences(
+                MiraApplication.PREFS,
+                MODE_PRIVATE
+        ).getInt(MiraApplication.PREF_THEME, MiraApplication.THEME_SYSTEM);
+
+        binding.appearanceValue.setText(themeLabel(themeMode));
+    }
+
+    private void showAppearanceDialog() {
+        CharSequence[] options = {
+                getString(R.string.settings_theme_system),
+                getString(R.string.settings_theme_light),
+                getString(R.string.settings_theme_dark)
+        };
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.settings_appearance)
+                .setSingleChoiceItems(options, themeMode, (dialog, which) -> {
+                    applyTheme(which);
+                    dialog.dismiss();
+                })
+                .show();
+    }
+
+    private void applyTheme(int mode) {
+        getSharedPreferences(MiraApplication.PREFS, MODE_PRIVATE)
+                .edit()
+                .putInt(MiraApplication.PREF_THEME, mode)
+                .apply();
+
+        themeMode = mode;
+        binding.appearanceValue.setText(themeLabel(mode));
+
+        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                MiraApplication.nightModeFor(mode)
+        );
+    }
+
+    private int themeLabel(int mode) {
+        switch (mode) {
+            case MiraApplication.THEME_LIGHT:
+                return R.string.settings_theme_light;
+            case MiraApplication.THEME_DARK:
+                return R.string.settings_theme_dark;
+            default:
+                return R.string.settings_theme_system;
+        }
     }
 
     private void logout() {

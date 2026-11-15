@@ -14,19 +14,19 @@
     <color name="brand_ink">#1F1F1F</color>
     <color name="brand_ink_muted">#444746</color>
 
-    <!-- Primary: Gemini blue -->
-    <color name="brand_primary">#3F6CF4</color>
+    <!-- Primary: MIRA purple (the brand colour) -->
+    <color name="brand_primary">#6C4CE0</color>
     <color name="brand_on_primary">#FFFFFF</color>
-    <color name="brand_primary_container">#D9E2FF</color>
-    <color name="brand_on_primary_container">#00164E</color>
+    <color name="brand_primary_container">#E7DEFF</color>
+    <color name="brand_on_primary_container">#21005D</color>
 
-    <!-- Secondary: gradient violet -->
-    <color name="brand_secondary">#8455C8</color>
+    <!-- Secondary: lighter violet for selected states and tonal surfaces -->
+    <color name="brand_secondary">#7B5AD6</color>
     <color name="brand_on_secondary">#FFFFFF</color>
-    <color name="brand_secondary_container">#EEDBFF</color>
+    <color name="brand_secondary_container">#E9E0FF</color>
     <color name="brand_on_secondary_container">#2B0B52</color>
 
-    <!-- Tertiary: gradient coral -->
+    <!-- Tertiary: warm coral accent -->
     <color name="brand_tertiary">#B5385A</color>
     <color name="brand_on_tertiary">#FFFFFF</color>
     <color name="brand_tertiary_container">#FFD9DF</color>
@@ -47,4 +47,10 @@
     <color name="brand_gradient_start">#4285F4</color>
     <color name="brand_gradient_mid">#9B72CB</color>
     <color name="brand_gradient_end">#D96570</color>
+
+    <!-- Soft purple glow behind the empty chat state -->
+    <color name="brand_glow">#4DA99BFF</color>
+
+    <!-- Account avatar plate in the drawer footer -->
+    <color name="brand_avatar_bg">#E7DEFF</color>
 </resources>

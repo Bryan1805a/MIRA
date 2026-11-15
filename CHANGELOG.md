@@ -8,87 +8,52 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Chat renders an in-flight "MIRA is thinking…" assistant bubble while the
-  backend waits on the AI provider, so a synchronous generation that can take
-  up to 30 seconds no longer looks like a frozen screen. The placeholder is
-  local to the UI: it is never persisted or sent to the backend, and the input
-  is disabled until the request completes or fails.
-- Instrumented test covering the thinking placeholder (detection, layout
-  inflation, and adapter view-type dispatch).
-
-### Added
-
-- Message bubbles show a local timestamp and support long-press to copy the
-  original message text (with haptic feedback and a confirmation toast).
-- Home screen rebuilt as a branded hero card, a session card ("Signed in as"
-  plus status), a primary conversation action, a Memory/Sign-out row, and a
-  short "How memory works" explainer instead of three stacked buttons.
-- Assistant replies are rendered as readable plain text (`MarkdownText`): bold,
-  italic, heading, inline-code, and display-math markers are stripped, list
-  bullets normalized, links turned into `text (url)`, and arithmetic such as
-  `2 * 3` or identifiers such as `snake_case` left untouched (12 unit tests).
-- Chat now follows to the newest message after the list diff commits, so a
-  freshly sent message or a long reply is no longer left below the fold.
-- Home screen shows a real tagline instead of the stale "Conversations and chat
-  arrive in the next checkpoint." placeholder.
+- Chat-first navigation: signing in lands on a conversation, history lives in a
+  left navigation drawer (recent chats with updated timestamps, long-press to
+  delete, "No chats yet" empty state), and preferences moved into a Settings hub
+  holding Communication memory, Appearance, and sign-out.
+- New chats create their conversation lazily from the first prompt, so opening
+  the app never leaves empty threads in history.
+- Gemini-style chat presentation: AI answers render as editorial text on the
+  bare surface with a gradient spark, user prompts sit in a soft pill, and each
+  answer carries copy / share / timestamp actions. A pulsing spark replaces the
+  mechanical spinner, and prompts appear optimistically while waiting.
+- Empty chat state with the spark, a soft purple glow, and starter prompts as
+  icon rows that send with one tap.
+- Assistant replies render as readable plain text (`MarkdownText`): emphasis,
+  heading, inline-code and display-math markers are stripped, bullets normalised,
+  links turned into `text (url)`, and arithmetic or identifiers left untouched
+  (12 unit tests).
+- "AI effort" selector above the prompt bar (Low / Medium / High). Presentational
+  only: the choice is remembered locally and does not change how the backend
+  generates answers.
+- Appearance setting (System / Light / Dark), applied app-wide and restored on
+  launch through `MiraApplication`.
+- Message bubbles show a local timestamp and support long-press to copy.
+- MIRA brand: adaptive launcher icon (gradient speech bubble with three memory
+  nodes), branded splash background, tighter headline tracking, and a purple-led
+  Material 3 palette mapped for light and dark.
+- Instrumented test covering the thinking placeholder.
 
 ### Changed
 
-- Memory screen rebuilt around single-select filter chips instead of five
-  dropdowns: one tap sets a preference, tapping the selected chip clears it back
-  to "no preference", and the whole screen now uses the same card language as
-  Settings. Reached from Settings → Communication memory.
-- Navigation now follows the Gemini mobile model: signing in lands directly on
-  a chat, conversation history lives in a left navigation drawer with "New
-  chat", and Memory moved under a new Settings screen. `MainActivity` and
-  `ConversationsActivity` were removed.
-- A new chat has no conversation until the first message; the conversation is
-  created from that prompt (title derived from it), so opening the app never
-  leaves empty threads in history.
-- Drawer lists recent chats and supports long-press to delete (with the existing
-  confirmation), showing "No chats yet" when empty.
-- Chat adopts a Gemini-style "container-light" presentation: AI answers render
-  as editorial text on the bare surface with a gradient spark instead of a
-  bubble, user prompts sit in a soft pill, and each answer carries a
-  copy / share / timestamp footer.
-- Empty threads show a "Hello, [name]" greeting with starter-prompt cards that
-  send with one tap; the prompt bar is now a floating rounded pill with a
-  circular send action.
-- The prompt appears immediately as an optimistic pill, so a slow provider no
-  longer looks like the message was swallowed; it is replaced by the server
-  message on success and removed on failure.
-- "Thinking" state is a pulsing gradient spark plus label rather than a
-  mechanical spinner.
-- Palette moved to neutral surfaces (white / soft blue-grey in light, deep
-  charcoal in dark) with the blue-violet-coral gradient reserved for brand
-  moments; the launcher icon uses the same gradient.
-- Cold-start resilience: the Android HTTP client read timeout is now 90 s and
-  the production health monitor allows 120 s per probe. A sleeping managed
-  instance took ~59 s to answer its first request, which previously exceeded
-  both budgets and turned a cold sign-in into a failure.
-- Brand identity: replaced the stock Android robot launcher icon with a MIRA
-  adaptive icon (violet-to-indigo gradient with a speech bubble holding three
-  memory nodes, monochrome-safe for themed icons), and branded the Android 12+
-  splash background.
-- Replaced the default Material purple with a MIRA palette (violet primary, teal
-  secondary, amber tertiary) mapped across every Material 3 colour role, with
-  light and dark values plus matching system-bar icon polarity.
-- Tightened headline/title tracking for a deliberate wordmark; set the window
-  background so the launch transition no longer flashes a default surface.
-- The chat system prompt asks the model for plain mobile-friendly text and no
-  LaTeX or dollar-delimited math, since the client renders plain text.
+- Cold-start resilience: the Android read timeout is now 90 s and the production
+  health monitor allows 120 s per probe, because a sleeping instance took ~59 s
+  to answer its first request and previously failed both budgets.
+- The chat system prompt asks for plain mobile-friendly text with no LaTeX or
+  dollar-delimited math, since the client renders plain text.
+- Memory preferences use single-select chips instead of five dropdowns.
 
 ### Fixed
 
-- Removed a duplicate `Intent` import in `MainActivity`.
-- Documentation corrections: Phase 3 security hardening is no longer listed as
-  "in progress" in the architecture status table; refresh-token rotation and
-  replay tests are no longer described as an open Phase 1 follow-up; the Phase 3
-  decision rows are closed against ADR-004/ADR-005; purge is documented as
-  clearing the profile JSONB and incrementing `version` rather than deleting
-  the `user_style_profile` row; `LICENSE` was removed from the Phase 0 target
-  tree; NFR-005.1 records the delivered layer-first package layout.
-
+- Copy and share use the rendered text rather than raw Markdown.
+- Chat follows to the newest message after the list diff commits, so a new reply
+  is never left below the fold.
+- Drawer insets are applied to a wrapper because `DrawerLayout` consumes window
+  insets; back handling uses `OnBackPressedDispatcher` for predictive back.
+- Account row in Settings no longer wraps the email onto a second line.
+- Documentation corrections: Phase 3 status, refresh replay follow-up, Phase 3
+  decision rows, purge semantics, `LICENSE` reference, NFR-005.1 layout note.
 ## [1.2.1] - 2026-11-14
 
 ### Fixed

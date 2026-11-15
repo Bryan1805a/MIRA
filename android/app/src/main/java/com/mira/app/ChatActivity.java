@@ -18,8 +18,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.mira.app.data.ApiCallback;
-import com.mira.app.data.AuthCallback;
-import com.mira.app.data.AuthRepository;
 import com.mira.app.data.ConversationRepository;
 import com.mira.app.data.MessageRepository;
 import com.mira.app.data.model.AssistantResponseResponse;
@@ -53,7 +51,6 @@ public class ChatActivity extends AppCompatActivity {
     private ActivityChatBinding binding;
     private MessageRepository repository;
     private ConversationRepository conversationRepository;
-    private AuthRepository authRepository;
     private MessageAdapter adapter;
     private ConversationAdapter drawerAdapter;
     private TokenStore tokenStore;
@@ -78,6 +75,8 @@ public class ChatActivity extends AppCompatActivity {
 
     private String pendingRetryKey;
     private String pendingRetryResponseId;
+
+    private int effortIndex = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,11 +105,11 @@ public class ChatActivity extends AppCompatActivity {
 
         repository = new MessageRepository(this);
         conversationRepository = new ConversationRepository(this);
-        authRepository = new AuthRepository(this);
 
         setUpToolbar();
         setUpDrawer();
         setUpBackHandling();
+        setUpEffort();
         setUpList();
         setUpGreeting();
         setUpSuggestions();
@@ -185,8 +184,8 @@ public class ChatActivity extends AppCompatActivity {
                 )
         );
 
-        binding.drawerSignOut.setOnClickListener(
-                view -> logout()
+        binding.drawerClose.setOnClickListener(
+                view -> closeDrawer()
         );
 
         binding.drawerLayout.addDrawerListener(
@@ -308,22 +307,6 @@ public class ChatActivity extends AppCompatActivity {
                     }
                 }
         );
-    }
-
-    private void logout() {
-        closeDrawer();
-
-        authRepository.logout(new AuthCallback<Void>() {
-            @Override
-            public void onSuccess(Void value) {
-                openLogin();
-            }
-
-            @Override
-            public void onError(String message, int statusCode) {
-                openLogin();
-            }
-        });
     }
 
     private void setUpGreeting() {
@@ -744,6 +727,68 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     /**
+     * AI effort is presentation only: it is remembered locally so the control
+     * behaves like a real preference, but generation settings stay fixed.
+     */
+    private void setUpEffort() {
+        effortIndex = getSharedPreferences(
+                MiraApplication.PREFS,
+                MODE_PRIVATE
+        ).getInt(MiraApplication.PREF_EFFORT, 1);
+
+        renderEffort();
+
+        binding.effortButton.setOnClickListener(
+                view -> showEffortDialog()
+        );
+    }
+
+    private void renderEffort() {
+        binding.effortButton.setText(
+                getString(
+                        R.string.effort_button,
+                        getString(effortOption(effortIndex))
+                )
+        );
+    }
+
+    private void showEffortDialog() {
+        CharSequence[] options = {
+                getString(R.string.effort_option_low),
+                getString(R.string.effort_option_medium),
+                getString(R.string.effort_option_high)
+        };
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.effort_dialog_title)
+                .setSingleChoiceItems(options, effortIndex, (dialog, which) -> {
+                    effortIndex = which;
+
+                    getSharedPreferences(
+                            MiraApplication.PREFS,
+                            MODE_PRIVATE
+                    ).edit()
+                            .putInt(MiraApplication.PREF_EFFORT, which)
+                            .apply();
+
+                    renderEffort();
+                    dialog.dismiss();
+                })
+                .show();
+    }
+
+    private int effortOption(int index) {
+        switch (index) {
+            case 0:
+                return R.string.effort_option_low;
+            case 2:
+                return R.string.effort_option_high;
+            default:
+                return R.string.effort_option_medium;
+        }
+    }
+
+    /**
      * Shows the prompt immediately so a slow provider never leaves the thread
      * looking like the message was swallowed. Replaced by the server message on
      * success and removed on failure.
@@ -846,10 +891,13 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void updateEmptyState() {
+        boolean showEmpty = messages.isEmpty() && !loading;
+
         binding.emptyState.setVisibility(
-                messages.isEmpty() && !loading
-                        ? View.VISIBLE
-                        : View.GONE
+                showEmpty ? View.VISIBLE : View.GONE
+        );
+        binding.glowView.setVisibility(
+                showEmpty ? View.VISIBLE : View.GONE
         );
     }
 

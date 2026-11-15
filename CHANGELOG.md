@@ -63,6 +63,9 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Regeneration matched the user prompt's response metadata first, which
+  replaced the prompt instead of the answer. The client now targets the
+  assistant row only.
 - Copy and share use the rendered text rather than raw Markdown.
 - Chat follows to the newest message after the list diff commits, so a new reply
   is never left below the fold.
@@ -75,6 +78,9 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Regeneration matched the user prompt's response metadata first, which
+  replaced the prompt instead of the answer. The client now targets the
+  assistant row only.
 - Release-only startup crash caused by R8 obfuscating Kotlin classes used by
   OkHttp. Added keep rules for `okhttp3`, `okio`, `kotlin`, and `kotlinx`.
 - v1.2.0 release artifacts are affected by this crash; use v1.2.1 instead.
@@ -112,6 +118,9 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Regeneration matched the user prompt's response metadata first, which
+  replaced the prompt instead of the answer. The client now targets the
+  assistant row only.
 - Android CI SDK installation (`setup-android` v4 and `platforms;android-37.0`).
 - Machine-specific Gradle JDK path removed from `android/gradle.properties`.
 - Production port binding honors Render's `PORT` instead of a hardcoded

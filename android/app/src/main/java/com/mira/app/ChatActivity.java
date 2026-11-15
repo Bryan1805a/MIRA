@@ -832,8 +832,16 @@ public class ChatActivity extends AppCompatActivity {
 
     private int indexOfResponse(String responseId) {
         for (int index = 0; index < messages.size(); index++) {
+            MessageResponse message = messages.get(index);
+
+            /* The user prompt carries the same response metadata, so the
+               assistant row is the only replacement target. */
+            if (message.getRole() != MessageRole.ASSISTANT) {
+                continue;
+            }
+
             MessageResponse.ResponseMetadata metadata =
-                    messages.get(index).getResponse();
+                    message.getResponse();
 
             if (metadata != null
                     && responseId.equals(metadata.getId())) {

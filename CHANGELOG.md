@@ -8,6 +8,15 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Regenerate: any completed answer can be regenerated from the chat footer
+  (`POST /api/v1/conversations/{id}/responses/{id}/regenerate`). The replacement
+  is written in place so a thread keeps one answer per prompt, the new text types
+  itself in, and a provider failure keeps the previous answer and tells the user.
+  Regeneration is owner-scoped, rate limited, idempotent, and shares the bounded
+  3-attempt budget with send/retry.
+- Assistant messages returned by the history endpoint now carry the same
+  `response` metadata as user messages, so regeneration is offered for answers
+  loaded from history too.
 - Assistant answers type themselves in (character-by-character reveal, capped at
   ~1.4 s) the first time they are shown; the animation updates only the text
   view, so list diffing is untouched, and it never replays for history.

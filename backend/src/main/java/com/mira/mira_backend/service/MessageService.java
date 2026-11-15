@@ -8,6 +8,7 @@ import com.mira.mira_backend.ai.AIProviderException;
 import com.mira.mira_backend.ai.AIRequest;
 import com.mira.mira_backend.ai.AIRole;
 
+import com.mira.mira_backend.dto.AssistantResponseResponse;
 import com.mira.mira_backend.dto.MessagePageResponse;
 import com.mira.mira_backend.dto.MessageResponse;
 import com.mira.mira_backend.dto.SendMessageResponse;
@@ -15,6 +16,7 @@ import com.mira.mira_backend.dto.SendMessageResponse;
 import com.mira.mira_backend.metrics.MiraMetrics;
 
 import com.mira.mira_backend.entity.AiResponse;
+import com.mira.mira_backend.entity.AttemptOutcome;
 import com.mira.mira_backend.entity.Message;
 import com.mira.mira_backend.entity.MessageRole;
 import com.mira.mira_backend.entity.AiProcessingAttempt;
@@ -217,6 +219,157 @@ public class MessageService {
         );
     }
 
+    public record RegenerateResult(
+            AssistantResponseResponse assistantResponse,
+            boolean regenerated
+    ) {
+    }
+
+    /**
+     * Replaces the answer for a completed response. The previous text stays
+     * visible until the replacement is ready, and survives a provider failure.
+     */
+    public RegenerateResult regenerate(
+            UUID userId,
+            UUID conversationId,
+            UUID responseId,
+            String idempotencyKey
+    ) {
+        validateIdempotencyKey(idempotencyKey);
+
+        AiResponse existing = aiResponseRepository
+                .findByIdAndUserIdAndConversationId(
+                        responseId,
+                        userId,
+                        conversationId
+                )
+                .orElseThrow(ConversationNotFoundException::new);
+
+        Optional<AiProcessingAttempt> existingAttempt =
+                attemptRepository.findByResponseIdAndIdempotencyKey(
+                        responseId,
+                        idempotencyKey
+                );
+
+        if (existingAttempt.isPresent()) {
+            return replayRegenerate(
+                    existing,
+                    existingAttempt.get(),
+                    userId,
+                    conversationId
+            );
+        }
+
+        MessageTransactionService.PendingMessage pending;
+
+        try {
+            pending = transactionService.beginRegenerate(
+                    userId,
+                    conversationId,
+                    responseId,
+                    idempotencyKey
+            );
+        } catch (DataIntegrityViolationException
+                 | InvalidRequestException exception) {
+            Optional<AiProcessingAttempt> raced =
+                    attemptRepository
+                            .findByResponseIdAndIdempotencyKey(
+                                    responseId,
+                                    idempotencyKey
+                            );
+
+            if (raced.isPresent()) {
+                return replayRegenerate(
+                        existing,
+                        raced.get(),
+                        userId,
+                        conversationId
+                );
+            }
+
+            throw exception;
+        }
+
+        AIRequest request = buildRequest(
+                userId,
+                conversationId,
+                existing.getAssistantMessage() == null
+                        ? null
+                        : existing.getAssistantMessage().getId()
+        );
+
+        try {
+            AICompletion completion = aiProvider.generate(request);
+
+            SendMessageResponse result =
+                    transactionService.completeRegenerate(
+                            pending,
+                            userId,
+                            conversationId,
+                            completion.content()
+                    );
+
+            metrics.chatRegenerate();
+
+            return new RegenerateResult(
+                    result.assistantResponse(),
+                    true
+            );
+        } catch (AIProviderException exception) {
+            metrics.chatProviderError(
+                    exception.category().name()
+            );
+            metrics.chatRegenerate();
+
+            SendMessageResponse unchanged =
+                    transactionService.failRegenerate(
+                            pending,
+                            userId,
+                            conversationId,
+                            exception.category().name(),
+                            exception.category()
+                                    == AIErrorCategory.TIMEOUT
+                    );
+
+            return new RegenerateResult(
+                    unchanged.assistantResponse(),
+                    false
+            );
+        } catch (RuntimeException exception) {
+            SendMessageResponse unchanged =
+                    transactionService.failRegenerate(
+                            pending,
+                            userId,
+                            conversationId,
+                            "UNEXPECTED",
+                            false
+                    );
+
+            return new RegenerateResult(
+                    unchanged.assistantResponse(),
+                    false
+            );
+        }
+    }
+
+    private RegenerateResult replayRegenerate(
+            AiResponse existing,
+            AiProcessingAttempt attempt,
+            UUID userId,
+            UUID conversationId
+    ) {
+        SendMessageResponse result = transactionService.currentResult(
+                existing.getId(),
+                userId,
+                conversationId
+        );
+
+        return new RegenerateResult(
+                result.assistantResponse(),
+                attempt.getOutcome() == AttemptOutcome.SUCCESS
+        );
+    }
+
     @Transactional(readOnly = true)
     public MessagePageResponse listMessages(
             UUID userId,
@@ -368,6 +521,19 @@ public class MessageService {
             UUID userId,
             UUID conversationId
     ) {
+        return buildRequest(userId, conversationId, null);
+    }
+
+    /**
+     * @param excludedMessageId message to leave out of the context, used when
+     *                          regenerating so the model does not simply echo
+     *                          the answer it is replacing
+     */
+    private AIRequest buildRequest(
+            UUID userId,
+            UUID conversationId,
+            UUID excludedMessageId
+    ) {
         List<Message> recent = messageRepository.findRecent(
                 conversationId,
                 userId,
@@ -396,6 +562,11 @@ public class MessageService {
         }
 
         for (Message message : chronological) {
+            if (excludedMessageId != null
+                    && excludedMessageId.equals(message.getId())) {
+                continue;
+            }
+
             AIRole role = message.getRole() == MessageRole.USER
                     ? AIRole.USER
                     : AIRole.ASSISTANT;
@@ -408,7 +579,22 @@ public class MessageService {
 
     private MessageResponse toMessageResponse(Message message) {
         if (message.getRole() == MessageRole.ASSISTANT) {
-            return MessageResponse.assistant(message);
+            AiResponse owningResponse = aiResponseRepository
+                    .findByAssistantMessageId(message.getId())
+                    .orElse(null);
+
+            if (owningResponse == null) {
+                return MessageResponse.assistant(message);
+            }
+
+            int attemptCount = (int) attemptRepository
+                    .countByResponseId(owningResponse.getId());
+
+            return MessageResponse.assistant(
+                    message,
+                    owningResponse,
+                    attemptCount
+            );
         }
 
         AiResponse response = aiResponseRepository

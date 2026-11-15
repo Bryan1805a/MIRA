@@ -30,6 +30,10 @@ public class MiraMetrics {
         registry.counter("mira.chat.retries").increment();
     }
 
+    public void chatRegenerate() {
+        registry.counter("mira.chat.regenerations").increment();
+    }
+
     public void extractionJob(String status) {
         registry.counter("mira.extraction.jobs", "status", status)
                 .increment();

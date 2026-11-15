@@ -48,6 +48,12 @@ public class MessageAdapter extends ListAdapter<
 
     public interface Listener {
         void onRetry(MessageResponse.ResponseMetadata response);
+
+        default void onRegenerate(
+                MessageResponse.ResponseMetadata response
+        ) {
+            /* Optional: only the chat screen offers regeneration. */
+        }
     }
 
     private static final int TYPE_USER = 0;
@@ -393,6 +399,24 @@ public class MessageAdapter extends ListAdapter<
             binding.shareButton.setOnClickListener(
                     view -> share(view, displayed)
             );
+
+            MessageResponse.ResponseMetadata metadata =
+                    message.getResponse();
+
+            boolean canRegenerate = metadata != null
+                    && metadata.getStatus() == ResponseStatus.COMPLETED;
+
+            binding.regenerateButton.setVisibility(
+                    canRegenerate ? View.VISIBLE : View.GONE
+            );
+
+            if (canRegenerate) {
+                binding.regenerateButton.setOnClickListener(
+                        view -> listener.onRegenerate(metadata)
+                );
+            } else {
+                binding.regenerateButton.setOnClickListener(null);
+            }
         }
 
         /**

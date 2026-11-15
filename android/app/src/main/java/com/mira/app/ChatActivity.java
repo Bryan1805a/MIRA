@@ -8,6 +8,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.OnBackPressedCallback;
@@ -28,6 +29,7 @@ import com.mira.app.data.model.ConversationResponse;
 import com.mira.app.data.model.MessagePageResponse;
 import com.mira.app.data.model.MessageResponse;
 import com.mira.app.data.model.MessageRole;
+import com.mira.app.data.model.RegenerateResponse;
 import com.mira.app.data.model.ResponseStatus;
 import com.mira.app.data.model.RetryResponse;
 import com.mira.app.data.model.SendMessageResponse;
@@ -377,7 +379,21 @@ public class ChatActivity extends AppCompatActivity {
 
     private void setUpList() {
         adapter = new MessageAdapter(
-                response -> retry(response)
+                new MessageAdapter.Listener() {
+                    @Override
+                    public void onRetry(
+                            MessageResponse.ResponseMetadata response
+                    ) {
+                        retry(response);
+                    }
+
+                    @Override
+                    public void onRegenerate(
+                            MessageResponse.ResponseMetadata response
+                    ) {
+                        regenerate(response);
+                    }
+                }
         );
         adapter.setRevealProgressListener(this::followReveal);
 
@@ -727,8 +743,105 @@ public class ChatActivity extends AppCompatActivity {
                 MessageRole.ASSISTANT,
                 assistant.getContent(),
                 assistant.getCreatedAt(),
-                null
+                new MessageResponse.ResponseMetadata(
+                        assistant.getId(),
+                        assistant.getStatus(),
+                        0
+                )
         );
+    }
+
+    /**
+     * Asks the backend for a fresh answer to the same prompt. The reply replaces
+     * the text in place, so the thread keeps one answer per question; if the
+     * provider fails the old answer stays and the user is told.
+     */
+    private void regenerate(MessageResponse.ResponseMetadata metadata) {
+        if (sending || metadata == null || metadata.getId() == null) {
+            return;
+        }
+
+        binding.errorText.setVisibility(View.GONE);
+        setSending(true);
+
+        repository.regenerate(
+                conversationId,
+                metadata.getId(),
+                UUID.randomUUID().toString(),
+                new ApiCallback<RegenerateResponse>() {
+                    @Override
+                    public void onSuccess(RegenerateResponse result) {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
+
+                        setSending(false);
+
+                        AssistantResponseResponse assistant =
+                                result.getAssistantResponse();
+
+                        if (assistant == null) {
+                            return;
+                        }
+
+                        int index = indexOfResponse(metadata.getId());
+
+                        if (index >= 0) {
+                            MessageResponse current = messages.get(index);
+
+                            MessageResponse updated = new MessageResponse(
+                                    current.getId(),
+                                    MessageRole.ASSISTANT,
+                                    assistant.getContent(),
+                                    current.getCreatedAt(),
+                                    current.getResponse()
+                            );
+
+                            messages.set(index, updated);
+                            adapter.setRevealTarget(updated.getId());
+                            renderMessages(false);
+                        }
+
+                        if (!result.isRegenerated()) {
+                            Toast.makeText(
+                                    ChatActivity.this,
+                                    R.string.regenerate_failed,
+                                    Toast.LENGTH_LONG
+                            ).show();
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
+
+                        setSending(false);
+
+                        if (statusCode == 401) {
+                            openLogin();
+                            return;
+                        }
+
+                        showError(message);
+                    }
+                }
+        );
+    }
+
+    private int indexOfResponse(String responseId) {
+        for (int index = 0; index < messages.size(); index++) {
+            MessageResponse.ResponseMetadata metadata =
+                    messages.get(index).getResponse();
+
+            if (metadata != null
+                    && responseId.equals(metadata.getId())) {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private void setSending(boolean value) {

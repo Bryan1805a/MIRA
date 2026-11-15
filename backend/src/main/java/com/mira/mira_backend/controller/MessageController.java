@@ -3,6 +3,7 @@ package com.mira.mira_backend.controller;
 import com.mira.mira_backend.dto.MessagePageResponse;
 import com.mira.mira_backend.dto.SendMessageRequest;
 import com.mira.mira_backend.dto.SendMessageResponse;
+import com.mira.mira_backend.dto.RegenerateResponse;
 import com.mira.mira_backend.dto.RetryResponse;
 
 import com.mira.mira_backend.entity.AiResponseStatus;
@@ -96,6 +97,32 @@ public class MessageController {
 
         return ResponseEntity.ok(
                 new RetryResponse(result.assistantResponse())
+        );
+    }
+
+    @PostMapping("/responses/{responseId}/regenerate")
+    public ResponseEntity<RegenerateResponse> regenerate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID conversationId,
+            @PathVariable UUID responseId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey
+    ) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+
+        rateLimiter.check(userId);
+
+        MessageService.RegenerateResult result = messageService.regenerate(
+                userId,
+                conversationId,
+                responseId,
+                idempotencyKey
+        );
+
+        return ResponseEntity.ok(
+                new RegenerateResponse(
+                        result.assistantResponse(),
+                        result.regenerated()
+                )
         );
     }
 }

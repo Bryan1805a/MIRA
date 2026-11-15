@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-TST-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.10.0 |
+| **Version** | 2.11.0 |
 | **Last Updated** | 2026-11-14 |
 | **Author / Lead** | Bryan / MIRA Quality Assurance & Test Engineering |
 | **Testing Scope** | Multi-Tier Automated Testing, Testcontainers, Mock Doubles |
@@ -38,6 +38,7 @@
 | 2.8.0 | 2026-11-14 | Bryan | Added gitleaks and Dependabot coverage, plus the opt-in production Android smoke test. |
 | 2.9.0 | 2026-11-14 | Bryan | Correction: removed the stale claim that refresh rotation/replay tests were an open Phase 1 follow-up; they are covered by `AuthSecurityTest`. |
 | 2.10.0 | 2026-11-14 | Bryan | Added the chat in-flight placeholder instrumented suite (`MessageAdapterThinkingTest`, 4 tests) and refreshed the Android instrumented inventory and execution status. |
+| 2.11.0 | 2026-11-15 | Bryan | Added RegenerateApiTests (6 tests) and updated the backend inventory to 131. |
 
 ---
 
@@ -130,6 +131,7 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `ApiContractTests` | Spring Boot + Testcontainers + MockMvc | 3 | Request-ID propagation, error envelope shape, and validation details. |
 | `ConversationApiTests` | Spring Boot + Testcontainers + MockMvc | 6 | Conversation ownership, ordering, cursor pagination, create/list/delete, and invalid pagination input. |
 | `MessagingApiTests` | Spring Boot + Testcontainers + MockMvc | 13 | Message lifecycle, persistence ordering, idempotent replay/conflict, timeout mapping, bounded retry, cross-account isolation, and rate limiting. |
+| `RegenerateApiTests` | Spring Boot + Testcontainers + MockMvc | 6 | Regeneration replaces a completed answer in place, assistant messages expose response metadata, idempotent replay, provider failure keeps the previous answer, the 3-attempt limit, and cross-account isolation. |
 | `MemoryLifecycleTests` | Spring Boot + Testcontainers + MockMvc | 26 | Governance, injection, extraction, candidate review, purge cleanup, and the `MEM-TEST-01`..`MEM-TEST-07` scenarios. |
 | `LatencySmokeTest` | Spring Boot + Testcontainers + MockMvc | 1 | NFR-004 smoke: read-endpoint p95 below 200 ms after warm-up. |
 | `MemoryConflictResolutionTest` | Spring Boot + Testcontainers + MockMvc | 5 | Full hybrid persistence matrix: explicit durable auto-merge, inferred candidate staging with evidence counter accumulation, ephemeral instruction discard, and immediate user correction overwrite. |
@@ -156,7 +158,7 @@ The `MockAIProvider` enables deterministic simulation of complex edge cases with
 | `ProductionSmokeTest` (Android) | Instrumented (manual) | 1 | Opt-in on-device register/login against the production backend (`miraProductionSmoke=true`). |
 | `ExampleUnitTest` (Android) | Unit | 1 | Android unit testing baseline. |
 
-The backend suite (125 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android unit suite (16 tests) executes via `.\gradlew.bat testDebugUnitTest`. The instrumented suite (7 tests) runs via `.\gradlew.bat connectedDebugAndroidTest` on a physical device (TECNO LI7, Android 15) and covers the API smoke flow, the chat in-flight placeholder, and the opt-in production smoke test (skipped unless `miraProductionSmoke=true`). No test contacts DeepSeek. The integration suite shares one singleton container and one Spring context across domain classes. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 125 backend tests pass offline without failures or errors.
+The backend suite (131 tests total) runs against a real PostgreSQL container (`postgres:18-alpine`) with Flyway applying `V1`–`V10`. The Android unit suite (16 tests) executes via `.\gradlew.bat testDebugUnitTest`. The instrumented suite (7 tests) runs via `.\gradlew.bat connectedDebugAndroidTest` on a physical device (TECNO LI7, Android 15) and covers the API smoke flow, the chat in-flight placeholder, and the opt-in production smoke test (skipped unless `miraProductionSmoke=true`). No test contacts DeepSeek. The integration suite shares one singleton container and one Spring context across domain classes. Extraction runs are deterministic: the scheduler and recovery pollers are disabled in the test profile, and workers are invoked directly with scripted mock responses. All 131 backend tests pass offline without failures or errors.
 
 ---
 

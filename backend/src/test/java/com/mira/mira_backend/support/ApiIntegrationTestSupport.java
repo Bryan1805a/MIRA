@@ -250,6 +250,25 @@ public abstract class ApiIntegrationTestSupport {
                 .andReturn();
     }
 
+    protected MvcResult regenerateResponse(
+            String accessToken,
+            UUID conversationId,
+            UUID responseId,
+            String idempotencyKey) throws Exception {
+        return mockMvc.perform(
+                post(
+                        "/api/v1/conversations/{cid}/responses/{rid}/regenerate",
+                        conversationId,
+                        responseId)
+                        .header(
+                                "Authorization",
+                                "Bearer " + accessToken)
+                        .header(
+                                "Idempotency-Key",
+                                idempotencyKey))
+                .andReturn();
+    }
+
     protected boolean requestHasSystemContent(
             AIRequest request,
             String text) {

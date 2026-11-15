@@ -29,6 +29,8 @@ public interface AiResponseRepository
 
     Optional<AiResponse> findByUserMessageId(UUID userMessageId);
 
+    Optional<AiResponse> findByAssistantMessageId(UUID assistantMessageId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT r

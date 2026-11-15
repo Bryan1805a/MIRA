@@ -105,6 +105,20 @@ public class Message {
         return content;
     }
 
+    /**
+     * Regeneration replaces the assistant text in place: the conversation keeps
+     * one answer per prompt, so history does not grow a second reply.
+     */
+    public void replaceContent(String nextContent) {
+        if (nextContent == null || nextContent.isBlank()) {
+            throw new IllegalArgumentException(
+                    "content must not be blank"
+            );
+        }
+
+        this.content = nextContent;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }

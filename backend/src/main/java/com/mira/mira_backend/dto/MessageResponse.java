@@ -25,6 +25,32 @@ public record MessageResponse(
         );
     }
 
+    /**
+     * Assistant messages carry the owning response so the client can offer
+     * regeneration for any answer, including ones loaded from history.
+     */
+    public static MessageResponse assistant(
+            Message message,
+            AiResponse response,
+            int attemptCount
+    ) {
+        ResponseMetadata metadata = response == null
+                ? null
+                : new ResponseMetadata(
+                        response.getId(),
+                        response.getStatus(),
+                        attemptCount
+                );
+
+        return new MessageResponse(
+                message.getId(),
+                message.getRole(),
+                message.getContent(),
+                message.getCreatedAt(),
+                metadata
+        );
+    }
+
     public static MessageResponse user(
             Message message,
             AiResponse response,

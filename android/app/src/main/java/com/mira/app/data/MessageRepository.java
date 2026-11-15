@@ -3,6 +3,7 @@ package com.mira.app.data;
 import android.content.Context;
 
 import com.mira.app.data.model.MessagePageResponse;
+import com.mira.app.data.model.RegenerateResponse;
 import com.mira.app.data.model.RetryResponse;
 import com.mira.app.data.model.SendMessageRequest;
 import com.mira.app.data.model.SendMessageResponse;
@@ -137,6 +138,49 @@ public class MessageRepository {
                     @Override
                     public void onFailure(
                             Call<RetryResponse> call,
+                            Throwable throwable
+                    ) {
+                        callback.onError(
+                                "Unable to reach MIRA.",
+                                0
+                        );
+                    }
+                });
+    }
+
+    public void regenerate(
+            String conversationId,
+            String responseId,
+            String idempotencyKey,
+            ApiCallback<RegenerateResponse> callback
+    ) {
+        api.regenerateMessage(
+                        conversationId,
+                        responseId,
+                        idempotencyKey
+                )
+                .enqueue(new Callback<RegenerateResponse>() {
+                    @Override
+                    public void onResponse(
+                            Call<RegenerateResponse> call,
+                            Response<RegenerateResponse> response
+                    ) {
+                        RegenerateResponse body = response.body();
+
+                        if (response.isSuccessful() && body != null) {
+                            callback.onSuccess(body);
+                            return;
+                        }
+
+                        callback.onError(
+                                ApiErrors.message(response),
+                                response.code()
+                        );
+                    }
+
+                    @Override
+                    public void onFailure(
+                            Call<RegenerateResponse> call,
                             Throwable throwable
                     ) {
                         callback.onError(

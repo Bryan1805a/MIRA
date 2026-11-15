@@ -11,6 +11,7 @@ import com.mira.app.data.model.ConversationPageResponse;
 import com.mira.app.data.model.ConversationResponse;
 import com.mira.app.data.model.CreateConversationRequest;
 import com.mira.app.data.model.MessagePageResponse;
+import com.mira.app.data.model.RegenerateResponse;
 import com.mira.app.data.model.RetryResponse;
 import com.mira.app.data.model.SendMessageRequest;
 import com.mira.app.data.model.SendMessageResponse;
@@ -81,6 +82,13 @@ public interface MiraApi {
 
     @POST("api/v1/conversations/{conversationId}/responses/{responseId}/retry")
     Call<RetryResponse> retryMessage(
+            @Path("conversationId") String conversationId,
+            @Path("responseId") String responseId,
+            @Header("Idempotency-Key") String idempotencyKey
+    );
+
+    @POST("api/v1/conversations/{conversationId}/responses/{responseId}/regenerate")
+    Call<RegenerateResponse> regenerateMessage(
             @Path("conversationId") String conversationId,
             @Path("responseId") String responseId,
             @Header("Idempotency-Key") String idempotencyKey

@@ -201,6 +201,7 @@ stateDiagram-v2
 1. **Stable Response Identity:** A retry operation references the existing logical response UUID. It does **not** create a duplicate user message or a second assistant response entity.
 2. **Attempt Tracking:** Each execution is recorded as an independent `AI_PROCESSING_ATTEMPT` record with its own attempt number, timestamp, and outcome.
 3. **Extraction Gate:** Memory extraction is strictly blocked from running on `PENDING`, `FAILED`, or `UNKNOWN` responses. Extraction is only permitted on `COMPLETED` responses.
+4. **Regeneration Keeps One Answer:** Regenerating a `COMPLETED` response replaces the assistant `message.content` in place and adds an attempt. The previous text survives a provider failure, the response never returns to `PENDING`, and the context passed to the model excludes the answer being replaced. Regeneration shares the same bounded attempt budget as send and retry.
 
 ---
 

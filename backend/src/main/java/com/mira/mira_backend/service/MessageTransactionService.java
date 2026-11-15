@@ -27,7 +27,6 @@ public class MessageTransactionService {
 
     public static final String SEND_OPERATION = "MESSAGE_SEND";
     private static final int MAX_ATTEMPTS = 3;
-
     private final UserAccountRepository userAccountRepository;
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
@@ -152,6 +151,133 @@ public class MessageTransactionService {
                         maxAttempt + 1
                 )
         );
+    }
+
+    /**
+     * Regeneration keeps the response COMPLETED and the previous answer in place
+     * while a replacement is produced, so a provider failure never destroys a
+     * good answer.
+     */
+    @Transactional
+    public PendingMessage beginRegenerate(
+            UUID userId,
+            UUID conversationId,
+            UUID responseId,
+            String idempotencyKey
+    ) {
+        AiResponse response = lockResponse(
+                responseId,
+                userId,
+                conversationId
+        );
+
+        if (response.getStatus() != AiResponseStatus.COMPLETED) {
+            throw new InvalidRequestException(
+                    "Only completed responses can be regenerated."
+            );
+        }
+
+        int maxAttempt = attemptRepository
+                .findMaxAttemptNumber(responseId);
+
+        if (maxAttempt >= MAX_ATTEMPTS) {
+            throw new InvalidRequestException(
+                    "Regeneration limit reached."
+            );
+        }
+
+        AiProcessingAttempt attempt =
+                attemptRepository.saveAndFlush(
+                        new AiProcessingAttempt(
+                                response,
+                                maxAttempt + 1,
+                                idempotencyKey
+                        )
+                );
+
+        return new PendingMessage(
+                response.getId(),
+                attempt.getId(),
+                MessageResponse.user(
+                        response.getUserMessage(),
+                        response,
+                        maxAttempt + 1
+                )
+        );
+    }
+
+    @Transactional
+    public SendMessageResponse completeRegenerate(
+            PendingMessage pending,
+            UUID userId,
+            UUID conversationId,
+            String content
+    ) {
+        AiResponse response = lockResponse(
+                pending.responseId(),
+                userId,
+                conversationId
+        );
+
+        if (response.getStatus() != AiResponseStatus.COMPLETED
+                || response.getAssistantMessage() == null) {
+            throw new InvalidRequestException(
+                    "Response is not completed."
+            );
+        }
+
+        Message assistantMessage = response.getAssistantMessage();
+        assistantMessage.replaceContent(content);
+        messageRepository.saveAndFlush(assistantMessage);
+
+        recordRegenerateAttempt(pending, true, false, null);
+
+        return toResult(response);
+    }
+
+    @Transactional
+    public SendMessageResponse failRegenerate(
+            PendingMessage pending,
+            UUID userId,
+            UUID conversationId,
+            String errorCategory,
+            boolean timeout
+    ) {
+        AiResponse response = lockResponse(
+                pending.responseId(),
+                userId,
+                conversationId
+        );
+
+        recordRegenerateAttempt(pending, false, timeout, errorCategory);
+
+        return toResult(response);
+    }
+
+    private void recordRegenerateAttempt(
+            PendingMessage pending,
+            boolean success,
+            boolean timeout,
+            String errorCategory
+    ) {
+        AiProcessingAttempt attempt = attemptRepository
+                .findByIdAndResponseId(
+                        pending.attemptId(),
+                        pending.responseId()
+                )
+                .orElseThrow(() -> new IllegalStateException(
+                        "Attempt not found for response."
+                ));
+
+        if (success) {
+            attempt.succeed();
+        } else if (timeout) {
+            attempt.timeout(errorCategory);
+        } else {
+            attempt.error(errorCategory);
+        }
+
+        attemptRepository.saveAndFlush(attempt);
     }
 
     @Transactional

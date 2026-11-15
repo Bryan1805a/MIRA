@@ -5,7 +5,7 @@
 | **Document ID** | MIRA-API-001 |
 | **Classification** | Internal Engineering Specification |
 | **Status** | Approved Baseline |
-| **Version** | 2.2.0 |
+| **Version** | 2.3.0 |
 | **Last Updated** | 2026-11-13 |
 | **Author / Lead** | Bryan / MIRA API & Backend Team |
 | **Protocol & Base URL** | HTTPS / `/api/v1` |
@@ -32,6 +32,7 @@
 | 2.1.0 | 2026-11-13 | Bryan | Reconciled memory integration and privacy audit test verification (104 backend tests, 0 failures; sub-millisecond token consumption alignment and message ordering tie-breaker fixed). |
 | 2.2.0 | 2026-11-13 | Bryan | Documented authentication rate limiting (`429 rate_limited` on login/register/refresh) and account-wide refresh-token replay revocation. |
 | 2.3.0 | 2026-11-15 | Bryan | Reconciled the Android navigation restructure: history is consumed by the navigation drawer and chats are created on the first message, replacing the standalone conversation screen. |
+| 2.4.0 | 2026-11-15 | Bryan | Added the regenerate endpoint for completed answers, assistant-message response metadata, and the regeneration attempt limit. |
 
 ---
 
@@ -60,7 +61,7 @@
 | Registration, login, refresh, logout, `/me` | **Implemented (Backend & Android)** | Live on backend; Android authentication UI and session storage delivered. See sections 2.1–2.5. |
 | Standard error envelope | **Implemented (Backend & Android)** | Uniform `{ "error", "message", "requestId", "details" }` schema handled via `ApiExceptionHandler`/`RequestIdFilter` and mapped via `ApiError` in Android. |
 | Conversation endpoints | **Implemented (Backend & Android)** | List, create, and delete endpoints with cursor pagination and strict ownership isolation; the Android navigation drawer consumes the list and chats are created on the first message. |
-| Message send/list and retry | **Implemented (Backend & Android)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, bounded retries, and Android `ChatActivity` delivered. |
+| Message send/list, retry and regenerate | **Implemented (Backend & Android)** | Message persistence, response lifecycle (`PENDING`, `COMPLETED`, `FAILED`, `UNKNOWN`), `MockAIProvider`, `DeepSeekAIProvider`, idempotency key/hash, bounded retries, completed-answer regeneration, and Android `ChatActivity` delivered. |
 | Style-memory governance and candidate review | **Implemented (Backend & Android)** | Allow-list validation, OCC `version`, generation-guarded purge, advisory injection, the internal extraction pipeline (bounded retries/recovery), and candidate list/accept/reject are live and covered by tests; integrated into Android via `MemoryActivity`. |
 
 Endpoints marked Implemented are live and covered by automated test suites. Phase 1 is complete; Phase 2 memory endpoints, candidate review, advisory injection, and dedicated test suites (including privacy audit, safety, and conflict resolution) are implemented and verified.
@@ -376,6 +377,41 @@ If an upstream AI provider times out after the user message has been safely pers
   * Bounded retry execution: Maximum 3 attempts per logical response.
   * Preserves original user prompt and response UUID; logs an additional row in `ai_processing_attempt`.
   * Retry requests use the idempotency scope `operation = RETRY`: replaying the same key for the same response returns the existing attempt/result, while reusing the key for a different response returns `409 idempotency_conflict`.
+
+---
+
+### 4.4 Regenerate AI Response
+
+* **Endpoint:** `POST /api/v1/conversations/{conversationId}/responses/{responseId}/regenerate`
+* **Authentication:** Required
+* **Required Headers:**
+  * `Idempotency-Key: <regeneration-attempt-key>`
+* **Status Code:** `200 OK`
+
+Replaces the answer for a `COMPLETED` response. The assistant `message` row keeps its identity and creation time, so the conversation still holds exactly one answer per prompt; the new text is written in place and an `ai_processing_attempt` row records the regeneration.
+
+#### Response Body (`200 OK`)
+```json
+{
+  "assistantResponse": {
+    "id": "a2c3eb4d-4b7d-4bad-8bee-3b0d7b3dcb7e",
+    "status": "COMPLETED",
+    "content": "A regenerated explanation...",
+    "createdAt": "2026-10-11T08:10:05Z"
+  },
+  "regenerated": true
+}
+```
+
+* **Rules:**
+  * Only `COMPLETED` responses can be regenerated; anything else returns `400 invalid_request`.
+  * The previous answer stays visible and valid until the replacement arrives. If the provider fails, the stored answer is left untouched, the attempt records the error, and the response carries `"regenerated": false` so the client can say so.
+  * Attempts share the bounded budget with send/retry: at most 3 per logical response, then `400 invalid_request`.
+  * Regeneration is owner-scoped (`404 resource_not_found` for another account) and rate limited with the message limiter (`429 rate_limited`).
+  * The model receives the conversation context up to the user prompt, excluding the answer being replaced, so it does not simply echo the old text.
+  * Replaying the same `Idempotency-Key` returns the stored outcome without generating again.
+
+> **Note:** `ASSISTANT` messages returned by `GET /messages` now carry the same `response` metadata object as `USER` messages, which lets the client offer regeneration for answers loaded from history.
 
 ---
 

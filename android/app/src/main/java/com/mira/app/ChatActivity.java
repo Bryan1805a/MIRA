@@ -1,5 +1,7 @@
 package com.mira.app;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -77,6 +79,8 @@ public class ChatActivity extends AppCompatActivity {
     private String pendingRetryResponseId;
 
     private int effortIndex = 1;
+
+    private ObjectAnimator glowAnimator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -375,6 +379,7 @@ public class ChatActivity extends AppCompatActivity {
         adapter = new MessageAdapter(
                 response -> retry(response)
         );
+        adapter.setRevealProgressListener(this::followReveal);
 
         binding.messageList.setLayoutManager(
                 new LinearLayoutManager(this)
@@ -496,14 +501,22 @@ public class ChatActivity extends AppCompatActivity {
 
         binding.errorText.setVisibility(View.GONE);
 
-        if (conversationId == null) {
-            createConversationThenSend(content);
-            return;
-        }
-
+        /*
+         * Feedback first: the prompt and the thinking row appear before any
+         * network round trip, including the conversation creation below.
+         */
         addOptimisticPrompt(content);
         setSending(true);
 
+        if (conversationId == null) {
+            createConversationThenSend(content, idempotencyKey);
+            return;
+        }
+
+        dispatchSend(content, idempotencyKey);
+    }
+
+    private void dispatchSend(String content, String idempotencyKey) {
         repository.send(
                 conversationId,
                 content,
@@ -535,8 +548,12 @@ public class ChatActivity extends AppCompatActivity {
                                 && assistant.getStatus()
                                 == ResponseStatus.COMPLETED
                                 && assistant.getContent() != null) {
-                            messages.add(
-                                    buildAssistantMessage(assistant)
+                            MessageResponse assistantMessage =
+                                    buildAssistantMessage(assistant);
+
+                            messages.add(assistantMessage);
+                            adapter.setRevealTarget(
+                                    assistantMessage.getId()
                             );
                         }
 
@@ -691,10 +708,11 @@ public class ChatActivity extends AppCompatActivity {
 
         if (assistant.getStatus() == ResponseStatus.COMPLETED
                 && assistant.getContent() != null) {
-            messages.add(
-                    userIndex + 1,
-                    buildAssistantMessage(assistant)
-            );
+            MessageResponse assistantMessage =
+                    buildAssistantMessage(assistant);
+
+            messages.add(userIndex + 1, assistantMessage);
+            adapter.setRevealTarget(assistantMessage.getId());
         }
 
         renderMessagesAt(userIndex + 1);
@@ -723,6 +741,73 @@ public class ChatActivity extends AppCompatActivity {
         } else {
             hideThinking();
             removeOptimisticPrompt();
+        }
+
+        updateGlow();
+    }
+
+    /**
+     * The glow breathes while an answer is generating and while the thread is
+     * empty, so the prompt bar area always has a hint of the brand.
+     */
+    private void updateGlow() {
+        boolean show = sending || (messages.isEmpty() && !loading);
+
+        binding.glowView.setVisibility(
+                show ? View.VISIBLE : View.GONE
+        );
+
+        if (show) {
+            startGlowPulse();
+        } else {
+            stopGlowPulse();
+        }
+    }
+
+    private void startGlowPulse() {
+        if (glowAnimator != null) {
+            return;
+        }
+
+        glowAnimator = ObjectAnimator.ofFloat(
+                binding.glowView,
+                View.ALPHA,
+                0.45f,
+                1f
+        );
+        glowAnimator.setDuration(1700L);
+        glowAnimator.setRepeatMode(ValueAnimator.REVERSE);
+        glowAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        glowAnimator.start();
+    }
+
+    private void stopGlowPulse() {
+        if (glowAnimator != null) {
+            glowAnimator.cancel();
+            glowAnimator = null;
+        }
+
+        binding.glowView.setAlpha(1f);
+    }
+
+    /**
+     * Keeps the newest text in view while the answer types itself in, but only
+     * when the reader has not scrolled away deliberately.
+     */
+    private void followReveal() {
+        LinearLayoutManager manager =
+                (LinearLayoutManager) binding.messageList.getLayoutManager();
+
+        if (manager == null) {
+            return;
+        }
+
+        int lastVisible = manager.findLastVisibleItemPosition();
+
+        if (adapter.getItemCount() - 1 - lastVisible <= 1) {
+            binding.messageList.scrollToPosition(
+                    adapter.getItemCount() - 1
+            );
         }
     }
 
@@ -896,9 +981,8 @@ public class ChatActivity extends AppCompatActivity {
         binding.emptyState.setVisibility(
                 showEmpty ? View.VISIBLE : View.GONE
         );
-        binding.glowView.setVisibility(
-                showEmpty ? View.VISIBLE : View.GONE
-        );
+
+        updateGlow();
     }
 
     private void scrollToBottom() {
@@ -944,13 +1028,13 @@ public class ChatActivity extends AppCompatActivity {
 
     /**
      * New-chat mode has no conversation yet: create one from the first prompt,
-     * then fall through to the normal send path so the user sees a single
-     * uninterrupted flow.
+     * then continue with the normal send so the user sees one uninterrupted
+     * flow. The prompt and thinking row are already on screen by this point.
      */
-    private void createConversationThenSend(final String content) {
-        sending = true;
-        binding.sendButton.setEnabled(false);
-
+    private void createConversationThenSend(
+            final String content,
+            final String idempotencyKey
+    ) {
         conversationRepository.create(
                 titleFrom(content),
                 new ApiCallback<ConversationResponse>() {
@@ -960,14 +1044,11 @@ public class ChatActivity extends AppCompatActivity {
                             return;
                         }
 
-                        sending = false;
-                        binding.sendButton.setEnabled(true);
-
                         conversationId = conversation.getId();
                         applyConversationTitle(conversation.getTitle());
                         loadRecentConversations();
 
-                        sendMessage();
+                        dispatchSend(content, idempotencyKey);
                     }
 
                     @Override
@@ -976,8 +1057,7 @@ public class ChatActivity extends AppCompatActivity {
                             return;
                         }
 
-                        sending = false;
-                        binding.sendButton.setEnabled(true);
+                        setSending(false);
 
                         if (statusCode == 401) {
                             openLogin();
@@ -1054,5 +1134,11 @@ public class ChatActivity extends AppCompatActivity {
                     }
                 }
         );
+    }
+
+    @Override
+    protected void onDestroy() {
+        stopGlowPulse();
+        super.onDestroy();
     }
 }

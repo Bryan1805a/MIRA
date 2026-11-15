@@ -1,5 +1,7 @@
 package com.mira.app.ui;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.ClipData;
@@ -11,6 +13,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -101,9 +104,26 @@ public class MessageAdapter extends ListAdapter<
 
     private final Listener listener;
 
+    /**
+     * Assistant message whose text should type itself in once. Cleared after the
+     * first reveal so scrolling back never replays the animation.
+     */
+    private String revealTargetId;
+
+    private Runnable revealProgressListener;
+
     public MessageAdapter(Listener listener) {
         super(DIFF);
         this.listener = listener;
+    }
+
+    public void setRevealTarget(String messageId) {
+        this.revealTargetId = messageId;
+    }
+
+    /** Invoked on every reveal frame so the list can follow the growing text. */
+    public void setRevealProgressListener(Runnable listener) {
+        this.revealProgressListener = listener;
     }
 
     @Override
@@ -180,6 +200,8 @@ public class MessageAdapter extends ListAdapter<
 
         if (holder instanceof ThinkingHolder) {
             ((ThinkingHolder) holder).stop();
+        } else if (holder instanceof AssistantHolder) {
+            ((AssistantHolder) holder).cancelReveal();
         }
     }
 
@@ -335,9 +357,10 @@ public class MessageAdapter extends ListAdapter<
         }
     }
 
-    static class AssistantHolder extends RecyclerView.ViewHolder {
+    class AssistantHolder extends RecyclerView.ViewHolder {
 
         private final ItemMessageAssistantBinding binding;
+        private ValueAnimator revealAnimator;
 
         AssistantHolder(ItemMessageAssistantBinding binding) {
             super(binding.getRoot());
@@ -345,9 +368,22 @@ public class MessageAdapter extends ListAdapter<
         }
 
         void bind(MessageResponse message) {
-            String displayed = MarkdownText.toPlainText(message.getContent());
+            cancelReveal();
 
-            binding.messageText.setText(displayed);
+            final String displayed =
+                    MarkdownText.toPlainText(message.getContent());
+
+            boolean shouldReveal = revealTargetId != null
+                    && revealTargetId.equals(message.getId())
+                    && !displayed.isEmpty();
+
+            if (shouldReveal) {
+                revealTargetId = null;
+                revealText(displayed);
+            } else {
+                binding.messageText.setText(displayed);
+            }
+
             bindTimestamp(binding.timestampText, message.getCreatedAt());
             enableCopyOnLongPress(binding.messageText, displayed);
 
@@ -357,6 +393,46 @@ public class MessageAdapter extends ListAdapter<
             binding.shareButton.setOnClickListener(
                     view -> share(view, displayed)
             );
+        }
+
+        /**
+         * Types the answer in by advancing a character count. Only the TextView
+         * is touched, so the list diff is not re-run on every frame.
+         */
+        private void revealText(String full) {
+            revealAnimator = ValueAnimator.ofInt(0, full.length());
+            revealAnimator.setDuration(
+                    Math.min(1400L, 300L + full.length() * 6L)
+            );
+            revealAnimator.setInterpolator(new DecelerateInterpolator());
+
+            revealAnimator.addUpdateListener(animation -> {
+                int chars = (int) animation.getAnimatedValue();
+
+                binding.messageText.setText(
+                        full.substring(0, Math.min(chars, full.length()))
+                );
+
+                if (revealProgressListener != null) {
+                    revealProgressListener.run();
+                }
+            });
+
+            revealAnimator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    binding.messageText.setText(full);
+                }
+            });
+
+            revealAnimator.start();
+        }
+
+        void cancelReveal() {
+            if (revealAnimator != null) {
+                revealAnimator.cancel();
+                revealAnimator = null;
+            }
         }
     }
 

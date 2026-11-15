@@ -8,6 +8,14 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Assistant answers type themselves in (character-by-character reveal, capped at
+  ~1.4 s) the first time they are shown; the animation updates only the text
+  view, so list diffing is untouched, and it never replays for history.
+- The purple glow behind the conversation now breathes while an answer is
+  generating (and on the empty state) instead of appearing only when idle.
+- Prompt feedback now precedes the network: in a new chat the prompt pill and
+  thinking row appear before the conversation is created, so a slow create call
+  no longer leaves the screen looking unresponsive.
 - Chat-first navigation: signing in lands on a conversation, history lives in a
   left navigation drawer (recent chats with updated timestamps, long-press to
   delete, "No chats yet" empty state), and preferences moved into a Settings hub

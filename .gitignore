@@ -36,3 +36,4 @@ application-local.properties
 
 secret.txt
 .android_keys
+ui_idea/

@@ -4,6 +4,7 @@ import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Shader;
@@ -88,6 +89,7 @@ public class ChatActivity extends AppCompatActivity {
     private String nextCursor;
     private boolean loading;
     private boolean dynamicColorEnabled;
+    private boolean wideLayout;
     private ObjectAnimator chatSkeletonAnimator;
     private ObjectAnimator drawerSkeletonAnimator;
     private boolean sending;
@@ -144,6 +146,7 @@ public class ChatActivity extends AppCompatActivity {
         setUpEffort();
         setUpMemoryChip();
         setUpList();
+        applyWideLayout();
         setUpGreeting();
         setUpSuggestions();
         binding.sendButton.setOnClickListener(
@@ -539,6 +542,14 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void closeDrawer() {
+        /*
+         * Lock mode stops gesture closing, but a programmatic close still hides
+         * the panel, which would leave the sidebar blank on tablets.
+         */
+        if (wideLayout) {
+            return;
+        }
+
         if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
             binding.drawerLayout.closeDrawer(GravityCompat.START);
         }
@@ -1608,13 +1619,47 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Tablets get a permanently visible history sidebar instead of a drawer:
+     * the content is inset past the panel, the scrim is dropped and the toggle
+     * affordances disappear. Phones keep the overlay drawer.
+     */
+    private void applyWideLayout() {
+        boolean wide = getResources()
+                .getConfiguration()
+                .smallestScreenWidthDp >= 600;
+
+        if (!wide) {
+            return;
+        }
+
+        wideLayout = true;
+
+        binding.drawerLayout.setScrimColor(Color.TRANSPARENT);
+        binding.drawerLayout.setDrawerLockMode(
+                DrawerLayout.LOCK_MODE_LOCKED_OPEN,
+                GravityCompat.START
+        );
+
+        int drawerWidth = Math.round(
+                320 * getResources().getDisplayMetrics().density
+        );
+
+        binding.contentRoot.setPadding(drawerWidth, 0, 0, 0);
+        binding.chatToolbar.setNavigationIcon(null);
+        binding.drawerClose.setVisibility(View.GONE);
+
+        /* No drawer-open event fires here, so load the history directly. */
+        loadRecentConversations();
+    }
+
     private void setUpBackHandling() {
         getOnBackPressedDispatcher().addCallback(
                 this,
                 new OnBackPressedCallback(true) {
                     @Override
                     public void handleOnBackPressed() {
-                        if (binding.drawerLayout.isDrawerOpen(
+                        if (!wideLayout && binding.drawerLayout.isDrawerOpen(
                                 GravityCompat.START
                         )) {
                             closeDrawer();

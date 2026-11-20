@@ -8,6 +8,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tablet layout: on devices whose smallest width is 600dp or more, the history
+  becomes a permanently visible sidebar with the chat inset beside it. The
+  hamburger and the drawer close button disappear, the scrim is dropped, and
+  back no longer tries to close the panel. Phones keep the existing overlay
+  drawer.
 - Dynamic color (Material You) toggle under Settings > Preferences, shown on
   Android 12+. When enabled, each activity re-inflates with the wallpaper-derived
   palette; the chat screen picks the change up on return without a restart. The
@@ -121,6 +126,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tablet layout: on devices whose smallest width is 600dp or more, the history
+  becomes a permanently visible sidebar with the chat inset beside it. The
+  hamburger and the drawer close button disappear, the scrim is dropped, and
+  back no longer tries to close the panel. Phones keep the existing overlay
+  drawer.
 - Dynamic color (Material You) toggle under Settings > Preferences, shown on
   Android 12+. When enabled, each activity re-inflates with the wallpaper-derived
   palette; the chat screen picks the change up on return without a restart. The
@@ -195,6 +205,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tablet layout: on devices whose smallest width is 600dp or more, the history
+  becomes a permanently visible sidebar with the chat inset beside it. The
+  hamburger and the drawer close button disappear, the scrim is dropped, and
+  back no longer tries to close the panel. Phones keep the existing overlay
+  drawer.
 - Dynamic color (Material You) toggle under Settings > Preferences, shown on
   Android 12+. When enabled, each activity re-inflates with the wallpaper-derived
   palette; the chat screen picks the change up on return without a restart. The
@@ -235,6 +250,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tablet layout: on devices whose smallest width is 600dp or more, the history
+  becomes a permanently visible sidebar with the chat inset beside it. The
+  hamburger and the drawer close button disappear, the scrim is dropped, and
+  back no longer tries to close the panel. Phones keep the existing overlay
+  drawer.
 - Dynamic color (Material You) toggle under Settings > Preferences, shown on
   Android 12+. When enabled, each activity re-inflates with the wallpaper-derived
   palette; the chat screen picks the change up on return without a restart. The

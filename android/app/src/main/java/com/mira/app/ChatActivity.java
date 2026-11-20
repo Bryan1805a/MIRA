@@ -86,6 +86,8 @@ public class ChatActivity extends AppCompatActivity {
 
     private String nextCursor;
     private boolean loading;
+    private ObjectAnimator chatSkeletonAnimator;
+    private ObjectAnimator drawerSkeletonAnimator;
     private boolean sending;
 
     private String pendingSendKey;
@@ -374,7 +376,58 @@ public class ChatActivity extends AppCompatActivity {
         );
     }
 
+    private void showChatSkeleton(boolean show) {
+        if (show) {
+            binding.chatSkeleton.setVisibility(View.VISIBLE);
+
+            if (chatSkeletonAnimator == null) {
+                chatSkeletonAnimator = pulse(binding.chatSkeleton);
+            }
+        } else {
+            binding.chatSkeleton.setVisibility(View.GONE);
+            stopPulse(chatSkeletonAnimator);
+            chatSkeletonAnimator = null;
+        }
+    }
+
+    private void showDrawerSkeleton(boolean show) {
+        if (show) {
+            binding.drawerSkeleton.setVisibility(View.VISIBLE);
+
+            if (drawerSkeletonAnimator == null) {
+                drawerSkeletonAnimator = pulse(binding.drawerSkeleton);
+            }
+        } else {
+            binding.drawerSkeleton.setVisibility(View.GONE);
+            stopPulse(drawerSkeletonAnimator);
+            drawerSkeletonAnimator = null;
+        }
+    }
+
+    private ObjectAnimator pulse(View view) {
+        ObjectAnimator animator = ObjectAnimator.ofFloat(
+                view,
+                View.ALPHA,
+                0.35f,
+                0.85f
+        );
+        animator.setDuration(650L);
+        animator.setRepeatCount(ValueAnimator.INFINITE);
+        animator.setRepeatMode(ValueAnimator.REVERSE);
+        animator.start();
+
+        return animator;
+    }
+
+    private static void stopPulse(ObjectAnimator animator) {
+        if (animator != null) {
+            animator.cancel();
+        }
+    }
+
     private void loadRecentConversations() {
+        showDrawerSkeleton(recentConversations.isEmpty());
+
         conversationRepository.list(
                 null,
                 new ApiCallback<ConversationPageResponse>() {
@@ -383,6 +436,8 @@ public class ChatActivity extends AppCompatActivity {
                         if (isFinishing() || isDestroyed()) {
                             return;
                         }
+
+                        showDrawerSkeleton(false);
 
                         recentConversations.clear();
 
@@ -398,6 +453,8 @@ public class ChatActivity extends AppCompatActivity {
                         if (isFinishing() || isDestroyed()) {
                             return;
                         }
+
+                        showDrawerSkeleton(false);
 
                         if (statusCode == 401) {
                             openLogin();
@@ -650,11 +707,7 @@ public class ChatActivity extends AppCompatActivity {
         loading = true;
         binding.emptyState.setVisibility(View.GONE);
         binding.errorText.setVisibility(View.GONE);
-        binding.progress.setVisibility(
-                messages.isEmpty()
-                        ? View.VISIBLE
-                        : View.GONE
-        );
+        showChatSkeleton(messages.isEmpty());
 
         if (cursor == null) {
             nextCursor = null;
@@ -671,7 +724,7 @@ public class ChatActivity extends AppCompatActivity {
                         }
 
                         loading = false;
-                        binding.progress.setVisibility(View.GONE);
+                        showChatSkeleton(false);
 
                         if (cursor == null) {
                             messages.clear();
@@ -697,7 +750,7 @@ public class ChatActivity extends AppCompatActivity {
                         }
 
                         loading = false;
-                        binding.progress.setVisibility(View.GONE);
+                        showChatSkeleton(false);
 
                         if (statusCode == 401) {
                             openLogin();
@@ -1559,6 +1612,8 @@ public class ChatActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         stopGlowPulse();
+        stopPulse(chatSkeletonAnimator);
+        stopPulse(drawerSkeletonAnimator);
         super.onDestroy();
     }
 }

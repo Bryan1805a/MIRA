@@ -64,6 +64,11 @@ public class SettingsActivity extends AppCompatActivity {
                 view -> showAppearanceDialog()
         );
 
+        binding.aboutValue.setText(BuildConfig.VERSION_NAME);
+        binding.aboutRow.setOnClickListener(
+                view -> startActivity(new Intent(this, AboutActivity.class))
+        );
+
         binding.signOutButton.setOnClickListener(
                 view -> logout()
         );

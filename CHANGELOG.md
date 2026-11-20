@@ -8,6 +8,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Skeleton placeholders replace the spinner while chat history and the drawer
+  load: message-shaped bars and row-shaped bars pulse gently, then disappear on
+  success or error.
+- About screen (Settings > About MIRA) with the app icon, version, build type,
+  backend URL and a plain-language privacy statement covering what memory holds,
+  what it never extracts, and how to purge it.
 - History drawer upgrades: a search field filters the loaded conversations by
   title locally (no extra requests), a "No chats match your search" state, and
   swipe-right on a row asks to delete it with a red band and trash icon. Chats
@@ -111,6 +117,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Skeleton placeholders replace the spinner while chat history and the drawer
+  load: message-shaped bars and row-shaped bars pulse gently, then disappear on
+  success or error.
+- About screen (Settings > About MIRA) with the app icon, version, build type,
+  backend URL and a plain-language privacy statement covering what memory holds,
+  what it never extracts, and how to purge it.
 - History drawer upgrades: a search field filters the loaded conversations by
   title locally (no extra requests), a "No chats match your search" state, and
   swipe-right on a row asks to delete it with a red band and trash icon. Chats
@@ -175,6 +187,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Skeleton placeholders replace the spinner while chat history and the drawer
+  load: message-shaped bars and row-shaped bars pulse gently, then disappear on
+  success or error.
+- About screen (Settings > About MIRA) with the app icon, version, build type,
+  backend URL and a plain-language privacy statement covering what memory holds,
+  what it never extracts, and how to purge it.
 - History drawer upgrades: a search field filters the loaded conversations by
   title locally (no extra requests), a "No chats match your search" state, and
   swipe-right on a row asks to delete it with a red band and trash icon. Chats
@@ -205,6 +223,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Skeleton placeholders replace the spinner while chat history and the drawer
+  load: message-shaped bars and row-shaped bars pulse gently, then disappear on
+  success or error.
+- About screen (Settings > About MIRA) with the app icon, version, build type,
+  backend URL and a plain-language privacy statement covering what memory holds,
+  what it never extracts, and how to purge it.
 - History drawer upgrades: a search field filters the loaded conversations by
   title locally (no extra requests), a "No chats match your search" state, and
   swipe-right on a row asks to delete it with a red band and trash icon. Chats

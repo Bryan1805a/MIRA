@@ -113,7 +113,22 @@ public class ConversationAdapter extends ListAdapter<
                     conversation.getUpdatedAt()
             );
 
-            if (updated.isEmpty()) {
+            /* Recent chats read better relative; older ones keep their date. */
+            long minutes = DateFormats.minutesSince(
+                    conversation.getUpdatedAt()
+            );
+
+            if (minutes >= 0 && minutes < 60) {
+                binding.updatedText.setVisibility(View.VISIBLE);
+                binding.updatedText.setText(
+                        minutes < 1
+                                ? context.getString(R.string.updated_just_now)
+                                : context.getString(
+                                        R.string.updated_minutes_ago,
+                                        minutes
+                                )
+                );
+            } else if (updated.isEmpty()) {
                 binding.updatedText.setVisibility(View.GONE);
             } else {
                 binding.updatedText.setVisibility(View.VISIBLE);

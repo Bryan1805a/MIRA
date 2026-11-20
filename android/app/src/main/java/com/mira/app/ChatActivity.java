@@ -3,8 +3,11 @@ package com.mira.app;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Intent;
+import android.graphics.Canvas;
 import android.graphics.LinearGradient;
+import android.graphics.Paint;
 import android.graphics.Shader;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
@@ -18,11 +21,14 @@ import androidx.activity.EdgeToEdge;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.mira.app.data.ApiCallback;
 import com.mira.app.data.ConversationRepository;
@@ -47,6 +53,7 @@ import com.mira.app.util.WindowInsetsHelper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -204,6 +211,142 @@ public class ChatActivity extends AppCompatActivity {
         );
         binding.drawerConversations.setAdapter(drawerAdapter);
 
+        binding.drawerSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(
+                    CharSequence s,
+                    int start,
+                    int count,
+                    int after
+            ) {
+                /* Filtering is purely local over the loaded page. */
+            }
+
+            @Override
+            public void onTextChanged(
+                    CharSequence s,
+                    int start,
+                    int before,
+                    int count
+            ) {
+                applyConversationFilter();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                /* Handled in onTextChanged. */
+            }
+        });
+
+        /*
+         * Only right-swipes are offered: a left drag inside the drawer is the
+         * DrawerLayout's own close gesture, so it would never reach the row.
+         */
+        final Paint swipeBackground = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final Drawable swipeIcon = ContextCompat.getDrawable(
+                this,
+                R.drawable.ic_delete
+        );
+        final int swipeIconSize = Math.round(
+                20 * getResources().getDisplayMetrics().density
+        );
+
+        new ItemTouchHelper(
+                new ItemTouchHelper.SimpleCallback(
+                        0,
+                        ItemTouchHelper.RIGHT
+                ) {
+                    @Override
+                    public boolean onMove(
+                            @NonNull RecyclerView recyclerView,
+                            @NonNull RecyclerView.ViewHolder viewHolder,
+                            @NonNull RecyclerView.ViewHolder target
+                    ) {
+                        return false;
+                    }
+
+                    @Override
+                    public void onChildDraw(
+                            @NonNull Canvas canvas,
+                            @NonNull RecyclerView recyclerView,
+                            @NonNull RecyclerView.ViewHolder viewHolder,
+                            float dX,
+                            float dY,
+                            int actionState,
+                            boolean isCurrentlyActive
+                    ) {
+                        if (dX > 0) {
+                            View item = viewHolder.itemView;
+
+                            swipeBackground.setColor(
+                                    MaterialColors.getColor(
+                                            item,
+                                            com.google.android.material.R.attr
+                                                    .colorErrorContainer
+                                    )
+                            );
+                            canvas.drawRect(
+                                    item.getLeft(),
+                                    item.getTop(),
+                                    item.getLeft() + dX,
+                                    item.getBottom(),
+                                    swipeBackground
+                            );
+
+                            if (swipeIcon != null) {
+                                int top = item.getTop()
+                                        + (item.getHeight() - swipeIconSize) / 2;
+                                int left = item.getLeft() + swipeIconSize;
+
+                                swipeIcon.setBounds(
+                                        left,
+                                        top,
+                                        left + swipeIconSize,
+                                        top + swipeIconSize
+                                );
+                                swipeIcon.setTint(
+                                        MaterialColors.getColor(
+                                                item,
+                                                com.google.android.material.R.attr
+                                                        .colorOnErrorContainer
+                                        )
+                                );
+                                swipeIcon.draw(canvas);
+                            }
+                        }
+
+                        super.onChildDraw(
+                                canvas,
+                                recyclerView,
+                                viewHolder,
+                                dX,
+                                dY,
+                                actionState,
+                                isCurrentlyActive
+                        );
+                    }
+
+                    @Override
+                    public void onSwiped(
+                            @NonNull RecyclerView.ViewHolder viewHolder,
+                            int direction
+                    ) {
+                        int position = viewHolder.getBindingAdapterPosition();
+
+                        if (position == RecyclerView.NO_POSITION) {
+                            return;
+                        }
+
+                        ConversationResponse conversation =
+                                drawerAdapter.getCurrentList().get(position);
+
+                        /* Bring the row back; deletion is confirmed first. */
+                        drawerAdapter.notifyItemChanged(position);
+                        confirmDeleteConversation(conversation);
+                    }
+                }
+        ).attachToRecyclerView(binding.drawerConversations);
+
         binding.drawerEmail.setText(tokenStore.email());
 
         binding.newChatButton.setOnClickListener(
@@ -224,6 +367,7 @@ public class ChatActivity extends AppCompatActivity {
                 new DrawerLayout.SimpleDrawerListener() {
                     @Override
                     public void onDrawerOpened(@NonNull View drawerView) {
+                        binding.drawerSearch.setText("");
                         loadRecentConversations();
                     }
                 }
@@ -246,14 +390,7 @@ public class ChatActivity extends AppCompatActivity {
                             recentConversations.addAll(page.getItems());
                         }
 
-                        drawerAdapter.submitList(
-                                new ArrayList<>(recentConversations)
-                        );
-                        binding.drawerEmpty.setVisibility(
-                                recentConversations.isEmpty()
-                                        ? View.VISIBLE
-                                        : View.GONE
-                        );
+                        applyConversationFilter();
                     }
 
                     @Override
@@ -267,6 +404,45 @@ public class ChatActivity extends AppCompatActivity {
                         }
                     }
                 }
+        );
+    }
+
+    /**
+     * Filters the loaded conversations by title. Kept local because the drawer
+     * only shows the first page, so there is no reason to hit the network while
+     * the user types.
+     */
+    private void applyConversationFilter() {
+        CharSequence raw = binding.drawerSearch.getText();
+        String query = raw == null
+                ? ""
+                : raw.toString().trim().toLowerCase(Locale.getDefault());
+
+        List<ConversationResponse> filtered = new ArrayList<>(
+                recentConversations.size()
+        );
+
+        for (ConversationResponse conversation : recentConversations) {
+            String title = conversation.getTitle();
+
+            if (query.isEmpty()
+                    || (title != null
+                    && title.toLowerCase(Locale.getDefault()).contains(query))) {
+                filtered.add(conversation);
+            }
+        }
+
+        drawerAdapter.submitList(filtered);
+
+        boolean empty = filtered.isEmpty();
+
+        binding.drawerEmpty.setVisibility(
+                empty ? View.VISIBLE : View.GONE
+        );
+        binding.drawerEmpty.setText(
+                query.isEmpty()
+                        ? R.string.drawer_no_chats
+                        : R.string.drawer_no_matches
         );
     }
 

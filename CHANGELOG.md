@@ -8,6 +8,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- History drawer upgrades: a search field filters the loaded conversations by
+  title locally (no extra requests), a "No chats match your search" state, and
+  swipe-right on a row asks to delete it with a red band and trash icon. Chats
+  updated within the hour read "Updated just now" or "Updated N min ago"; older
+  ones keep the absolute date. Left-swipe is deliberately not offered because
+  the drawer uses that gesture to close.
 - The chat composer now shows a "Style memory on" chip whenever communication
   memory is enabled, tappable to open the memory screen. It reads "Memory on"
   when the profile exists but has no preferences yet, disappears when
@@ -105,6 +111,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- History drawer upgrades: a search field filters the loaded conversations by
+  title locally (no extra requests), a "No chats match your search" state, and
+  swipe-right on a row asks to delete it with a red band and trash icon. Chats
+  updated within the hour read "Updated just now" or "Updated N min ago"; older
+  ones keep the absolute date. Left-swipe is deliberately not offered because
+  the drawer uses that gesture to close.
 - The chat composer now shows a "Style memory on" chip whenever communication
   memory is enabled, tappable to open the memory screen. It reads "Memory on"
   when the profile exists but has no preferences yet, disappears when
@@ -163,6 +175,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- History drawer upgrades: a search field filters the loaded conversations by
+  title locally (no extra requests), a "No chats match your search" state, and
+  swipe-right on a row asks to delete it with a red band and trash icon. Chats
+  updated within the hour read "Updated just now" or "Updated N min ago"; older
+  ones keep the absolute date. Left-swipe is deliberately not offered because
+  the drawer uses that gesture to close.
 - The chat composer now shows a "Style memory on" chip whenever communication
   memory is enabled, tappable to open the memory screen. It reads "Memory on"
   when the profile exists but has no preferences yet, disappears when
@@ -187,6 +205,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- History drawer upgrades: a search field filters the loaded conversations by
+  title locally (no extra requests), a "No chats match your search" state, and
+  swipe-right on a row asks to delete it with a red band and trash icon. Chats
+  updated within the hour read "Updated just now" or "Updated N min ago"; older
+  ones keep the absolute date. Left-swipe is deliberately not offered because
+  the drawer uses that gesture to close.
 - The chat composer now shows a "Style memory on" chip whenever communication
   memory is enabled, tappable to open the memory screen. It reads "Memory on"
   when the profile exists but has no preferences yet, disappears when

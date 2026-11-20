@@ -8,6 +8,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The chat composer now shows a "Style memory on" chip whenever communication
+  memory is enabled, tappable to open the memory screen. It reads "Memory on"
+  when the profile exists but has no preferences yet, disappears when
+  personalization is off, and refreshes when returning from the memory screen.
 - Rich answers: headings scale up and bold, bullets hang-indent, inline code is
   monospaced on a tinted background, and fenced code renders as full-width
   monospaced bands inside the same bubble. Nested emphasis (code inside bold)
@@ -101,6 +105,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The chat composer now shows a "Style memory on" chip whenever communication
+  memory is enabled, tappable to open the memory screen. It reads "Memory on"
+  when the profile exists but has no preferences yet, disappears when
+  personalization is off, and refreshes when returning from the memory screen.
 - Rich answers: headings scale up and bold, bullets hang-indent, inline code is
   monospaced on a tinted background, and fenced code renders as full-width
   monospaced bands inside the same bubble. Nested emphasis (code inside bold)
@@ -155,6 +163,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The chat composer now shows a "Style memory on" chip whenever communication
+  memory is enabled, tappable to open the memory screen. It reads "Memory on"
+  when the profile exists but has no preferences yet, disappears when
+  personalization is off, and refreshes when returning from the memory screen.
 - Rich answers: headings scale up and bold, bullets hang-indent, inline code is
   monospaced on a tinted background, and fenced code renders as full-width
   monospaced bands inside the same bubble. Nested emphasis (code inside bold)
@@ -175,6 +187,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The chat composer now shows a "Style memory on" chip whenever communication
+  memory is enabled, tappable to open the memory screen. It reads "Memory on"
+  when the profile exists but has no preferences yet, disappears when
+  personalization is off, and refreshes when returning from the memory screen.
 - Rich answers: headings scale up and bold, bullets hang-indent, inline code is
   monospaced on a tinted background, and fenced code renders as full-width
   monospaced bands inside the same bubble. Nested emphasis (code inside bold)

@@ -73,6 +73,9 @@
 
     <!-- Communication-style memory -->
     <string name="memory_title">Communication memory</string>
+    <string name="memory_chip_on">Style memory on</string>
+    <string name="memory_chip_enabled">Memory on</string>
+    <string name="memory_chip_action">Open communication memory</string>
     <string name="memory_status_title">Personalization</string>
     <string name="memory_status_on">On. Your preferences are applied to new messages.</string>
     <string name="memory_status_off">Off. Preferences are saved but not applied.</string>

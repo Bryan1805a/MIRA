@@ -297,6 +297,35 @@
                 android:textColor="?attr/colorError"
                 android:visibility="gone" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/memoryChip"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_gravity="start"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="4dp"
+                android:contentDescription="@string/memory_chip_action"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingStart="10dp"
+                android:paddingTop="0dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="0dp"
+                android:text="@string/memory_chip_on"
+                android:textAppearance="?attr/textAppearanceLabelSmall"
+                android:textColor="?attr/colorPrimary"
+                android:visibility="gone"
+                app:backgroundTint="?attr/colorSurfaceContainerHigh"
+                app:cornerRadius="14dp"
+                app:icon="@drawable/ic_memory"
+                app:iconGravity="textStart"
+                app:iconPadding="4dp"
+                app:iconSize="14dp"
+                app:iconTint="?attr/colorPrimary"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp" />
+
             <!-- Floating prompt capsule -->
             <LinearLayout
                 android:layout_width="match_parent"

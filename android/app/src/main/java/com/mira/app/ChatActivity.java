@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.mira.app.data.ApiCallback;
 import com.mira.app.data.ConversationRepository;
+import com.mira.app.data.MemoryRepository;
 import com.mira.app.data.MessageRepository;
 import com.mira.app.data.model.AssistantResponseResponse;
 import com.mira.app.data.model.ConversationPageResponse;
@@ -33,6 +34,7 @@ import com.mira.app.data.model.ConversationResponse;
 import com.mira.app.data.model.MessagePageResponse;
 import com.mira.app.data.model.MessageResponse;
 import com.mira.app.data.model.MessageRole;
+import com.mira.app.data.model.StyleProfileResponse;
 import com.mira.app.data.model.RegenerateResponse;
 import com.mira.app.data.model.ResponseStatus;
 import com.mira.app.data.model.RetryResponse;
@@ -45,6 +47,7 @@ import com.mira.app.util.WindowInsetsHelper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class ChatActivity extends AppCompatActivity {
@@ -59,6 +62,7 @@ public class ChatActivity extends AppCompatActivity {
     private ActivityChatBinding binding;
     private MessageRepository repository;
     private ConversationRepository conversationRepository;
+    private MemoryRepository memoryRepository;
     private MessageAdapter adapter;
     private ConversationAdapter drawerAdapter;
     private TokenStore tokenStore;
@@ -115,11 +119,13 @@ public class ChatActivity extends AppCompatActivity {
 
         repository = new MessageRepository(this);
         conversationRepository = new ConversationRepository(this);
+        memoryRepository = new MemoryRepository(this);
 
         setUpToolbar();
         setUpDrawer();
         setUpBackHandling();
         setUpEffort();
+        setUpMemoryChip();
         setUpList();
         setUpGreeting();
         setUpSuggestions();
@@ -1281,6 +1287,79 @@ public class ChatActivity extends AppCompatActivity {
      * Predictive-back safe handling: the drawer closes before the activity does.
      * Registering through the dispatcher keeps gesture back working on API 33+.
      */
+    /**
+     * Surfaces the style memory inside the chat instead of only in Settings, so
+     * the personalization is visible while a conversation is happening. The chip
+     * reflects the saved profile and opens the memory screen.
+     */
+    private void setUpMemoryChip() {
+        binding.memoryChip.setOnClickListener(
+                view -> startActivity(
+                        new Intent(this, MemoryActivity.class)
+                )
+        );
+    }
+
+    private void refreshMemoryChip() {
+        if (binding == null || memoryRepository == null) {
+            return;
+        }
+
+        memoryRepository.getStyle(new ApiCallback<StyleProfileResponse>() {
+            @Override
+            public void onSuccess(StyleProfileResponse profile) {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+
+                if (profile == null || !profile.isEnabled()) {
+                    binding.memoryChip.setVisibility(View.GONE);
+                    return;
+                }
+
+                binding.memoryChip.setText(
+                        hasPreferences(profile)
+                                ? R.string.memory_chip_on
+                                : R.string.memory_chip_enabled
+                );
+                binding.memoryChip.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                /* Memory is advisory; never interrupt the chat over it. */
+                if (binding != null) {
+                    binding.memoryChip.setVisibility(View.GONE);
+                }
+            }
+        });
+    }
+
+    private static boolean hasPreferences(StyleProfileResponse profile) {
+        Map<String, String> values = profile.getProfile();
+
+        if (values == null) {
+            return false;
+        }
+
+        for (String value : values.values()) {
+            if (value != null && !value.isEmpty()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (tokenStore != null && tokenStore.hasSession()) {
+            refreshMemoryChip();
+        }
+    }
+
     private void setUpBackHandling() {
         getOnBackPressedDispatcher().addCallback(
                 this,

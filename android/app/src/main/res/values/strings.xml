@@ -31,7 +31,6 @@
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
-    <string name="effort_button">Effort: %1$s</string>
     <string name="effort_dialog_title">AI effort</string>
     <string name="effort_option_low">Low</string>
     <string name="effort_option_medium">Medium</string>

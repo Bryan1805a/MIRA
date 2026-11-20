@@ -1,11 +1,15 @@
 package com.mira.app.ui;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.LeadingMarginSpan;
+import android.text.style.LineBackgroundSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
@@ -83,9 +87,7 @@ public final class RichText {
             MarkdownDocument.Block block,
             int codeBackground
     ) {
-        if (out.length() > 0) {
-            out.append('\n');
-        }
+        ensureNewline(out);
 
         int start = out.length();
         out.append(inline(context, block.text(), codeBackground));
@@ -137,9 +139,7 @@ public final class RichText {
             MarkdownDocument.Block block,
             int codeBackground
     ) {
-        if (out.length() > 0) {
-            out.append('\n');
-        }
+        ensureNewline(out);
 
         String indented = "  " + block.text().replace("\n", "\n  ");
 
@@ -154,7 +154,7 @@ public final class RichText {
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
         );
         out.setSpan(
-                new BackgroundColorSpan(codeBackground),
+                new CodeBlockBackground(codeBackground),
                 start,
                 end,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -166,6 +166,46 @@ public final class RichText {
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
         );
         out.append('\n');
+    }
+
+    private static void ensureNewline(SpannableStringBuilder out) {
+        if (out.length() > 0 && out.charAt(out.length() - 1) != '\n') {
+            out.append('\n');
+        }
+    }
+
+    /**
+     * Paints every code line edge to edge, so a block reads as one band instead
+     * of a highlight that stops wherever the text happens to end.
+     */
+    private static final class CodeBlockBackground
+            implements LineBackgroundSpan {
+
+        private final int color;
+
+        CodeBlockBackground(int color) {
+            this.color = color;
+        }
+
+        @Override
+        public void drawBackground(
+                Canvas canvas,
+                Paint paint,
+                int left,
+                int right,
+                int top,
+                int baseline,
+                int bottom,
+                CharSequence text,
+                int start,
+                int end,
+                int lineNumber
+        ) {
+            int previous = paint.getColor();
+            paint.setColor(color);
+            canvas.drawRect(0, top, right, bottom, paint);
+            paint.setColor(previous);
+        }
     }
 
     /**
@@ -229,11 +269,7 @@ public final class RichText {
                 int end = text.indexOf("" + current + current, index + 2);
 
                 if (end > index + 2) {
-                    appendSpan(
-                            out,
-                            text.substring(index + 2, end),
-                            new StyleSpan(Typeface.BOLD)
-                    );
+                    appendNested(out, context, text.substring(index + 2, end), new StyleSpan(Typeface.BOLD), codeBackground);
                     index = end + 2;
                     continue;
                 }
@@ -243,11 +279,7 @@ public final class RichText {
                 int end = text.indexOf("~~", index + 2);
 
                 if (end > index + 2) {
-                    appendSpan(
-                            out,
-                            text.substring(index + 2, end),
-                            new StrikethroughSpan()
-                    );
+                    appendNested(out, context, text.substring(index + 2, end), new StrikethroughSpan(), codeBackground);
                     index = end + 2;
                     continue;
                 }
@@ -257,11 +289,7 @@ public final class RichText {
                 int end = closingItalic(text, index + 1, current);
 
                 if (end > index + 1) {
-                    appendSpan(
-                            out,
-                            text.substring(index + 1, end),
-                            new StyleSpan(Typeface.ITALIC)
-                    );
+                    appendNested(out, context, text.substring(index + 1, end), new StyleSpan(Typeface.ITALIC), codeBackground);
                     index = end + 1;
                     continue;
                 }
@@ -301,6 +329,46 @@ public final class RichText {
                 span,
                 start,
                 out.length(),
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+    }
+
+    /**
+     * Appends {@code content} with its own inline formatting (code inside bold,
+     * for example) and then applies the outer span over the whole range. Without
+     * this, markers nested inside emphasis leaked into the answer as literal
+     * backticks.
+     */
+    private static void appendNested(
+            SpannableStringBuilder out,
+            Context context,
+            String content,
+            Object outerSpan,
+            int codeBackground
+    ) {
+        CharSequence inner = inline(context, content, codeBackground);
+
+        int start = out.length();
+        out.append(inner);
+        int stop = out.length();
+
+        if (inner instanceof Spanned) {
+            Spanned spans = (Spanned) inner;
+
+            for (Object span : spans.getSpans(0, inner.length(), Object.class)) {
+                out.setSpan(
+                        span,
+                        spans.getSpanStart(span) + start,
+                        spans.getSpanEnd(span) + start,
+                        spans.getSpanFlags(span)
+                );
+            }
+        }
+
+        out.setSpan(
+                outerSpan,
+                start,
+                stop,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
         );
     }

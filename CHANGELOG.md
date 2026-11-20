@@ -8,6 +8,18 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Rich answers: headings scale up and bold, bullets hang-indent, inline code is
+  monospaced on a tinted background, and fenced code renders as full-width
+  monospaced bands inside the same bubble. Nested emphasis (code inside bold)
+  renders too. The typewriter reveal animates the styled text.
+- The chat toolbar now carries the conversation title, an inline AI-effort chip
+  and a new-chat action; the empty state shows horizontal prompt cards and a
+  gradient greeting.
+
+### Changed
+
+- The backend system prompt now asks for light Markdown (headings, bold, lists,
+  fenced code) instead of plain text, so answers can use the richer renderer.
 - Regenerate: any completed answer can be regenerated from the chat footer
   (`POST /api/v1/conversations/{id}/responses/{id}/regenerate`). The replacement
   is written in place so a thread keeps one answer per prompt, the new text types
@@ -89,6 +101,18 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Rich answers: headings scale up and bold, bullets hang-indent, inline code is
+  monospaced on a tinted background, and fenced code renders as full-width
+  monospaced bands inside the same bubble. Nested emphasis (code inside bold)
+  renders too. The typewriter reveal animates the styled text.
+- The chat toolbar now carries the conversation title, an inline AI-effort chip
+  and a new-chat action; the empty state shows horizontal prompt cards and a
+  gradient greeting.
+
+### Changed
+
+- The backend system prompt now asks for light Markdown (headings, bold, lists,
+  fenced code) instead of plain text, so answers can use the richer renderer.
 - Phase 3 security hardening: authentication rate limiting for login,
   registration, and refresh, with per-email and per-IP windows.
 - Account-wide refresh-token replay revocation.
@@ -131,6 +155,18 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Rich answers: headings scale up and bold, bullets hang-indent, inline code is
+  monospaced on a tinted background, and fenced code renders as full-width
+  monospaced bands inside the same bubble. Nested emphasis (code inside bold)
+  renders too. The typewriter reveal animates the styled text.
+- The chat toolbar now carries the conversation title, an inline AI-effort chip
+  and a new-chat action; the empty state shows horizontal prompt cards and a
+  gradient greeting.
+
+### Changed
+
+- The backend system prompt now asks for light Markdown (headings, bold, lists,
+  fenced code) instead of plain text, so answers can use the richer renderer.
 - Production container image and Render blueprint.
 - Signed Android release workflow and release keystore configuration.
 - Local container verification against PostgreSQL.
@@ -139,6 +175,18 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Rich answers: headings scale up and bold, bullets hang-indent, inline code is
+  monospaced on a tinted background, and fenced code renders as full-width
+  monospaced bands inside the same bubble. Nested emphasis (code inside bold)
+  renders too. The typewriter reveal animates the styled text.
+- The chat toolbar now carries the conversation title, an inline AI-effort chip
+  and a new-chat action; the empty state shows horizontal prompt cards and a
+  gradient greeting.
+
+### Changed
+
+- The backend system prompt now asks for light Markdown (headings, bold, lists,
+  fenced code) instead of plain text, so answers can use the richer renderer.
 - Android communication-style memory management and candidate review
   (`MemoryActivity`).
 - Release signing configuration and tag-based signed artifacts.

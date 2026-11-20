@@ -32,6 +32,8 @@
     <string name="close_navigation">Close navigation</string>
     <string name="settings_preferences">Preferences</string>
     <string name="settings_appearance">Appearance</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_summary">Use your wallpaper palette (Android 12+)</string>
     <string name="about_title">About MIRA</string>
     <string name="about_tagline">Memory-Informed Response Agent</string>
     <string name="about_version">Version %1$s</string>

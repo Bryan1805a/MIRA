@@ -23,6 +23,7 @@ import com.mira.app.databinding.ActivityMemoryBinding;
 import com.mira.app.databinding.ItemMemoryCandidateBinding;
 import com.mira.app.ui.MemoryOptions;
 import com.mira.app.util.DateFormats;
+import com.mira.app.util.MiraTheme;
 import com.mira.app.util.WindowInsetsHelper;
 
 import java.util.LinkedHashMap;
@@ -56,6 +57,7 @@ public class MemoryActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
+        MiraTheme.apply(this);
 
         binding = ActivityMemoryBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());

@@ -2,6 +2,9 @@ package com.mira.app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
+import android.os.Build;
+import android.content.SharedPreferences;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -11,6 +14,7 @@ import com.mira.app.data.AuthCallback;
 import com.mira.app.data.AuthRepository;
 import com.mira.app.data.session.TokenStore;
 import com.mira.app.databinding.ActivitySettingsBinding;
+import com.mira.app.util.MiraTheme;
 import com.mira.app.util.WindowInsetsHelper;
 
 /**
@@ -29,6 +33,7 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
+        MiraTheme.apply(this);
 
         binding = ActivitySettingsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -64,6 +69,8 @@ public class SettingsActivity extends AppCompatActivity {
                 view -> showAppearanceDialog()
         );
 
+        setUpDynamicColor();
+
         binding.aboutValue.setText(BuildConfig.VERSION_NAME);
         binding.aboutRow.setOnClickListener(
                 view -> startActivity(new Intent(this, AboutActivity.class))
@@ -74,6 +81,48 @@ public class SettingsActivity extends AppCompatActivity {
         );
 
         renderAppearance();
+    }
+
+    private void setUpDynamicColor() {
+        boolean supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+
+        binding.dynamicColorRow.setVisibility(
+                supported ? View.VISIBLE : View.GONE
+        );
+
+        if (!supported) {
+            return;
+        }
+
+        final SharedPreferences preferences = getSharedPreferences(
+                MiraApplication.PREFS,
+                MODE_PRIVATE
+        );
+
+        binding.dynamicColorSwitch.setChecked(
+                preferences.getBoolean(
+                        MiraApplication.PREF_DYNAMIC_COLOR,
+                        false
+                )
+        );
+
+        binding.dynamicColorSwitch.setOnCheckedChangeListener(
+                (button, checked) -> {
+                    preferences.edit()
+                            .putBoolean(
+                                    MiraApplication.PREF_DYNAMIC_COLOR,
+                                    checked
+                            )
+                            .apply();
+
+                    /* Colours are resolved per activity, so re-inflate this one. */
+                    recreate();
+                }
+        );
+
+        binding.dynamicColorRow.setOnClickListener(
+                view -> binding.dynamicColorSwitch.toggle()
+        );
     }
 
     private void renderAppearance() {

@@ -49,6 +49,7 @@ import com.mira.app.data.session.TokenStore;
 import com.mira.app.databinding.ActivityChatBinding;
 import com.mira.app.ui.ConversationAdapter;
 import com.mira.app.ui.MessageAdapter;
+import com.mira.app.util.MiraTheme;
 import com.mira.app.util.WindowInsetsHelper;
 
 import java.util.ArrayList;
@@ -86,6 +87,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private String nextCursor;
     private boolean loading;
+    private boolean dynamicColorEnabled;
     private ObjectAnimator chatSkeletonAnimator;
     private ObjectAnimator drawerSkeletonAnimator;
     private boolean sending;
@@ -105,9 +107,15 @@ public class ChatActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
+        MiraTheme.apply(this);
 
         binding = ActivityChatBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
+        dynamicColorEnabled = getSharedPreferences(
+                MiraApplication.PREFS,
+                MODE_PRIVATE
+        ).getBoolean(MiraApplication.PREF_DYNAMIC_COLOR, false);
 
         /*
          * DrawerLayout consumes window insets itself and ignores padding set on
@@ -1583,6 +1591,17 @@ public class ChatActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        /* Colours are applied per activity, so pick up a toggle made in Settings. */
+        boolean dynamicNow = getSharedPreferences(
+                MiraApplication.PREFS,
+                MODE_PRIVATE
+        ).getBoolean(MiraApplication.PREF_DYNAMIC_COLOR, false);
+
+        if (dynamicNow != dynamicColorEnabled) {
+            recreate();
+            return;
+        }
 
         if (tokenStore != null && tokenStore.hasSession()) {
             refreshMemoryChip();

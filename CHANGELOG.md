@@ -8,6 +8,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Dynamic color (Material You) toggle under Settings > Preferences, shown on
+  Android 12+. When enabled, each activity re-inflates with the wallpaper-derived
+  palette; the chat screen picks the change up on return without a restart. The
+  preference defaults to off so the purple brand stays the default look.
 - Skeleton placeholders replace the spinner while chat history and the drawer
   load: message-shaped bars and row-shaped bars pulse gently, then disappear on
   success or error.
@@ -117,6 +121,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Dynamic color (Material You) toggle under Settings > Preferences, shown on
+  Android 12+. When enabled, each activity re-inflates with the wallpaper-derived
+  palette; the chat screen picks the change up on return without a restart. The
+  preference defaults to off so the purple brand stays the default look.
 - Skeleton placeholders replace the spinner while chat history and the drawer
   load: message-shaped bars and row-shaped bars pulse gently, then disappear on
   success or error.
@@ -187,6 +195,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Dynamic color (Material You) toggle under Settings > Preferences, shown on
+  Android 12+. When enabled, each activity re-inflates with the wallpaper-derived
+  palette; the chat screen picks the change up on return without a restart. The
+  preference defaults to off so the purple brand stays the default look.
 - Skeleton placeholders replace the spinner while chat history and the drawer
   load: message-shaped bars and row-shaped bars pulse gently, then disappear on
   success or error.
@@ -223,6 +235,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Dynamic color (Material You) toggle under Settings > Preferences, shown on
+  Android 12+. When enabled, each activity re-inflates with the wallpaper-derived
+  palette; the chat screen picks the change up on return without a restart. The
+  preference defaults to off so the purple brand stays the default look.
 - Skeleton placeholders replace the spinner while chat history and the drawer
   load: message-shaped bars and row-shaped bars pulse gently, then disappear on
   success or error.

@@ -13,6 +13,7 @@ import com.mira.app.data.AuthCallback;
 import com.mira.app.data.AuthRepository;
 import com.mira.app.data.model.SessionResponse;
 import com.mira.app.databinding.ActivityRegisterBinding;
+import com.mira.app.util.MiraTheme;
 import com.mira.app.util.WindowInsetsHelper;
 
 public class RegisterActivity extends AppCompatActivity {
@@ -24,6 +25,7 @@ public class RegisterActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
+        MiraTheme.apply(this);
 
         binding = ActivityRegisterBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());

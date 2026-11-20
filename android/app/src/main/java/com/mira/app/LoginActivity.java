@@ -14,6 +14,7 @@ import com.mira.app.data.AuthRepository;
 import com.mira.app.data.model.SessionResponse;
 import com.mira.app.data.session.TokenStore;
 import com.mira.app.databinding.ActivityLoginBinding;
+import com.mira.app.util.MiraTheme;
 import com.mira.app.util.WindowInsetsHelper;
 
 public class LoginActivity extends AppCompatActivity {
@@ -25,6 +26,7 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
+        MiraTheme.apply(this);
 
         binding = ActivityLoginBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());

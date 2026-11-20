@@ -5,6 +5,7 @@ import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.mira.app.databinding.ActivityAboutBinding;
+import com.mira.app.util.MiraTheme;
 import com.mira.app.util.WindowInsetsHelper;
 
 /**
@@ -19,6 +20,7 @@ public class AboutActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        MiraTheme.apply(this);
 
         binding = ActivityAboutBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());

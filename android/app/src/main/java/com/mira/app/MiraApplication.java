@@ -10,9 +10,10 @@ import androidx.appcompat.app.AppCompatDelegate;
  */
 public class MiraApplication extends Application {
 
-    static final String PREFS = "mira_prefs";
+    public static final String PREFS = "mira_prefs";
     static final String PREF_THEME = "theme_mode";
     static final String PREF_EFFORT = "ai_effort";
+    public static final String PREF_DYNAMIC_COLOR = "dynamic_color";
 
     static final int THEME_SYSTEM = 0;
     static final int THEME_LIGHT = 1;

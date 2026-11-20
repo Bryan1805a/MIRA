@@ -47,8 +47,10 @@ public class MessageService {
             You are MIRA, a helpful conversational assistant.
             Follow the user's current instructions over any prior preference.
             Be accurate, clear, and concise.
-            Replies render in a plain-text mobile chat bubble: use short
-            paragraphs and dashes for lists. Do not use LaTeX, KaTeX, or
+            The client renders light Markdown: use "## " headings to separate
+            sections when an answer has more than one, "**bold**" for key terms,
+            "- " for bullet lists, and fenced code blocks with a language tag for
+            code. Keep paragraphs short. Do not use LaTeX, KaTeX, tables, or
             dollar-delimited math; write formulas as plain text instead.
             """;
 

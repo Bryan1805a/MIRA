@@ -376,28 +376,33 @@ public class MessageAdapter extends ListAdapter<
         void bind(MessageResponse message) {
             cancelReveal();
 
-            final String displayed =
+            final String plain =
                     MarkdownText.toPlainText(message.getContent());
+
+            final CharSequence styled = RichText.render(
+                    binding.getRoot().getContext(),
+                    message.getContent()
+            );
 
             boolean shouldReveal = revealTargetId != null
                     && revealTargetId.equals(message.getId())
-                    && !displayed.isEmpty();
+                    && styled.length() > 0;
 
             if (shouldReveal) {
                 revealTargetId = null;
-                revealText(displayed);
+                revealText(styled);
             } else {
-                binding.messageText.setText(displayed);
+                binding.messageText.setText(styled);
             }
 
             bindTimestamp(binding.timestampText, message.getCreatedAt());
-            enableCopyOnLongPress(binding.messageText, displayed);
+            enableCopyOnLongPress(binding.messageText, plain);
 
             binding.copyButton.setOnClickListener(
-                    view -> copy(view, displayed)
+                    view -> copy(view, plain)
             );
             binding.shareButton.setOnClickListener(
-                    view -> share(view, displayed)
+                    view -> share(view, plain)
             );
 
             MessageResponse.ResponseMetadata metadata =
@@ -423,7 +428,7 @@ public class MessageAdapter extends ListAdapter<
          * Types the answer in by advancing a character count. Only the TextView
          * is touched, so the list diff is not re-run on every frame.
          */
-        private void revealText(String full) {
+        private void revealText(CharSequence full) {
             revealAnimator = ValueAnimator.ofInt(0, full.length());
             revealAnimator.setDuration(
                     Math.min(1400L, 300L + full.length() * 6L)
@@ -433,8 +438,9 @@ public class MessageAdapter extends ListAdapter<
             revealAnimator.addUpdateListener(animation -> {
                 int chars = (int) animation.getAnimatedValue();
 
+                /* subSequence keeps the spans, so styled text reveals styled. */
                 binding.messageText.setText(
-                        full.substring(0, Math.min(chars, full.length()))
+                        full.subSequence(0, Math.min(chars, full.length()))
                 );
 
                 if (revealProgressListener != null) {

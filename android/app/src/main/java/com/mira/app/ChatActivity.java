@@ -3,8 +3,12 @@ package com.mira.app;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Intent;
+import android.graphics.LinearGradient;
+import android.graphics.Shader;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
@@ -122,6 +126,19 @@ public class ChatActivity extends AppCompatActivity {
         binding.sendButton.setOnClickListener(
                 view -> sendMessage()
         );
+        binding.messageInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateSendButtonAlpha();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+        updateSendButtonAlpha();
 
         if (conversationId == null) {
             updateEmptyState();
@@ -140,6 +157,9 @@ public class ChatActivity extends AppCompatActivity {
                         GravityCompat.START
                 )
         );
+        binding.newChatTopButton.setOnClickListener(
+                view -> startNewChat()
+        );
 
         applyConversationTitle(
                 getIntent().getStringExtra(EXTRA_CONVERSATION_TITLE)
@@ -147,15 +167,15 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void applyConversationTitle(String title) {
-        binding.chatToolbar.setTitle(
-                title == null || title.isBlank()
-                        ? getString(
-                                conversationId == null
-                                        ? R.string.new_chat
-                                        : R.string.chat_title
-                        )
-                        : title
-        );
+        String display = title == null || title.isBlank()
+                ? getString(
+                        conversationId == null
+                                ? R.string.new_chat
+                                : R.string.chat_title
+                )
+                : title;
+        binding.toolbarTitleText.setText(display);
+        binding.chatToolbar.setTitle("");
     }
 
     private void setUpDrawer() {
@@ -323,6 +343,22 @@ public class ChatActivity extends AppCompatActivity {
                         ? getString(R.string.greeting_default)
                         : getString(R.string.greeting_named, name)
         );
+
+        binding.greetingText.post(() -> {
+            CharSequence text = binding.greetingText.getText();
+            if (text != null && text.length() > 0) {
+                float width = binding.greetingText.getPaint().measureText(text.toString());
+                if (width > 0) {
+                    Shader gradient = new LinearGradient(
+                            0f, 0f, width, 0f,
+                            new int[]{0xFF9E7BFF, 0xFF6C4CE0, 0xFFC7A2FF},
+                            null, Shader.TileMode.CLAMP
+                    );
+                    binding.greetingText.getPaint().setShader(gradient);
+                    binding.greetingText.invalidate();
+                }
+            }
+        });
     }
 
     private void setUpSuggestions() {
@@ -856,6 +892,7 @@ public class ChatActivity extends AppCompatActivity {
         sending = value;
         binding.sendButton.setEnabled(!value);
         binding.messageInput.setEnabled(!value);
+        updateSendButtonAlpha();
 
         if (value) {
             showThinking();
@@ -865,6 +902,16 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         updateGlow();
+    }
+
+    private void updateSendButtonAlpha() {
+        if (sending) {
+            binding.sendButton.setAlpha(0.35f);
+            return;
+        }
+        CharSequence text = binding.messageInput.getText();
+        boolean hasText = text != null && !text.toString().trim().isEmpty();
+        binding.sendButton.setAlpha(hasText ? 1.0f : 0.45f);
     }
 
     /**
@@ -951,10 +998,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private void renderEffort() {
         binding.effortButton.setText(
-                getString(
-                        R.string.effort_button,
-                        getString(effortOption(effortIndex))
-                )
+                getString(effortOption(effortIndex))
         );
     }
 

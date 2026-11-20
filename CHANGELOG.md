@@ -8,6 +8,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- "Your name" under Settings > Account: an optional local display name used in
+  the chat greeting ("Hello, Bryan"). Without it the greeting derives a name
+  from the email local part and stays nameless for generated-looking addresses
+  with digits, instead of inventing one. The greeting refreshes on return.
 - Tablet layout: on devices whose smallest width is 600dp or more, the history
   becomes a permanently visible sidebar with the chat inset beside it. The
   hamburger and the drawer close button disappear, the scrim is dropped, and
@@ -126,6 +130,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- "Your name" under Settings > Account: an optional local display name used in
+  the chat greeting ("Hello, Bryan"). Without it the greeting derives a name
+  from the email local part and stays nameless for generated-looking addresses
+  with digits, instead of inventing one. The greeting refreshes on return.
 - Tablet layout: on devices whose smallest width is 600dp or more, the history
   becomes a permanently visible sidebar with the chat inset beside it. The
   hamburger and the drawer close button disappear, the scrim is dropped, and
@@ -205,6 +213,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- "Your name" under Settings > Account: an optional local display name used in
+  the chat greeting ("Hello, Bryan"). Without it the greeting derives a name
+  from the email local part and stays nameless for generated-looking addresses
+  with digits, instead of inventing one. The greeting refreshes on return.
 - Tablet layout: on devices whose smallest width is 600dp or more, the history
   becomes a permanently visible sidebar with the chat inset beside it. The
   hamburger and the drawer close button disappear, the scrim is dropped, and
@@ -250,6 +262,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- "Your name" under Settings > Account: an optional local display name used in
+  the chat greeting ("Hello, Bryan"). Without it the greeting derives a name
+  from the email local part and stays nameless for generated-looking addresses
+  with digits, instead of inventing one. The greeting refreshes on return.
 - Tablet layout: on devices whose smallest width is 600dp or more, the history
   becomes a permanently visible sidebar with the chat inset beside it. The
   hamburger and the drawer close button disappear, the scrim is dropped, and

@@ -594,7 +594,15 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void setUpGreeting() {
-        String name = displayName(tokenStore.email());
+        renderGreeting();
+    }
+
+    private void renderGreeting() {
+        if (binding == null) {
+            return;
+        }
+
+        String name = greetingName();
 
         binding.greetingText.setText(
                 name.isEmpty()
@@ -652,6 +660,24 @@ public class ChatActivity extends AppCompatActivity {
      * Uses the first segment of the email local part so the greeting reads like
      * a name ("bryan.tran@..." becomes "Bryan") without pretending to know it.
      */
+    /**
+     * The saved name wins; otherwise a plausible name is derived from the email
+     * local part. Generated-looking accounts greet without a name instead of
+     * inventing one.
+     */
+    private String greetingName() {
+        String saved = getSharedPreferences(
+                MiraApplication.PREFS,
+                MODE_PRIVATE
+        ).getString(MiraApplication.PREF_DISPLAY_NAME, "");
+
+        if (saved != null && !saved.trim().isEmpty()) {
+            return saved.trim();
+        }
+
+        return displayName(tokenStore.email());
+    }
+
     private static String displayName(String email) {
         if (email == null || email.isBlank()) {
             return "";
@@ -659,6 +685,14 @@ public class ChatActivity extends AppCompatActivity {
 
         int at = email.indexOf('@');
         String local = at > 0 ? email.substring(0, at) : email;
+
+        /* Digits usually mean a generated address, not a person's name. */
+        for (int index = 0; index < local.length(); index++) {
+            if (Character.isDigit(local.charAt(index))) {
+                return "";
+            }
+        }
+
         String[] segments = local.split("[._\\-]+");
 
         for (String segment : segments) {
@@ -1615,6 +1649,7 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         if (tokenStore != null && tokenStore.hasSession()) {
+            renderGreeting();
             refreshMemoryChip();
         }
     }

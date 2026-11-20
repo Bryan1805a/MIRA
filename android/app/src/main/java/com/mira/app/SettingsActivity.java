@@ -10,6 +10,7 @@ import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 import com.mira.app.data.AuthCallback;
 import com.mira.app.data.AuthRepository;
 import com.mira.app.data.session.TokenStore;
@@ -59,6 +60,11 @@ public class SettingsActivity extends AppCompatActivity {
                         : email
         );
 
+        renderDisplayName();
+        binding.displayNameRow.setOnClickListener(
+                view -> showDisplayNameDialog()
+        );
+
         binding.memoryRow.setOnClickListener(
                 view -> startActivity(
                         new Intent(this, MemoryActivity.class)
@@ -81,6 +87,68 @@ public class SettingsActivity extends AppCompatActivity {
         );
 
         renderAppearance();
+    }
+
+    private String savedDisplayName() {
+        String value = getSharedPreferences(
+                MiraApplication.PREFS,
+                MODE_PRIVATE
+        ).getString(MiraApplication.PREF_DISPLAY_NAME, "");
+
+        return value == null ? "" : value.trim();
+    }
+
+    private void renderDisplayName() {
+        String name = savedDisplayName();
+
+        binding.displayNameValue.setText(
+                name.isEmpty()
+                        ? getString(R.string.display_name_unset)
+                        : name
+        );
+    }
+
+    private void showDisplayNameDialog() {
+        View content = getLayoutInflater().inflate(
+                R.layout.dialog_display_name,
+                null,
+                false
+        );
+        TextInputEditText input = content.findViewById(
+                R.id.displayNameInput
+        );
+
+        input.setText(savedDisplayName());
+        input.setSelection(
+                input.getText() == null ? 0 : input.getText().length()
+        );
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.display_name_dialog_title)
+                .setView(content)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(
+                        android.R.string.ok,
+                        (dialog, which) -> {
+                            String name = input.getText() == null
+                                    ? ""
+                                    : input.getText().toString().trim();
+
+                            getSharedPreferences(
+                                    MiraApplication.PREFS,
+                                    MODE_PRIVATE
+                            )
+                                    .edit()
+                                    .putString(
+                                            MiraApplication.PREF_DISPLAY_NAME,
+                                            name
+                                    )
+                                    .apply();
+
+                            renderDisplayName();
+                        }
+                )
+                .show();
     }
 
     private void setUpDynamicColor() {

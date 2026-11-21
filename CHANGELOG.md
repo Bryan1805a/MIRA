@@ -104,6 +104,8 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The drawer no longer shows "No chats yet" underneath the loading skeleton; the
+  empty message waits for the request to finish.
 - Regeneration matched the user prompt's response metadata first, which
   replaced the prompt instead of the answer. The client now targets the
   assistant row only.
@@ -119,6 +121,8 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The drawer no longer shows "No chats yet" underneath the loading skeleton; the
+  empty message waits for the request to finish.
 - Regeneration matched the user prompt's response metadata first, which
   replaced the prompt instead of the answer. The client now targets the
   assistant row only.
@@ -200,6 +204,8 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The drawer no longer shows "No chats yet" underneath the loading skeleton; the
+  empty message waits for the request to finish.
 - Regeneration matched the user prompt's response metadata first, which
   replaced the prompt instead of the answer. The client now targets the
   assistant row only.

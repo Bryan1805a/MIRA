@@ -90,6 +90,7 @@ public class ChatActivity extends AppCompatActivity {
     private boolean loading;
     private boolean dynamicColorEnabled;
     private boolean wideLayout;
+    private boolean drawerLoading;
     private ObjectAnimator chatSkeletonAnimator;
     private ObjectAnimator drawerSkeletonAnimator;
     private boolean sending;
@@ -402,6 +403,8 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showDrawerSkeleton(boolean show) {
+        drawerLoading = show;
+
         if (show) {
             binding.drawerSkeleton.setVisibility(View.VISIBLE);
 
@@ -502,7 +505,7 @@ public class ChatActivity extends AppCompatActivity {
 
         drawerAdapter.submitList(filtered);
 
-        boolean empty = filtered.isEmpty();
+        boolean empty = filtered.isEmpty() && !drawerLoading;
 
         binding.drawerEmpty.setVisibility(
                 empty ? View.VISIBLE : View.GONE
